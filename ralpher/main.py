@@ -2,6 +2,8 @@ import typer
 
 from ralpher.init import init as _init
 from ralpher.loop import loop as _loop
+from ralpher.prd import generate_prd
+import asyncio
 
 app = typer.Typer(invoke_without_command=True)
 
@@ -18,8 +20,23 @@ def init() -> None:
 
 
 @app.command()
+def prd(
+    prompt: str = typer.Argument(..., help="The PRD prompt to generate from."),
+    interactive: bool = typer.Option(
+        True,
+        "--interactive/--no-interactive",
+        help="Whether to include interactive sections in the PRD prompt.",
+    ),
+) -> None:
+    """Generate a PRD."""
+    asyncio.run(generate_prd(prompt, interactive=interactive))
+
+
+@app.command()
 def loop(
-    max_iterations: int = typer.Option(10, "--max-iterations", "-n", help="Maximum number of iterations."),
+    max_iterations: int = typer.Option(
+        10, "--max-iterations", "-n", help="Maximum number of iterations."
+    ),
 ) -> None:
     """Run Claude in a loop until tasks are complete or max iterations reached."""
     _loop(max_iterations)
