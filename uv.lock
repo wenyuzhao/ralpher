@@ -67,11 +67,15 @@ name = "ralpher"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "rich" },
     { name = "typer" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "typer", specifier = ">=0.24.1" }]
+requires-dist = [
+    { name = "rich", specifier = ">=14.3.4" },
+    { name = "typer", specifier = ">=0.24.1" },
+]
 
 [[package]]
 name = "rich"
