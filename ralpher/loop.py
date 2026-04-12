@@ -23,7 +23,6 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
     prd_file = task_dir / "prd.json"
     prd_doc = task_dir / "PRD.md"
     progress_file = task_dir / "progress.md"
-    last_branch_file = task_dir / ".last-branch"
 
     if not prd_doc.exists():
         console.print(f"[red][b]Error:[/] {prd_doc} not found.[/]")
@@ -41,7 +40,7 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
     prd = PRD.model_validate(json.loads(prd_file.read_text()))
 
     # Track current branch
-    _track_branch(prd, last_branch_file)
+    _checkout_branch(prd)
 
     # Initialize progress file if it doesn't exist
     if not progress_file.exists():
