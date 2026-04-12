@@ -1,6 +1,10 @@
 from pathlib import Path
 import json
 from typing import Literal
+import datetime
+import socket
+import os
+import dotenv
 
 from ..models import PRD
 
@@ -10,8 +14,11 @@ class Hooks:
         self.task_id = task_id
         self.task_dir = task_dir
         self.max_iterations = max_iterations
+        self.start_time = datetime.datetime.now()
+        dotenv.load_dotenv()  # Load environment variables from .env file
+        self.project = os.getenv("RALPHER_PROJECT", "ralpher")
 
-    async def load_prd(self) -> PRD:
+    def load_prd(self) -> PRD:
         prd_file = self.task_dir / "prd.json"
         if not prd_file.exists():
             raise FileNotFoundError(f"{prd_file} not found.")

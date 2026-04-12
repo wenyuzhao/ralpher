@@ -14,7 +14,6 @@ import asyncio
 from slugify import slugify
 from .utils.error import fail
 
-
 class DefaultCommandGroup(TyperGroup):
     """Typer group that falls back to 'run' when the first arg isn't a known command."""
 

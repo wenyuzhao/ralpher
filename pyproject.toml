@@ -13,6 +13,7 @@ dependencies = [
     "slugify>=0.0.1",
     "typer>=0.24.1",
     "yaspin>=3.4.0",
+    "python-dotenv>=1.2.2",
 ]
 
 [project.scripts]
