@@ -6,6 +6,7 @@ import datetime
 from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts.choice_input import ChoiceInput
+import rich
 from rich.console import Console
 from slugify import slugify
 
@@ -37,29 +38,38 @@ async def _ask_user_questions(questions: list[dict]) -> str:
     session = PromptSession()
     answers: list[str] = []
 
+    rich.print(
+        f"[bold on blue]Please answer the following questions to clarify the task:[/]"
+    )
+
     for index, q in enumerate(questions):
         header = q.get("header", "")
         question_text = q.get("question", "")
         options = q.get("options", [])
+        if not options:
+            continue
 
         console.print()
-        if options:
-            choice_options = [
-                (
-                    opt.get("label", ""),
-                    f"{opt.get('label', '')} - {opt.get('description', '')}",
-                )
-                for opt in options
-            ]
-            result = await ChoiceInput(
-                message=HTML(
-                    f"<style bg='blue'><b><i>Q{index + 1}: {header}</i></b> - {question_text}</style>"
-                ),
-                options=choice_options,
-            ).prompt_async()
-            answer = result if result else choice_options[0][0]
+        choice_options = [
+            (
+                opt.get("label", ""),
+                f"{opt.get('label', '')} - {opt.get('description', '')}",
+            )
+            for opt in options
+        ]
+        choice_options.append(("__other__", "Other - Enter a custom answer"))
+        result = await ChoiceInput(
+            message=HTML(
+                f"<style color='ansimagenta'><b>[Q{index + 1}] <i>{header}:</i></b> {question_text}</style>"
+            ),
+            options=choice_options,
+        ).prompt_async()
+        if result == "__other__":
+            answer = await session.prompt_async(
+                HTML("<b><i>Enter your answer: </i></b>")
+            )
         else:
-            answer = await session.prompt_async(f"{question_text}: ")
+            answer = result if result else choice_options[0][0]
 
         answers.append(f"{question_text}: {answer}")
 
