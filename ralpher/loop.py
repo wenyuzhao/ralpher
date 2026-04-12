@@ -164,7 +164,11 @@ def _checkout_branch(prd: PRD) -> None:
             .strip()
         )
     except subprocess.CalledProcessError:
-        # No commits yet — HEAD doesn't exist, so just create the branch
+        # No commits yet — HEAD doesn't exist; create main first, then the target branch
+        subprocess.check_call(["git", "checkout", "-b", "main"])
+        subprocess.check_call(
+            ["git", "commit", "--allow-empty", "-m", "Initial commit"]
+        )
         subprocess.check_call(["git", "checkout", "-b", prd.branch_name])
         return
 
