@@ -1,6 +1,5 @@
 import asyncio
 import json
-import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -8,14 +7,12 @@ import json
 import subprocess
 
 import rich
-from rich.panel import Panel
-from rich.rule import Rule
-from rich.text import Text
 from .prd.extract import extract_prd_json
 from .models import PRD
 from .utils.spinner import Spinner
 from .utils.error import fail
 from rich.prompt import Confirm
+from .utils.hooks import Hooks
 
 
 async def loop(task_id: str, max_iterations: int = 10) -> None:
@@ -24,14 +21,18 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
     prd_file = task_dir / "prd.json"
     prd_doc = task_dir / "PRD.md"
     progress_file = task_dir / "progress.md"
+    hooks = Hooks(task_id, task_dir, max_iterations)
 
     if not prd_doc.exists():
         fail(f"{prd_doc} not found.")
 
     if not prd_file.exists():
         rich.print(f"[bold blue]Extracting prd.json from PRD.md[/]\n")
+        await hooks.on_extract_start()
         await extract_prd_json(task_id)
-        if not prd_file.exists():
+        success = prd_file.exists()
+        await hooks.on_extract_end(success)
+        if success:
             fail(f"{prd_file} still not found after extraction.")
 
     prd = PRD.model_validate(json.loads(prd_file.read_text()))
@@ -47,6 +48,8 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
     rich.print(f" • Branch: [i]{prd.branch_name}[/]\n")
     rich.print(f" • Max iterations: {max_iterations}\n")
 
+    await hooks.on_loop_start()
+
     # Track current branch
     _checkout_branch(prd)
 
@@ -59,6 +62,7 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
             f"[yellow][b]Warning:[/] Max iterations ({max_iterations}) is less than the number of user stories ({len(prd.user_stories)}). Some stories may not be attempted.[/]\n"
         )
         if not Confirm.ask("Do you want to continue?", default=False):
+            await hooks.on_loop_end(0, "canceled")
             raise SystemExit(0)
 
     all_passed = False
@@ -68,7 +72,7 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
         iterations += 1
 
         # Run claude
-        await _run_one_iteration(task_id, prd, task_dir, i)
+        await _run_one_iteration(task_id, prd, task_dir, i, hooks)
 
         # Check for completion
         prd = PRD.model_validate(json.loads(prd_file.read_text()))
@@ -79,6 +83,7 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
         if i < max_iterations - 1:
             time.sleep(3)
 
+    await hooks.on_loop_end(iterations, "complete" if all_passed else "incomplete")
     if all_passed:
         rich.print(f"[bold green]✔ Completed in {iterations} iterations![/bold green]")
     else:
@@ -88,7 +93,9 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
         raise SystemExit(1)
 
 
-async def _run_one_iteration(task_id: str, prd: PRD, task_dir: Path, i: int) -> None:
+async def _run_one_iteration(
+    task_id: str, prd: PRD, task_dir: Path, i: int, hooks: Hooks
+) -> None:
     """Run claude --dangerously-skip-permissions --print with CLAUDE.md as stdin."""
 
     # Pick user story
@@ -106,6 +113,7 @@ async def _run_one_iteration(task_id: str, prd: PRD, task_dir: Path, i: int) -> 
     rich.print(
         f"[bold magenta]\\[#{i}] [i]{story.id}[/] - {story.title}[/bold magenta]\n",
     )
+    await hooks.on_iteration_start(i)
 
     cmd = [
         "claude",
@@ -134,6 +142,7 @@ async def _run_one_iteration(task_id: str, prd: PRD, task_dir: Path, i: int) -> 
     (logs_dir / f"{i}.err.log").write_text(stderr)
 
     if proc.returncode != 0:
+        await hooks.on_loop_end(i + 1, "crashed")
         fail(f"Claude process exited with code {proc.returncode}")
 
     # Propagate changes to prd.json if updated
@@ -144,7 +153,8 @@ async def _run_one_iteration(task_id: str, prd: PRD, task_dir: Path, i: int) -> 
         current_user_story_file.exists()
     ), "current_user_story.json not found after iteration."
     cus = json.loads(current_user_story_file.read_text())
-    if cus.get("passes", False):
+    success = cus.get("passes", False)
+    if success:
         # Update the corresponding user story in prd.json
         prd = PRD.model_validate(json.loads(prd_file.read_text()))
         for s in prd.user_stories:
@@ -155,6 +165,7 @@ async def _run_one_iteration(task_id: str, prd: PRD, task_dir: Path, i: int) -> 
         rich.print(f"  [green]✔ PASSED[/green]\n")
     else:
         rich.print(f"  [red]✘ FAILED[/red]\n")
+    await hooks.on_iteration_end(i)
 
 
 def _checkout_branch(prd: PRD) -> None:
