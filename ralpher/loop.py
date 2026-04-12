@@ -122,6 +122,8 @@ async def _run_one_iteration(task_id: str, prd: PRD, task_dir: Path) -> None:
         "--dangerously-skip-permissions",
         "--permission-mode",
         "dontAsk",
+        "--plugin-dir",
+        str(Path(__file__).resolve().parent / "plugin"),
         "--print",
         f"/ralpher:loop {task_id}",
     ]
@@ -137,6 +139,7 @@ async def _run_one_iteration(task_id: str, prd: PRD, task_dir: Path) -> None:
         stdout = (await proc.stdout.read()).decode()
     else:
         stdout = ""
+    # print(stdout, file=sys.stdout)
 
     if proc.returncode != 0:
         if stdout:

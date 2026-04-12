@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import rich
 import typer
 
@@ -16,7 +18,10 @@ DEFAULT_MAX_ITERATIONS = 15
 def callback(
     ctx: typer.Context,
     prompt: str = typer.Option(
-        None, "--prompt", "-p", help="Prompt to generate PRD, extract, and run loop."
+        None,
+        "--prompt",
+        "-p",
+        help="Prompt or file to generate PRD, extract, and run loop.",
     ),
     name: str | None = typer.Option(
         None, "--name", "-t", help="Name for the PRD task."
@@ -33,6 +38,8 @@ def callback(
         return
     if prompt is None:
         return
+    if Path(prompt).is_file():
+        prompt = Path(prompt).read_text()
     asyncio.run(_run(prompt, name, max_iterations))
 
 
@@ -55,12 +62,14 @@ def init() -> None:
 
 @app.command()
 def prd(
-    prompt: str = typer.Argument(..., help="The PRD prompt to generate from."),
+    prompt: str = typer.Argument(..., help="The PRD prompt or file to generate from."),
     name: str | None = typer.Option(
         None, "--name", "-n", help="Name for the PRD task."
     ),
 ) -> None:
     """Generate a PRD."""
+    if Path(prompt).is_file():
+        prompt = Path(prompt).read_text()
     task_id = asyncio.run(generate_prd(prompt, name))
     rich.print(f"[green]PRD generated at .ralpher/tasks/{task_id}/PRD.md[/]")
 
