@@ -1,3 +1,4 @@
+import rich
 import typer
 
 from ralpher.init import init as _init
@@ -22,14 +23,10 @@ def init() -> None:
 @app.command()
 def prd(
     prompt: str = typer.Argument(..., help="The PRD prompt to generate from."),
-    interactive: bool = typer.Option(
-        True,
-        "--interactive/--no-interactive",
-        help="Whether to include interactive sections in the PRD prompt.",
-    ),
 ) -> None:
     """Generate a PRD."""
-    asyncio.run(generate_prd(prompt, interactive=interactive))
+    task_id = asyncio.run(generate_prd(prompt))
+    rich.print(f"[green]PRD generated at .ralpher/tasks/{task_id}/PRD.md[/]")
 
 
 @app.command()
