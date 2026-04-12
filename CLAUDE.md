@@ -26,14 +26,17 @@ Requires Python 3.14+ and the `claude` CLI on PATH.
 
 ## Architecture
 
-- **CLI layer** (`ralpher/main.py`): Typer app with `init` and `loop` subcommands. Entry point registered as `ralpher` in pyproject.toml.
-- **PRD generation** (`ralpher/prd.py`): Loads Jinja2 template from `ralpher/prompts/prd.md`, strips YAML frontmatter, renders with user input, then passes to `claude` CLI via subprocess.
-- **Loop execution** (`ralpher/loop.py`): Runs `claude` iteratively up to a max iteration count. Tracks state in `progress.txt` and `prd.json` at the working directory. Detects completion via `<promise>COMPLETE</promise>` signal in output. Archives state when the git branch changes.
+- **CLI layer** (`ralpher/main.py`): Typer app with `init`, `prd`, `extract`, and `loop` subcommands. The default command (no subcommand) accepts a prompt and runs the full pipeline: generate PRD → extract JSON → run loop. Entry point registered as `ralpher` in pyproject.toml.
+- **PRD generation** (`ralpher/prd/prd.py`): Generates a PRD from a user prompt via the `claude` CLI subprocess. Stores output in `.ralpher/tasks/{task_id}/PRD.md`.
+- **PRD extraction** (`ralpher/prd/extract.py`): Extracts structured JSON from a generated PRD into a `PRD` Pydantic model.
+- **Models** (`ralpher/models.py`): Pydantic models — `PRD` (project, branch_name, description, user_stories) and `UserStory` (id, title, description, acceptance_criteria, priority, passes, notes).
+- **Loop execution** (`ralpher/loop.py`): Runs `claude` iteratively up to a max iteration count. Tracks state per task under `.ralpher/tasks/`. Detects completion via `<promise>COMPLETE</promise>` signal in output.
 - **Skill installer** (`ralpher/init.py`): Downloads PRD and Ralph skill files from GitHub (`snarktank/ralph`) into `.claude/skills/` of the target project.
+- **Plugin commands** (`ralpher/plugin/commands/`): Markdown skill files (`prd.md`, `ralph.md`, `loop.md`) used as Claude skill definitions.
 
 ## Key Patterns
 
-- Jinja2 templates use `StrictUndefined` — all variables must be provided or rendering fails.
 - The `loop` command invokes `claude` with `--dangerously-skip-permissions --print` flags.
 - Rich library is used for all terminal output formatting (panels, rules, styled text).
+- Async subprocess calls throughout — CLI commands use `asyncio.run()` to bridge sync Typer handlers.
 - Tests mock subprocess calls and file I/O; no real `claude` invocations in tests.
