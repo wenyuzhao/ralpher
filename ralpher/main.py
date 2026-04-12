@@ -138,7 +138,9 @@ def extract(
 
 @app.command()
 def loop(
-    task_id: str = typer.Argument(..., help="The task ID to run the loop on."),
+    task_id: str | None = typer.Option(
+        None, "--task", "-t", help="The task ID to run the loop on."
+    ),
     max_iterations: int = typer.Option(
         DEFAULT_MAX_ITERATIONS,
         "--max-iterations",
@@ -147,6 +149,11 @@ def loop(
     ),
 ) -> None:
     """Run Claude in a loop until tasks are complete or max iterations reached."""
+    if not task_id:
+        task_id = _get_latest_task_id()
+        rich.print(f"[blue]Running the latest task: [i]{task_id}[/][/]\n")
+    else:
+        rich.print(f"[blue]Running task: [i]{task_id}[/][/]\n")
     asyncio.run(_loop(task_id, max_iterations))
 
 
