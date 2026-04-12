@@ -15,8 +15,8 @@ DEFAULT_MAX_ITERATIONS = 15
 @app.callback()
 def callback(
     ctx: typer.Context,
-    prompt: str = typer.Argument(
-        None, help="Prompt to generate PRD, extract, and run loop."
+    prompt: str = typer.Option(
+        None, "--prompt", "-p", help="Prompt to generate PRD, extract, and run loop."
     ),
     name: str | None = typer.Option(
         None, "--name", "-t", help="Name for the PRD task."

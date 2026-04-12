@@ -151,11 +151,20 @@ async def _run_one_iteration(task_id: str, prd: PRD, task_dir: Path) -> None:
 def _checkout_branch(prd: PRD) -> None:
     """Checkout the branch or create from main/master if it's different from the current branch."""
 
-    current_branch = (
-        subprocess.check_output(["git", "rev-parse", "--abrev-ref", "HEAD"])
-        .decode()
-        .strip()
-    )
+    try:
+        current_branch = (
+            subprocess.check_output(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                stderr=subprocess.DEVNULL,
+            )
+            .decode()
+            .strip()
+        )
+    except subprocess.CalledProcessError:
+        # No commits yet — HEAD doesn't exist, so just create the branch
+        subprocess.check_call(["git", "checkout", "-b", prd.branch_name])
+        return
+
     if prd.branch_name != current_branch:
         # Check if branch exists
         branches = (
