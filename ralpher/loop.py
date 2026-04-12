@@ -54,6 +54,11 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
         )
     )
 
+    if max_iterations < len(prd.user_stories):
+        console.print(
+            f"[yellow]Warning: Max iterations ({max_iterations}) is less than the number of user stories ({len(prd.user_stories)}). Some stories may not be attempted.[/]"
+        )
+
     for i in range(1, max_iterations + 1):
         console.print()
         console.print(

@@ -9,6 +9,8 @@ import asyncio
 
 app = typer.Typer(invoke_without_command=True)
 
+DEFAULT_MAX_ITERATIONS = 15
+
 
 @app.callback()
 def callback(
@@ -20,7 +22,10 @@ def callback(
         None, "--name", "-t", help="Name for the PRD task."
     ),
     max_iterations: int = typer.Option(
-        10, "--max-iterations", "-n", help="Maximum loop iterations."
+        DEFAULT_MAX_ITERATIONS,
+        "--max-iterations",
+        "-n",
+        help="Maximum loop iterations.",
     ),
 ) -> None:
     """Ralph - autonomous agent tooling."""
@@ -73,7 +78,10 @@ def extract(
 def loop(
     task_id: str = typer.Argument(..., help="The task ID to run the loop on."),
     max_iterations: int = typer.Option(
-        10, "--max-iterations", "-n", help="Maximum number of iterations."
+        DEFAULT_MAX_ITERATIONS,
+        "--max-iterations",
+        "-n",
+        help="Maximum number of iterations.",
     ),
 ) -> None:
     """Run Claude in a loop until tasks are complete or max iterations reached."""
