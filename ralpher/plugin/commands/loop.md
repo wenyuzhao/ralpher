@@ -15,7 +15,10 @@ You are an autonomous coding agent working on a software project.
 4. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
 5. Update CLAUDE.md files if you discover reusable patterns (see below)
 6. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
+   * When the checks are not passed, DON'T commit or update current_user_story.json
 7. Update current_user_story.json to set `passes: true`
+   * Optionally update notes
+   * Don't set `passes: true` if checks are not passed.
 8. Append your progress to `progress.md`
 
 ## Progress Report Format

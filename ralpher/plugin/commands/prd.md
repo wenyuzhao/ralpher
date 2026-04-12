@@ -11,8 +11,9 @@ Create detailed Product Requirements Documents that are clear, actionable, and s
 ## The Job
 
 1. Receive a feature description from the user
-2. Ask 3-5 essential clarifying questions using the `AskUserQuestion` tool
+2. Ask 3-10 essential clarifying questions using the `AskUserQuestion` tool
   * Don't ask the user to provide more details. Just provide them with a list of concrate options.
+  * You can use `AskUserQuestion` multiple times.
 3. Generate a structured PRD based on answers
 4. Save to `.ralpher/tasks/$0/PRD.md`
 

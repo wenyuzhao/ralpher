@@ -112,7 +112,7 @@ async def _run_one_iteration(task_id: str, prd: PRD, task_dir: Path) -> None:
     user_stories.sort(key=lambda s: s.priority)
     assert user_stories, "No failing user stories found."
     # Always pick the highest priority failing story
-    story = user_stories[-1]
+    story = user_stories[0]
     (task_dir / "current_user_story.json").write_text(
         json.dumps(story.model_dump(), indent=2)
     )
@@ -149,6 +149,25 @@ async def _run_one_iteration(task_id: str, prd: PRD, task_dir: Path) -> None:
             print(stderr.decode(), file=sys.stderr)
         console.print(f"[bold red]Claude process exited with code {proc.returncode}[/]")
         raise SystemExit(proc.returncode)
+
+    # Propagate changes to prd.json if updated
+    prd_file = task_dir / "prd.json"
+    current_user_story_file = task_dir / "current_user_story.json"
+    assert prd_file.exists(), "prd.json not found after iteration."
+    assert (
+        current_user_story_file.exists()
+    ), "current_user_story.json not found after iteration."
+    cus = json.loads(current_user_story_file.read_text())
+    if cus.get("passes", False):
+        # Update the corresponding user story in prd.json
+        prd = PRD.model_validate(json.loads(prd_file.read_text()))
+        for s in prd.user_stories:
+            if s.id == cus["id"]:
+                s.passes = True
+                if notes := cus.get("notes", ""):
+                    s.notes = notes
+                break
+        prd_file.write_text(json.dumps(prd.model_dump(), indent=2))
 
 
 def _checkout_branch(prd: PRD) -> None:
