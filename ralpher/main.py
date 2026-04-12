@@ -17,10 +17,10 @@ def callback(
         None, help="Prompt to generate PRD, extract, and run loop."
     ),
     name: str | None = typer.Option(
-        None, "--name", "-n", help="Name for the PRD task."
+        None, "--name", "-t", help="Name for the PRD task."
     ),
     max_iterations: int = typer.Option(
-        10, "--max-iterations", "-m", help="Maximum loop iterations."
+        10, "--max-iterations", "-n", help="Maximum loop iterations."
     ),
 ) -> None:
     """Ralph - autonomous agent tooling."""
