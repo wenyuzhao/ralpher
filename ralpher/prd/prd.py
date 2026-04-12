@@ -1,11 +1,8 @@
 import asyncio
 import json
-import shutil
 from pathlib import Path
 import datetime
 
-import frontmatter
-import jinja2
 from rich.console import Console
 from rich.prompt import Prompt
 from slugify import slugify
@@ -14,15 +11,6 @@ from slugify import slugify
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
 console = Console()
-
-
-def load_prd_prompt(user_input: str, *, interactive: bool = True) -> str:
-    """Load the PRD template, strip frontmatter, and render with user input."""
-    template_path = PROMPTS_DIR / "PRD.md"
-    post = frontmatter.load(str(template_path))
-    content = post.content
-    template = jinja2.Environment(undefined=jinja2.StrictUndefined).from_string(content)
-    return template.render(prompt=user_input, interactive=interactive)
 
 
 def _parse_result(data: dict) -> tuple[list[dict] | None, str | None]:
