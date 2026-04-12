@@ -72,7 +72,6 @@ async def extract_prd_json(task_id: str, retries: int = 3) -> None:
     for i in range(retries):
         success = await __try_extract_prd(task_dir, task_id)
         if success:
-            console.print(f"[green]Successfully extracted prd.json[/]")
             return
         else:
             console.print(
