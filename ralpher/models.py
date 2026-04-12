@@ -16,3 +16,6 @@ class PRD(BaseModel):
     branch_name: str
     description: str
     user_stories: list[UserStory]
+
+    def failed_stories(self) -> list[UserStory]:
+        return [s for s in self.user_stories if not s.passes]

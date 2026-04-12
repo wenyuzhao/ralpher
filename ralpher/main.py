@@ -75,12 +75,10 @@ def _gen_task_id(name: str | None) -> str:
 async def _run(prompt: str, name: str | None, max_iterations: int) -> None:
     """Generate PRD, extract JSON, and run loop."""
     task_id = _gen_task_id(name)
+
+    rich.print(f"[bold blue]Generating PRD for new task: [i]{task_id}[/][/]\n")
     await generate_prd(task_id, prompt, name)
-    rich.print(f"[green]✔ PRD generated at .ralpher/tasks/{task_id}/PRD.md[/]")
-
-    await extract_prd_json(task_id)
-    rich.print(f"[green]✔ Extracted JSON for task {task_id}[/]")
-
+    rich.print(f"[green]✔ PRD generated at .ralpher/tasks/{task_id}/PRD.md[/]\n")
     await _loop(task_id, max_iterations)
 
 
@@ -94,12 +92,10 @@ def prd(
     """Generate a PRD."""
     if Path(prompt).is_file():
         prompt = Path(prompt).read_text()
-
     task_id = _gen_task_id(name)
+
     rich.print(f"[bold blue]Generating PRD for new task: [i]{task_id}[/][/]\n")
-
     asyncio.run(generate_prd(task_id, prompt, name))
-
     rich.print(f"[green]✔ PRD generated at .ralpher/tasks/{task_id}/PRD.md[/]")
 
 

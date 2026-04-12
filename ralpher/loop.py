@@ -15,6 +15,7 @@ from .prd.extract import extract_prd_json
 from .models import PRD
 from .utils.spinner import Spinner
 from .utils.error import fail
+from rich.prompt import Confirm
 
 
 async def loop(task_id: str, max_iterations: int = 10) -> None:
@@ -28,12 +29,23 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
         fail(f"{prd_doc} not found.")
 
     if not prd_file.exists():
-        rich.print(f"[yellow]prd.json not found. Extracting from PRD.md...[/]")
+        rich.print(f"[bold blue]Extracting prd.json from PRD.md[/]\n")
         await extract_prd_json(task_id)
         if not prd_file.exists():
             fail(f"{prd_file} still not found after extraction.")
 
     prd = PRD.model_validate(json.loads(prd_file.read_text()))
+
+    num_stories = len(prd.user_stories)
+    num_failed_stories = len(prd.failed_stories())
+
+    if num_failed_stories == 0:
+        rich.print(f"[bold green]✔ All {num_stories} user stories already pass![/]")
+        return
+
+    rich.print(f" • Incomplete user stories: {num_failed_stories} / {num_stories}")
+    rich.print(f" • Branch: [i]{prd.branch_name}[/]\n")
+    rich.print(f" • Max iterations: {max_iterations}\n")
 
     # Track current branch
     _checkout_branch(prd)
@@ -42,75 +54,57 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
     if not progress_file.exists():
         _init_progress(progress_file)
 
-    rich.print(
-        Panel(
-            f"[bold]Tool:[/bold] claude  |  [bold]Max iterations:[/bold] {max_iterations}",
-            title="[bold cyan]Ralph Loop[/bold cyan]",
-            border_style="cyan",
-        )
-    )
-
     if max_iterations < len(prd.user_stories):
         rich.print(
-            f"[yellow]Warning: Max iterations ({max_iterations}) is less than the number of user stories ({len(prd.user_stories)}). Some stories may not be attempted.[/]"
+            f"[yellow][b]Warning:[/] Max iterations ({max_iterations}) is less than the number of user stories ({len(prd.user_stories)}). Some stories may not be attempted.[/]\n"
         )
+        if not Confirm.ask("Do you want to continue?", default=False):
+            raise SystemExit(0)
 
-    for i in range(1, max_iterations + 1):
-        rich.print()
-        rich.print(
-            Rule(
-                f"[bold yellow]Iteration {i} of {max_iterations}[/bold yellow]",
-                style="yellow",
-            )
-        )
+    all_passed = False
+    iterations = 0
+
+    for i in range(max_iterations):
+        iterations += 1
 
         # Run claude
-        await _run_one_iteration(task_id, prd, task_dir)
+        await _run_one_iteration(task_id, prd, task_dir, i)
 
         # Check for completion
         prd = PRD.model_validate(json.loads(prd_file.read_text()))
-        all_passed = all(story.passes for story in prd.user_stories)
-
+        all_passed = len(prd.failed_stories()) == 0
         if all_passed:
-            rich.print()
-            rich.print(
-                Panel(
-                    f"[bold green]All tasks completed at iteration {i} of {max_iterations}[/bold green]",
-                    title="[bold green]Done[/bold green]",
-                    border_style="green",
-                )
-            )
-            return
+            break
 
+        if i < max_iterations - 1:
+            time.sleep(3)
+
+    if all_passed:
+        rich.print(f"[bold green]✔ Completed in {iterations} iterations![/bold green]")
+    else:
         rich.print(
-            Text(f"Iteration {i} complete. Continuing...", style="dim"),
+            f"[bold red]✘ Not completed after {iterations} iterations.[/bold red]"
         )
-        if i < max_iterations:
-            time.sleep(2)
-
-    rich.print()
-    rich.print(
-        Panel(
-            f"[bold red]Reached max iterations ({max_iterations}) without completing all tasks.[/bold red]\n"
-            f"Check [bold]{progress_file}[/bold] for status.",
-            title="[bold red]Incomplete[/bold red]",
-            border_style="red",
-        )
-    )
-    raise SystemExit(1)
+        raise SystemExit(1)
 
 
-async def _run_one_iteration(task_id: str, prd: PRD, task_dir: Path) -> None:
+async def _run_one_iteration(task_id: str, prd: PRD, task_dir: Path, i: int) -> None:
     """Run claude --dangerously-skip-permissions --print with CLAUDE.md as stdin."""
 
     # Pick user story
-    user_stories = [s for s in prd.user_stories if not s.passes]
+    user_stories = prd.failed_stories()
     user_stories.sort(key=lambda s: s.priority)
     assert user_stories, "No failing user stories found."
-    # Always pick the highest priority failing story
-    story = user_stories[0]
+    story = user_stories[0]  # highest priority failing story
     (task_dir / "current_user_story.json").write_text(
         json.dumps(story.model_dump(), indent=2)
+    )
+    logs_dir = task_dir / "logs"
+    logs_dir.mkdir(exist_ok=True)
+
+    # Print banner
+    rich.print(
+        f"[bold magenta]\\[#{i}] [i]{story.id}[/] - {story.title}[/bold magenta]\n",
     )
 
     cmd = [
@@ -133,19 +127,13 @@ async def _run_one_iteration(task_id: str, prd: PRD, task_dir: Path) -> None:
     async with Spinner() as spinner:
         await spinner.run(proc)
 
-    if proc.stdout:
-        stdout = (await proc.stdout.read()).decode()
-    else:
-        stdout = ""
-    # print(stdout, file=sys.stdout)
+    # Save stdout and stderr to log files for debugging
+    stdout = (await proc.stdout.read()).decode() if proc.stdout else ""
+    stderr = (await proc.stderr.read()).decode() if proc.stderr else ""
+    (logs_dir / f"{i}.out.log").write_text(stdout)
+    (logs_dir / f"{i}.err.log").write_text(stderr)
 
     if proc.returncode != 0:
-        # Save stdout and stderr to log files for debugging
-        if stdout:
-            print(stdout, file=sys.stdout)
-        if proc.stderr:
-            stderr = await proc.stderr.read()
-            print(stderr.decode(), file=sys.stderr)
         fail(f"Claude process exited with code {proc.returncode}")
 
     # Propagate changes to prd.json if updated
@@ -164,6 +152,9 @@ async def _run_one_iteration(task_id: str, prd: PRD, task_dir: Path) -> None:
                 s.passes = True
                 break
         prd_file.write_text(json.dumps(prd.model_dump(), indent=2))
+        rich.print(f"  [green]✔ PASSED[/green]\n")
+    else:
+        rich.print(f"  [red]✘ FAILED[/red]\n")
 
 
 def _checkout_branch(prd: PRD) -> None:
