@@ -57,7 +57,7 @@ async def _ask_user_questions(questions: list[dict]) -> str:
             )
             for opt in options
         ]
-        choice_options.append(("__other__", "Other - Enter a custom answer"))
+        choice_options.append(("__other__", HTML("Other - <style color='ansibrightblack'>[please specify]</style>"))) # type: ignore
         result = await ChoiceInput(
             message=HTML(
                 f"<style color='ansimagenta'><b>[Q{index + 1}] <i>{header}:</i></b> {question_text}</style>"
