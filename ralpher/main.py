@@ -24,9 +24,10 @@ def init() -> None:
 @app.command()
 def prd(
     prompt: str = typer.Argument(..., help="The PRD prompt to generate from."),
+    name: str |None= typer.Option(None, "--name", "-n", help="Name for the PRD task."),
 ) -> None:
     """Generate a PRD."""
-    task_id = asyncio.run(generate_prd(prompt))
+    task_id = asyncio.run(generate_prd(prompt, name))
     rich.print(f"[green]PRD generated at .ralpher/tasks/{task_id}/PRD.md[/]")
 
 

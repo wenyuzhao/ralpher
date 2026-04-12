@@ -8,6 +8,7 @@ import frontmatter
 import jinja2
 from rich.console import Console
 from rich.prompt import Prompt
+from slugify import slugify
 
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
@@ -70,10 +71,12 @@ def _ask_user_questions(questions: list[dict]) -> str:
     return "\n".join(answers)
 
 
-async def generate_prd(user_input: str) -> str:
+async def generate_prd(user_input: str, name: str | None = None) -> str:
     """Run a Claude Code session with the rendered PRD prompt."""
 
     task_id = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    if name:
+        task_id += f"-{slugify(name)}"
     task_dir = Path.cwd() / ".ralpher" / "tasks" / task_id
     task_dir.mkdir(parents=True, exist_ok=True)
     (task_dir / "PROMPT.md").write_text(user_input)
