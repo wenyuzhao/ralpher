@@ -36,7 +36,8 @@ def callback() -> None:
     [b]Example usage:[/]
         • [b]ralpher[/] "build a todo app" \\[--name todo-app] \\[--max-iterations 20]
         • [b]ralpher[/] prd "build a todo app"
-        • [b]ralpher[/] loop 2026-01-01-123045
+        • [b]ralpher[/] refine "add user authentication" [--task <task_id>]
+        • [b]ralpher[/] loop [--task <task_id>]
     """
 
 
