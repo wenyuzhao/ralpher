@@ -17,9 +17,8 @@ You are an autonomous coding agent working on a software project.
 6. If checks pass, commit ALL changes with message: `feat: [Story ID] - [Story Title]`
    * When the checks are not passed, DON'T commit or update current_user_story.json
 7. Update current_user_story.json to set `passes: true`
-   * Optionally update notes
    * Don't set `passes: true` if checks are not passed.
-8. Append your progress to `progress.md`
+8. Append your progress and additional notes to `progress.md`
 
 ## Progress Report Format
 
@@ -39,7 +38,7 @@ The learnings section is critical - it helps future iterations avoid repeating m
 
 ## Consolidate Patterns
 
-If you discover a **reusable pattern** that future iterations should know, add it to the `## Codebase Patterns` section at the TOP of progress.txt (create it if it doesn't exist). This section should consolidate the most important learnings:
+If you discover a **reusable pattern** that future iterations should know, add it to the `## Codebase Patterns` section at the TOP of progress.md (create it if it doesn't exist). This section should consolidate the most important learnings:
 
 ```
 ## Codebase Patterns

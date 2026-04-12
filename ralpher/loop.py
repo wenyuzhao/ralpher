@@ -164,8 +164,6 @@ async def _run_one_iteration(task_id: str, prd: PRD, task_dir: Path) -> None:
         for s in prd.user_stories:
             if s.id == cus["id"]:
                 s.passes = True
-                if notes := cus.get("notes", ""):
-                    s.notes = notes
                 break
         prd_file.write_text(json.dumps(prd.model_dump(), indent=2))
 
