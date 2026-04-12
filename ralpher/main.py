@@ -5,10 +5,10 @@ import rich
 import typer
 from typer.core import TyperGroup
 
-from ralpher.init import init as _init
 from ralpher.loop import loop as _loop
 from ralpher.prd.prd import generate_prd
 from ralpher.prd.extract import extract_prd_json
+from ralpher.prd.refine import refine_prd
 import asyncio
 
 
@@ -73,12 +73,6 @@ async def _run(prompt: str, name: str | None, max_iterations: int) -> None:
 
 
 @app.command()
-def init() -> None:
-    """Install prd and ralph skills to .claude/skills/ in the current directory."""
-    _init()
-
-
-@app.command()
 def prd(
     prompt: str = typer.Argument(..., help="The PRD prompt or file to generate from."),
     name: str | None = typer.Option(
@@ -90,6 +84,18 @@ def prd(
         prompt = Path(prompt).read_text()
     task_id = asyncio.run(generate_prd(prompt, name))
     rich.print(f"[green]PRD generated at .ralpher/tasks/{task_id}/PRD.md[/]")
+
+
+@app.command()
+def refine(
+    task_id: str = typer.Argument(..., help="The task ID of the PRD to refine."),
+    prompt: str = typer.Argument(..., help="The refinement prompt or file."),
+) -> None:
+    """Refine an existing PRD."""
+    if Path(prompt).is_file():
+        prompt = Path(prompt).read_text()
+    task_id = asyncio.run(refine_prd(task_id, prompt))
+    rich.print(f"[green]PRD refined at .ralpher/tasks/{task_id}/PRD.md[/]")
 
 
 @app.command(hidden=True)

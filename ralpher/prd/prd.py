@@ -57,7 +57,7 @@ async def _ask_user_questions(questions: list[dict]) -> str:
             )
             for opt in options
         ]
-        choice_options.append(("__other__", HTML("Other - <style color='ansibrightblack'>[please specify]</style>"))) # type: ignore
+        choice_options.append(("__other__", HTML("Other - <style color='ansibrightblack'>[please specify]</style>")))  # type: ignore
         result = await ChoiceInput(
             message=HTML(
                 f"<style color='ansimagenta'><b>[Q{index + 1}] <i>{header}:</i></b> {question_text}</style>"
@@ -76,18 +76,11 @@ async def _ask_user_questions(questions: list[dict]) -> str:
     return "\n".join(answers)
 
 
-async def generate_prd(user_input: str, name: str | None = None) -> str:
-    """Run a Claude Code session with the rendered PRD prompt."""
-
-    task_id = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
-    if name:
-        task_id += f"-{slugify(name)}"
-    task_dir = Path.cwd() / ".ralpher" / "tasks" / task_id
-    task_dir.mkdir(parents=True, exist_ok=True)
-    (task_dir / "PROMPT.md").write_text(user_input)
+async def _run_agent_with_qa(prompt: str):
+    """Run a Claude Code session and ask user questions as needed."""
 
     session_id: str | None = None
-    current_prompt = f"/ralpher:prd {task_id}"
+    current_prompt = prompt
 
     while True:
         cmd = [
@@ -138,6 +131,19 @@ async def generate_prd(user_input: str, name: str | None = None) -> str:
             current_prompt = await _ask_user_questions(questions)
         else:
             break
+
+
+async def generate_prd(user_input: str, name: str | None = None) -> str:
+    """Run a Claude Code session with the rendered PRD prompt."""
+
+    task_id = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    if name:
+        task_id += f"-{slugify(name)}"
+    task_dir = Path.cwd() / ".ralpher" / "tasks" / task_id
+    task_dir.mkdir(parents=True, exist_ok=True)
+    (task_dir / "PROMPT.md").write_text(user_input)
+
+    await _run_agent_with_qa(f"/ralpher:prd {task_id}")
 
     if not (task_dir / "PRD.md").exists():
         console.print(f"[bold red]PRD.md not found in {task_dir}[/]")
