@@ -1,7 +1,9 @@
 from pathlib import Path
 
+import click
 import rich
 import typer
+from typer.core import TyperGroup
 
 from ralpher.init import init as _init
 from ralpher.loop import loop as _loop
@@ -9,19 +11,39 @@ from ralpher.prd.prd import generate_prd
 from ralpher.prd.extract import extract_prd_json
 import asyncio
 
-app = typer.Typer(invoke_without_command=True)
+
+class DefaultCommandGroup(TyperGroup):
+    """Typer group that falls back to 'run' when the first arg isn't a known command."""
+
+    default_cmd_name = "run"
+
+    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        if args and args[0] not in self.commands and not args[0].startswith("-"):
+            args = [self.default_cmd_name] + args
+        return super().parse_args(ctx, args)
+
+
+app = typer.Typer(cls=DefaultCommandGroup)
 
 DEFAULT_MAX_ITERATIONS = 15
 
 
 @app.callback()
-def callback(
-    ctx: typer.Context,
-    prompt: str = typer.Option(
-        None,
-        "--prompt",
-        "-p",
-        help="Prompt or file to generate PRD, extract, and run loop.",
+def callback() -> None:
+    """
+    Ralpher - autonomous agent tooling.
+
+    [b]Example usage:[/]
+        • [b]ralpher[/] "build a todo app" \\[--name todo-app] \\[--max-iterations 20]
+        • [b]ralpher[/] prd "build a todo app"
+        • [b]ralpher[/] loop 2026-01-01-123045
+    """
+
+
+@app.command()
+def run(
+    prompt: str = typer.Argument(
+        ..., help="Prompt or file to generate PRD, extract, and run loop."
     ),
     name: str | None = typer.Option(
         None, "--name", "-t", help="Name for the PRD task."
@@ -33,11 +55,7 @@ def callback(
         help="Maximum loop iterations.",
     ),
 ) -> None:
-    """Ralph - autonomous agent tooling."""
-    if ctx.invoked_subcommand is not None:
-        return
-    if prompt is None:
-        return
+    """\\[default] Generate PRD, extract JSON, and run loop."""
     if Path(prompt).is_file():
         prompt = Path(prompt).read_text()
     asyncio.run(_run(prompt, name, max_iterations))
@@ -74,11 +92,11 @@ def prd(
     rich.print(f"[green]PRD generated at .ralpher/tasks/{task_id}/PRD.md[/]")
 
 
-@app.command()
+@app.command(hidden=True)
 def extract(
     task_id: str = typer.Argument(..., help="The task ID to extract JSON from."),
 ) -> None:
-    """Generate a PRD."""
+    """Extract PRD JSON for a given task ID."""
     asyncio.run(extract_prd_json(task_id))
     rich.print(f"[green]Extracted JSON for task {task_id}[/]")
 
