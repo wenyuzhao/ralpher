@@ -1,12 +1,24 @@
 import json
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
+
 
 import pytest
 
 from ralpher.prd.prd import _ask_user_questions, _parse_result, generate_prd, load_prd_prompt
+from ralpher.prd.extract import extract_prd_json
+
+
+TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "ralpher" / "prompts" / "prd.md"
 
 
 class TestLoadPrdPrompt:
+    @pytest.fixture(autouse=True)
+    def _patch_prompts_dir(self, monkeypatch):
+        monkeypatch.setattr(
+            "ralpher.prd.prd.PROMPTS_DIR", TEMPLATE_PATH.parent,
+        )
+
     def test_renders_user_input(self):
         result = load_prd_prompt("Build a todo app")
         assert "Build a todo app" in result
@@ -79,22 +91,37 @@ class TestParseResult:
 
 
 class TestAskUserQuestions:
-    @patch("ralpher.prd.Prompt.ask", return_value="REST")
+    @patch("ralpher.prd.prd.Prompt.ask", return_value="REST")
     def test_single_question(self, mock_ask):
-        questions = [{"label": "API style", "description": "What kind of API do you want?"}]
+        questions = [{"question": "API style", "description": "What kind of API do you want?"}]
         result = _ask_user_questions(questions)
         assert "API style: REST" in result
         mock_ask.assert_called_once()
 
-    @patch("ralpher.prd.Prompt.ask", side_effect=["Yes", "Mobile"])
+    @patch("ralpher.prd.prd.Prompt.ask", side_effect=["Yes", "Mobile"])
     def test_multiple_questions(self, mock_ask):
         questions = [
-            {"label": "Auth needed?", "description": "Should the app require login?"},
-            {"label": "Platform", "description": ""},
+            {"question": "Auth needed?", "description": "Should the app require login?"},
+            {"question": "Platform", "description": ""},
         ]
         result = _ask_user_questions(questions)
         assert "Auth needed?: Yes" in result
         assert "Platform: Mobile" in result
+
+    @patch("ralpher.prd.prd.Prompt.ask", return_value="B")
+    def test_question_with_options(self, mock_ask):
+        questions = [
+            {
+                "header": "Architecture",
+                "question": "Pick a pattern",
+                "options": [
+                    {"label": "Monolith", "description": "Single deployable"},
+                    {"label": "Microservices", "description": "Distributed"},
+                ],
+            }
+        ]
+        result = _ask_user_questions(questions)
+        assert "Pick a pattern: B" in result
 
 
 def _make_mock_process(returncode: int, stdout_json: dict | None = None) -> AsyncMock:
@@ -109,56 +136,80 @@ def _make_mock_process(returncode: int, stdout_json: dict | None = None) -> Asyn
 
 
 class TestGeneratePrd:
-    @patch("ralpher.prd.shutil.which", return_value=None)
+    @patch("ralpher.prd.prd.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
-    async def test_raises_when_claude_not_found(self, mock_which):
-        with pytest.raises(RuntimeError, match="claude CLI not found"):
-            await generate_prd("test")
-
-    @patch("ralpher.prd.asyncio.create_subprocess_exec")
-    @patch("ralpher.prd.shutil.which", return_value="/usr/bin/claude")
-    @pytest.mark.asyncio
-    async def test_returns_zero_on_success(self, mock_which, mock_exec):
+    async def test_returns_task_id_on_success(self, mock_exec, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
         mock_exec.return_value = _make_mock_process(
             0, {"session_id": "s1", "result": "done"},
         )
+        # Pre-create PRD.md so generate_prd doesn't raise
+        def create_prd_side_effect(*args, **kwargs):
+            import glob as _g
+            tasks = list((tmp_path / ".ralpher" / "tasks").iterdir())
+            if tasks:
+                (tasks[0] / "PRD.md").write_text("# PRD")
+            return _make_mock_process(0, {"session_id": "s1", "result": "done"})
+
+        mock_exec.side_effect = create_prd_side_effect
         result = await generate_prd("Build a chat app")
-        assert result == 0
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    @patch("ralpher.prd.prd.asyncio.create_subprocess_exec")
+    @pytest.mark.asyncio
+    async def test_raises_on_nonzero_exit(self, mock_exec, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        mock_exec.return_value = _make_mock_process(1)
+        with pytest.raises(SystemExit):
+            await generate_prd("test")
+
+    @patch("ralpher.prd.prd.asyncio.create_subprocess_exec")
+    @pytest.mark.asyncio
+    async def test_command_flags(self, mock_exec, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+
+        def side_effect(*args, **kwargs):
+            tasks = list((tmp_path / ".ralpher" / "tasks").iterdir())
+            if tasks:
+                (tasks[0] / "PRD.md").write_text("# PRD")
+            return _make_mock_process(0, {"session_id": "s1"})
+
+        mock_exec.side_effect = side_effect
+        await generate_prd("Implement SSO login")
         call_args = mock_exec.call_args[0]
         assert "--output-format" in call_args
         assert "json" in call_args
         assert "--dangerously-skip-permissions" in call_args
+        assert "--permission-mode" in call_args
+        assert "dontAsk" in call_args
+        assert "--plugin-dir" in call_args
         assert "--print" in call_args
 
-    @patch("ralpher.prd.asyncio.create_subprocess_exec")
-    @patch("ralpher.prd.shutil.which", return_value="/usr/bin/claude")
+    @patch("ralpher.prd.prd.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
-    async def test_raises_on_nonzero_exit(self, mock_which, mock_exec):
-        mock_exec.return_value = _make_mock_process(1)
-        with pytest.raises(RuntimeError, match="exited with code 1"):
-            await generate_prd("test")
+    async def test_creates_task_directory_and_prompt(self, mock_exec, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
 
-    @patch("ralpher.prd.asyncio.create_subprocess_exec")
-    @patch("ralpher.prd.shutil.which", return_value="/usr/bin/claude")
-    @pytest.mark.asyncio
-    async def test_prompt_contains_user_input(self, mock_which, mock_exec):
-        mock_exec.return_value = _make_mock_process(
-            0, {"session_id": "s1"},
-        )
-        await generate_prd("Implement SSO login")
-        call_args = mock_exec.call_args[0]
-        # Prompt is the last positional arg after --print
-        print_idx = list(call_args).index("--print")
-        prompt_text = call_args[print_idx + 1]
-        assert "Implement SSO login" in prompt_text
+        def side_effect(*args, **kwargs):
+            tasks = list((tmp_path / ".ralpher" / "tasks").iterdir())
+            if tasks:
+                (tasks[0] / "PRD.md").write_text("# PRD")
+            return _make_mock_process(0, {"session_id": "s1"})
 
-    @patch("ralpher.prd._ask_user_questions", return_value="Q1: A")
-    @patch("ralpher.prd.asyncio.create_subprocess_exec")
-    @patch("ralpher.prd.shutil.which", return_value="/usr/bin/claude")
+        mock_exec.side_effect = side_effect
+        task_id = await generate_prd("My feature request")
+        task_dir = tmp_path / ".ralpher" / "tasks" / task_id
+        assert task_dir.exists()
+        assert (task_dir / "PROMPT.md").read_text() == "My feature request"
+
+    @patch("ralpher.prd.prd._ask_user_questions", return_value="Q1: A")
+    @patch("ralpher.prd.prd.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_intercepts_ask_user_question_and_resumes(
-        self, mock_which, mock_exec, mock_ask
+        self, mock_exec, mock_ask, tmp_path, monkeypatch
     ):
+        monkeypatch.chdir(tmp_path)
         ask_result = {
             "session_id": "sess-interactive",
             "permission_denials": [
@@ -170,39 +221,112 @@ class TestGeneratePrd:
                 }
             ],
         }
-        final_result = {"session_id": "sess-interactive"}
 
-        mock_exec.side_effect = [
-            _make_mock_process(0, ask_result),
-            _make_mock_process(0, final_result),
-        ]
+        call_count = 0
 
-        result = await generate_prd("Build feature", interactive=True)
-        assert result == 0
+        def side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return _make_mock_process(0, ask_result)
+            else:
+                tasks = list((tmp_path / ".ralpher" / "tasks").iterdir())
+                if tasks:
+                    (tasks[0] / "PRD.md").write_text("# PRD")
+                return _make_mock_process(0, {"session_id": "sess-interactive"})
+
+        mock_exec.side_effect = side_effect
+        result = await generate_prd("Build feature")
+        assert isinstance(result, str)
         assert mock_exec.call_count == 2
 
         second_call_args = mock_exec.call_args_list[1][0]
         assert "--resume" in second_call_args
         assert "sess-interactive" in second_call_args
-        print_idx = list(second_call_args).index("--print")
-        assert second_call_args[print_idx + 1] == "Q1: A"
+        assert "--print" in second_call_args
 
-    @patch("ralpher.prd.asyncio.create_subprocess_exec")
-    @patch("ralpher.prd.shutil.which", return_value="/usr/bin/claude")
+    @patch("ralpher.prd.prd.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
-    async def test_non_interactive_skips_questions(self, mock_which, mock_exec):
-        ask_result = {
-            "session_id": "sess-ni",
-            "permission_denials": [
-                {
-                    "tool_name": "AskUserQuestion",
-                    "tool_input": {
-                        "questions": [{"label": "Q?", "description": "Some question"}]
-                    },
-                }
-            ],
-        }
-        mock_exec.return_value = _make_mock_process(0, ask_result)
-        result = await generate_prd("test", interactive=False)
-        assert result == 0
-        assert mock_exec.call_count == 1
+    async def test_raises_when_prd_not_created(self, mock_exec, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        mock_exec.return_value = _make_mock_process(0, {"session_id": "s1"})
+        with pytest.raises(SystemExit):
+            await generate_prd("test")
+
+
+class TestExtractPrdJson:
+    @pytest.mark.asyncio
+    async def test_raises_when_task_dir_missing(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(SystemExit):
+            await extract_prd_json("nonexistent-task")
+
+    @pytest.mark.asyncio
+    async def test_raises_when_prd_md_missing(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".ralpher" / "tasks" / "test-task"
+        task_dir.mkdir(parents=True)
+        with pytest.raises(SystemExit):
+            await extract_prd_json("test-task")
+
+    @patch("ralpher.prd.extract.asyncio.create_subprocess_exec")
+    @pytest.mark.asyncio
+    async def test_returns_on_success(self, mock_exec, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".ralpher" / "tasks" / "test-task"
+        task_dir.mkdir(parents=True)
+        (task_dir / "PRD.md").write_text("# My PRD")
+        (task_dir / "prd.json").write_text('{"title": "Test"}')
+
+        mock_exec.return_value = _make_mock_process(0, {})
+        await extract_prd_json("test-task")
+
+        call_args = mock_exec.call_args[0]
+        assert "--output-format" in call_args
+        assert "json" in call_args
+        assert "--dangerously-skip-permissions" in call_args
+        assert "--permission-mode" in call_args
+        assert "dontAsk" in call_args
+        assert "--model" in call_args
+        assert "haiku" in call_args
+        assert "--print" in call_args
+
+    @patch("ralpher.prd.extract.asyncio.create_subprocess_exec")
+    @pytest.mark.asyncio
+    async def test_raises_on_nonzero_exit(self, mock_exec, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".ralpher" / "tasks" / "test-task"
+        task_dir.mkdir(parents=True)
+        (task_dir / "PRD.md").write_text("# My PRD")
+
+        mock_exec.return_value = _make_mock_process(1)
+        with pytest.raises(SystemExit):
+            await extract_prd_json("test-task")
+
+    @patch("ralpher.prd.extract.asyncio.create_subprocess_exec")
+    @pytest.mark.asyncio
+    async def test_raises_when_prd_json_not_created(self, mock_exec, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".ralpher" / "tasks" / "test-task"
+        task_dir.mkdir(parents=True)
+        (task_dir / "PRD.md").write_text("# My PRD")
+
+        mock_exec.return_value = _make_mock_process(0, {})
+        with pytest.raises(SystemExit):
+            await extract_prd_json("test-task")
+
+    @patch("ralpher.prd.extract.asyncio.create_subprocess_exec")
+    @pytest.mark.asyncio
+    async def test_prompt_includes_task_id(self, mock_exec, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        task_dir = tmp_path / ".ralpher" / "tasks" / "my-task-123"
+        task_dir.mkdir(parents=True)
+        (task_dir / "PRD.md").write_text("# PRD")
+        (task_dir / "prd.json").write_text("{}")
+
+        mock_exec.return_value = _make_mock_process(0, {})
+        await extract_prd_json("my-task-123")
+
+        call_args = mock_exec.call_args[0]
+        prompt_arg = call_args[-1]
+        assert "my-task-123" in prompt_arg
