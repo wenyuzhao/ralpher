@@ -90,7 +90,7 @@ async def generate_prd(user_input: str) -> str:
             "--permission-mode",
             "dontAsk",
             "--plugin-dir",
-            str(Path(__file__).resolve().parent / "plugin"),
+            str(Path(__file__).resolve().parent.parent / "plugin"),
         ]
         if session_id:
             cmd += ["--resume", session_id]
@@ -102,10 +102,8 @@ async def generate_prd(user_input: str) -> str:
             stderr=asyncio.subprocess.PIPE,
         )
 
-        stdout_bytes = await proc.stdout.read()
         await proc.wait()
-
-        print(stdout_bytes.decode())
+        stdout_bytes = await proc.stdout.read()
 
         if proc.returncode != 0:
             console.print(

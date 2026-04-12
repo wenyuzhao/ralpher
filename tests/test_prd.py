@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from ralpher.prd import _ask_user_questions, _parse_result, generate_prd, load_prd_prompt
+from ralpher.prd.prd import _ask_user_questions, _parse_result, generate_prd, load_prd_prompt
 
 
 class TestLoadPrdPrompt:
