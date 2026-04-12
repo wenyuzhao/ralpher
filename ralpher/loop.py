@@ -1,34 +1,47 @@
+import asyncio
 import json
-import shutil
-import subprocess
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
+import json
+import subprocess
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.rule import Rule
 from rich.text import Text
+from .prd.extract import extract_prd_json
+from .models import PRD
 
 console = Console()
 
-COMPLETION_SIGNAL = "<promise>COMPLETE</promise>"
 
-
-def loop(max_iterations: int = 10) -> None:
+async def loop(task_id: str, max_iterations: int = 10) -> None:
     """Run Claude in a loop, checking for completion signal each iteration."""
-    script_dir = Path.cwd()
-    prd_file = script_dir / "prd.json"
-    progress_file = script_dir / "progress.txt"
-    archive_dir = script_dir / "archive"
-    last_branch_file = script_dir / ".last-branch"
-    claude_md = script_dir / "CLAUDE.md"
+    task_dir = Path.cwd() / ".ralpher" / "tasks" / task_id
+    prd_file = task_dir / "prd.json"
+    prd_doc = task_dir / "PRD.md"
+    progress_file = task_dir / "progress.md"
+    last_branch_file = task_dir / ".last-branch"
 
-    # Archive previous run if branch changed
-    _maybe_archive(prd_file, last_branch_file, progress_file, archive_dir)
+    if not prd_doc.exists():
+        console.print(f"[red][b]Error:[/] {prd_doc} not found.[/]")
+        raise SystemExit(1)
+
+    if not prd_file.exists():
+        console.print(f"[yellow]prd.json not found. Extracting from PRD.md...[/]")
+        await extract_prd_json(task_id)
+        if not prd_file.exists():
+            console.print(
+                f"[red][b]Error:[/] prd.json still not found after extraction.[/]"
+            )
+            raise SystemExit(1)
+
+    prd = PRD.model_validate(json.loads(prd_file.read_text()))
 
     # Track current branch
-    _track_branch(prd_file, last_branch_file)
+    _track_branch(prd, last_branch_file)
 
     # Initialize progress file if it doesn't exist
     if not progress_file.exists():
@@ -52,10 +65,13 @@ def loop(max_iterations: int = 10) -> None:
         )
 
         # Run claude
-        output = _run_claude(claude_md)
+        await _run_one_iteration(task_id, prd, task_dir)
 
-        # Check for completion signal
-        if COMPLETION_SIGNAL in output:
+        # Check for completion
+        prd = PRD.model_validate(json.loads(prd_file.read_text()))
+        all_passed = all(story.passes for story in prd.user_stories)
+
+        if all_passed:
             console.print()
             console.print(
                 Panel(
@@ -84,86 +100,79 @@ def loop(max_iterations: int = 10) -> None:
     raise SystemExit(1)
 
 
-def _run_claude(claude_md: Path) -> str:
+async def _run_one_iteration(task_id: str, prd: PRD, task_dir: Path) -> None:
     """Run claude --dangerously-skip-permissions --print with CLAUDE.md as stdin."""
-    claude_bin = shutil.which("claude")
-    if claude_bin is None:
-        console.print("[bold red]Error:[/bold red] claude CLI not found on PATH.")
-        raise SystemExit(1)
 
-    cmd = [claude_bin, "--dangerously-skip-permissions", "--print"]
-
-    stdin_data = None
-    if claude_md.exists():
-        stdin_data = claude_md.read_text()
-
-    proc = subprocess.run(
-        cmd,
-        input=stdin_data,
-        capture_output=True,
-        text=True,
+    # Pick user story
+    user_stories = [s for s in prd.user_stories if not s.passes]
+    user_stories.sort(key=lambda s: s.priority)
+    assert user_stories, "No failing user stories found."
+    # Always pick the highest priority failing story
+    story = user_stories[-1]
+    (task_dir / "current_user_story.json").write_text(
+        json.dumps(story.model_dump(), indent=2)
     )
 
-    output = proc.stdout
-    if output:
-        console.print(output)
-    if proc.stderr:
-        console.print(Text(proc.stderr, style="dim red"))
+    cmd = [
+        "claude",
+        "--dangerously-skip-permissions",
+        "--permission-mode",
+        "dontAsk",
+        "--print",
+        f"/ralpher:loop {task_id}",
+    ]
 
-    return output
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    await proc.wait()
 
+    if proc.stdout:
+        stdout = (await proc.stdout.read()).decode()
+    else:
+        stdout = ""
 
-def _maybe_archive(
-    prd_file: Path,
-    last_branch_file: Path,
-    progress_file: Path,
-    archive_dir: Path,
-) -> None:
-    """Archive previous run if the branch in prd.json changed."""
-    if not prd_file.exists() or not last_branch_file.exists():
-        return
-
-    try:
-        current_branch = json.loads(prd_file.read_text()).get("branchName", "")
-    except (json.JSONDecodeError, OSError):
-        return
-
-    last_branch = last_branch_file.read_text().strip()
-
-    if not current_branch or not last_branch or current_branch == last_branch:
-        return
-
-    # Archive
-    date_str = datetime.now().strftime("%Y-%m-%d")
-    folder_name = last_branch.removeprefix("ralph/")
-    archive_folder = archive_dir / f"{date_str}-{folder_name}"
-    archive_folder.mkdir(parents=True, exist_ok=True)
-
-    console.print(f"[dim]Archiving previous run:[/dim] {last_branch}")
-    if prd_file.exists():
-        shutil.copy2(prd_file, archive_folder)
-    if progress_file.exists():
-        shutil.copy2(progress_file, archive_folder)
-    console.print(f"[dim]  Archived to:[/dim] {archive_folder}")
-
-    # Reset progress
-    _init_progress(progress_file)
+    if proc.returncode != 0:
+        if stdout:
+            print(stdout, file=sys.stdout)
+        if proc.stderr:
+            stderr = await proc.stderr.read()
+            print(stderr.decode(), file=sys.stderr)
+        console.print(f"[bold red]Claude process exited with code {proc.returncode}[/]")
+        raise SystemExit(proc.returncode)
 
 
-def _track_branch(prd_file: Path, last_branch_file: Path) -> None:
-    """Write current branch from prd.json to .last-branch."""
-    if not prd_file.exists():
-        return
-    try:
-        branch = json.loads(prd_file.read_text()).get("branchName", "")
-    except (json.JSONDecodeError, OSError):
-        return
-    if branch:
-        last_branch_file.write_text(branch)
+def _checkout_branch(prd: PRD) -> None:
+    """Checkout the branch or create from main/master if it's different from the current branch."""
+
+    current_branch = (
+        subprocess.check_output(["git", "rev-parse", "--abrev-ref", "HEAD"])
+        .decode()
+        .strip()
+    )
+    if prd.branch_name != current_branch:
+        # Check if branch exists
+        branches = (
+            subprocess.check_output(["git", "branch", "--list", prd.branch_name])
+            .decode()
+            .strip()
+        )
+        if not branches:
+            # Create branch from main or master
+            base_branch = "main"
+            try:
+                subprocess.check_call(["git", "rev-parse", "--verify", base_branch])
+            except subprocess.CalledProcessError:
+                base_branch = "master"
+            subprocess.check_call(
+                ["git", "checkout", "-b", prd.branch_name, base_branch]
+            )
+        else:
+            subprocess.check_call(["git", "checkout", prd.branch_name])
 
 
 def _init_progress(progress_file: Path) -> None:
     """Create or reset the progress file."""
-    progress_file.write_text(
-        f"# Ralph Progress Log\nStarted: {datetime.now()}\n---\n"
-    )
+    progress_file.write_text(f"# Ralph Progress Log\nStarted: {datetime.now()}\n---\n")

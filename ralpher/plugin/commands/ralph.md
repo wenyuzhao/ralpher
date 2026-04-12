@@ -26,14 +26,14 @@ Take a PRD (markdown file or text) and convert it to `.ralpher/tasks/$0/prd.json
 ```json
 {
   "project": "[Project Name]",
-  "branchName": "ralph/[feature-name-kebab-case]",
+  "branch_name": "ralph/[feature-name-kebab-case]",
   "description": "[Feature description from PRD title/intro]",
-  "userStories": [
+  "user_stories": [
     {
       "id": "US-001",
       "title": "[Story title]",
       "description": "As a [user], I want [feature] so that [benefit]",
-      "acceptanceCriteria": [
+      "acceptance_criteria": [
         "Criterion 1",
         "Criterion 2",
         "Typecheck passes"
@@ -170,14 +170,14 @@ Add ability to mark tasks with different statuses.
 ```json
 {
   "project": "TaskApp",
-  "branchName": "ralph/task-status",
+  "branch_name": "ralph/task-status",
   "description": "Task Status Feature - Track task progress with status indicators",
-  "userStories": [
+  "user_stories": [
     {
       "id": "US-001",
       "title": "Add status field to tasks table",
       "description": "As a developer, I need to store task status in the database.",
-      "acceptanceCriteria": [
+      "acceptance_criteria": [
         "Add status column: 'pending' | 'in_progress' | 'done' (default 'pending')",
         "Generate and run migration successfully",
         "Typecheck passes"
@@ -190,7 +190,7 @@ Add ability to mark tasks with different statuses.
       "id": "US-002",
       "title": "Display status badge on task cards",
       "description": "As a user, I want to see task status at a glance.",
-      "acceptanceCriteria": [
+      "acceptance_criteria": [
         "Each task card shows colored status badge",
         "Badge colors: gray=pending, blue=in_progress, green=done",
         "Typecheck passes",
@@ -204,7 +204,7 @@ Add ability to mark tasks with different statuses.
       "id": "US-003",
       "title": "Add status toggle to task list rows",
       "description": "As a user, I want to change task status directly from the list.",
-      "acceptanceCriteria": [
+      "acceptance_criteria": [
         "Each row has status dropdown or toggle",
         "Changing status saves immediately",
         "UI updates without page refresh",
@@ -219,7 +219,7 @@ Add ability to mark tasks with different statuses.
       "id": "US-004",
       "title": "Filter tasks by status",
       "description": "As a user, I want to filter the list to see only certain statuses.",
-      "acceptanceCriteria": [
+      "acceptance_criteria": [
         "Filter dropdown: All | Pending | In Progress | Done",
         "Filter persists in URL params",
         "Typecheck passes",

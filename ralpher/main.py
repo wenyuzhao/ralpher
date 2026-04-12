@@ -24,7 +24,9 @@ def init() -> None:
 @app.command()
 def prd(
     prompt: str = typer.Argument(..., help="The PRD prompt to generate from."),
-    name: str |None= typer.Option(None, "--name", "-n", help="Name for the PRD task."),
+    name: str | None = typer.Option(
+        None, "--name", "-n", help="Name for the PRD task."
+    ),
 ) -> None:
     """Generate a PRD."""
     task_id = asyncio.run(generate_prd(prompt, name))
@@ -42,12 +44,13 @@ def extract(
 
 @app.command()
 def loop(
+    task_id: str = typer.Argument(..., help="The task ID to run the loop on."),
     max_iterations: int = typer.Option(
         10, "--max-iterations", "-n", help="Maximum number of iterations."
     ),
 ) -> None:
     """Run Claude in a loop until tasks are complete or max iterations reached."""
-    _loop(max_iterations)
+    asyncio.run(_loop(task_id, max_iterations))
 
 
 def main() -> None:
