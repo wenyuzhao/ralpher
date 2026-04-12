@@ -28,7 +28,7 @@ class DefaultCommandGroup(TyperGroup):
 
 app = typer.Typer(cls=DefaultCommandGroup)
 
-DEFAULT_MAX_ITERATIONS = 15
+DEFAULT_MAX_ITERATIONS = 30
 
 
 @app.callback()
