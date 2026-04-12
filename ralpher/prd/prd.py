@@ -21,14 +21,15 @@ def _parse_result(data: dict) -> tuple[list[dict] | None, str | None]:
     Returns (questions, session_id). questions is None if no AskUserQuestion found.
     """
     session_id = data.get("session_id")
-    questions: list[dict] | None = None
+    questions: list[dict] = []
 
     for pd in data.get("permission_denials", []):
         if pd.get("tool_name") == "AskUserQuestion":
-            questions = pd.get("tool_input", {}).get("questions", [])
+            qs = pd.get("tool_input", {}).get("questions", [])
+            questions.extend(qs)
             break
 
-    return questions, session_id
+    return questions or None, session_id
 
 
 async def _ask_user_questions(questions: list[dict]) -> str:
