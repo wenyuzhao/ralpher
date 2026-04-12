@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from ralpher.prd.prd import _ask_user_questions, _parse_result, generate_prd, load_prd_prompt
+from ralpher.prd.prd import _ask_user_questions, _parse_result, generate_prd
 from ralpher.prd.extract import extract_prd_json
 
 
@@ -91,25 +91,30 @@ class TestParseResult:
 
 
 class TestAskUserQuestions:
-    @patch("ralpher.prd.prd.Prompt.ask", return_value="REST")
-    def test_single_question(self, mock_ask):
+    @pytest.mark.asyncio
+    @patch("ralpher.prd.prd.PromptSession")
+    async def test_single_question(self, mock_session_cls):
+        mock_session_cls.return_value.prompt_async = AsyncMock(return_value="REST")
         questions = [{"question": "API style", "description": "What kind of API do you want?"}]
-        result = _ask_user_questions(questions)
+        result = await _ask_user_questions(questions)
         assert "API style: REST" in result
-        mock_ask.assert_called_once()
 
-    @patch("ralpher.prd.prd.Prompt.ask", side_effect=["Yes", "Mobile"])
-    def test_multiple_questions(self, mock_ask):
+    @pytest.mark.asyncio
+    @patch("ralpher.prd.prd.PromptSession")
+    async def test_multiple_questions(self, mock_session_cls):
+        mock_session_cls.return_value.prompt_async = AsyncMock(side_effect=["Yes", "Mobile"])
         questions = [
             {"question": "Auth needed?", "description": "Should the app require login?"},
             {"question": "Platform", "description": ""},
         ]
-        result = _ask_user_questions(questions)
+        result = await _ask_user_questions(questions)
         assert "Auth needed?: Yes" in result
         assert "Platform: Mobile" in result
 
-    @patch("ralpher.prd.prd.Prompt.ask", return_value="B")
-    def test_question_with_options(self, mock_ask):
+    @pytest.mark.asyncio
+    @patch("ralpher.prd.prd.ChoiceInput")
+    async def test_question_with_options(self, mock_choice_cls):
+        mock_choice_cls.return_value.prompt_async = AsyncMock(return_value="Monolith")
         questions = [
             {
                 "header": "Architecture",
@@ -120,8 +125,8 @@ class TestAskUserQuestions:
                 ],
             }
         ]
-        result = _ask_user_questions(questions)
-        assert "Pick a pattern: B" in result
+        result = await _ask_user_questions(questions)
+        assert "Pick a pattern: Monolith" in result
 
 
 def _make_mock_process(returncode: int, stdout_json: dict | None = None) -> AsyncMock:

@@ -3,8 +3,10 @@ import json
 from pathlib import Path
 import datetime
 
+from prompt_toolkit import PromptSession
+from prompt_toolkit.formatted_text import HTML
+from prompt_toolkit.shortcuts.choice_input import ChoiceInput
 from rich.console import Console
-from rich.prompt import Prompt
 from slugify import slugify
 
 
@@ -29,8 +31,9 @@ def _parse_result(data: dict) -> tuple[list[dict] | None, str | None]:
     return questions, session_id
 
 
-def _ask_user_questions(questions: list[dict]) -> str:
-    """Prompt the user for answers to AskUserQuestion questions using Rich."""
+async def _ask_user_questions(questions: list[dict]) -> str:
+    """Prompt the user for answers to AskUserQuestion questions."""
+    session = PromptSession()
     answers: list[str] = []
 
     for index, q in enumerate(questions):
@@ -40,19 +43,22 @@ def _ask_user_questions(questions: list[dict]) -> str:
 
         console.print()
         if options:
-            console.print(
-                f"[on blue][b i]Q{index + 1}: {header}[/] - {question_text}[/]"
-            )
-            for i, opt in enumerate(options):
-                label = opt.get("label", "")
-                description = opt.get("description", "")
-                console.print(
-                    f"  [bold]{chr(65 + i)}.[/bold] [bold]{label}[/] [bright_black]-[/] [italic]{description}[/]"
+            choice_options = [
+                (
+                    opt.get("label", ""),
+                    f"{opt.get('label', '')} - {opt.get('description', '')}",
                 )
-            console.print()
-            answer = Prompt.ask("Your answer")
+                for opt in options
+            ]
+            result = await ChoiceInput(
+                message=HTML(
+                    f"<style bg='blue'><b><i>Q{index + 1}: {header}</i></b> - {question_text}</style>"
+                ),
+                options=choice_options,
+            ).prompt_async()
+            answer = result if result else choice_options[0][0]
         else:
-            answer = Prompt.ask(f"[cyan]{question_text}[/cyan]")
+            answer = await session.prompt_async(f"{question_text}: ")
 
         answers.append(f"{question_text}: {answer}")
 
@@ -94,7 +100,10 @@ async def generate_prd(user_input: str, name: str | None = None) -> str:
         )
 
         await proc.wait()
-        stdout_bytes = await proc.stdout.read()
+        if proc.stdout:
+            stdout_bytes = await proc.stdout.read()
+        else:
+            stdout_bytes = b""
 
         if proc.returncode != 0:
             console.print(
@@ -115,7 +124,7 @@ async def generate_prd(user_input: str, name: str | None = None) -> str:
             raise RuntimeError(f"claude exited with code {proc.returncode}")
 
         if questions:
-            current_prompt = _ask_user_questions(questions)
+            current_prompt = await _ask_user_questions(questions)
         else:
             break
 
