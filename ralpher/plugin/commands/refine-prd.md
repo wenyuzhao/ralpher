@@ -43,6 +43,8 @@ Please refer to @../docs/prd-structure.md for a list of required sections and an
 
 Strictly follow the user's instructions, and don't change unrelated parts.
 
+You may need to add/update/remove user stories to fit the new plan.
+
 ---
 
 ## Checklist
