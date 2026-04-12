@@ -1,19 +1,16 @@
 import asyncio
 import json
 from pathlib import Path
-import datetime
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts.choice_input import ChoiceInput
 import rich
-from rich.console import Console
-from slugify import slugify
+from ..utils.spinner import Spinner
+from ..utils.error import fail
 
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
-
-console = Console()
 
 
 def _parse_result(data: dict) -> tuple[list[dict] | None, str | None]:
@@ -39,7 +36,7 @@ async def _ask_user_questions(questions: list[dict]) -> str:
     answers: list[str] = []
 
     rich.print(
-        f"[bold on blue]Please answer the following questions to clarify the task:[/]"
+        f"[bold blue]Please answer the following questions to clarify the task:[/]"
     )
 
     for index, q in enumerate(questions):
@@ -49,7 +46,7 @@ async def _ask_user_questions(questions: list[dict]) -> str:
         if not options:
             continue
 
-        console.print()
+        print()
         choice_options = [
             (
                 opt.get("label", ""),
@@ -72,6 +69,8 @@ async def _ask_user_questions(questions: list[dict]) -> str:
             answer = result if result else choice_options[0][0]
 
         answers.append(f"{question_text}: {answer}")
+
+    print()  # Add spacing after questions
 
     return "\n".join(answers)
 
@@ -103,17 +102,16 @@ async def _run_agent_with_qa(prompt: str):
             stderr=asyncio.subprocess.PIPE,
         )
 
-        await proc.wait()
+        async with Spinner() as spinner:
+            await spinner.run(proc)
+
         if proc.stdout:
             stdout_bytes = await proc.stdout.read()
         else:
             stdout_bytes = b""
 
         if proc.returncode != 0:
-            console.print(
-                f"[bold red]Claude process exited with code {proc.returncode}[/]"
-            )
-            raise SystemExit(proc.returncode)
+            fail(f"Claude process exited with code {proc.returncode}")
 
         try:
             data = json.loads(stdout_bytes.decode())
@@ -125,7 +123,7 @@ async def _run_agent_with_qa(prompt: str):
             session_id = new_session_id
 
         if proc.returncode != 0 and not questions:
-            raise RuntimeError(f"claude exited with code {proc.returncode}")
+            fail(f"claude exited with code {proc.returncode}")
 
         if questions:
             current_prompt = await _ask_user_questions(questions)
@@ -133,12 +131,9 @@ async def _run_agent_with_qa(prompt: str):
             break
 
 
-async def generate_prd(user_input: str, name: str | None = None) -> str:
+async def generate_prd(task_id: str, user_input: str, name: str | None = None) -> str:
     """Run a Claude Code session with the rendered PRD prompt."""
 
-    task_id = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
-    if name:
-        task_id += f"-{slugify(name)}"
     task_dir = Path.cwd() / ".ralpher" / "tasks" / task_id
     task_dir.mkdir(parents=True, exist_ok=True)
     (task_dir / "PROMPT.md").write_text(user_input)
@@ -146,7 +141,6 @@ async def generate_prd(user_input: str, name: str | None = None) -> str:
     await _run_agent_with_qa(f"/ralpher:prd {task_id}")
 
     if not (task_dir / "PRD.md").exists():
-        console.print(f"[bold red]PRD.md not found in {task_dir}[/]")
-        raise SystemExit(1)
+        fail(f"{task_dir / 'PRD.md'} was not created.")
 
     return task_id

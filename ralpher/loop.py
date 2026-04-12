@@ -7,14 +7,14 @@ from pathlib import Path
 import json
 import subprocess
 
-from rich.console import Console
+import rich
 from rich.panel import Panel
 from rich.rule import Rule
 from rich.text import Text
 from .prd.extract import extract_prd_json
 from .models import PRD
-
-console = Console()
+from .utils.spinner import Spinner
+from .utils.error import fail
 
 
 async def loop(task_id: str, max_iterations: int = 10) -> None:
@@ -25,17 +25,13 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
     progress_file = task_dir / "progress.md"
 
     if not prd_doc.exists():
-        console.print(f"[red][b]Error:[/] {prd_doc} not found.[/]")
-        raise SystemExit(1)
+        fail(f"{prd_doc} not found.")
 
     if not prd_file.exists():
-        console.print(f"[yellow]prd.json not found. Extracting from PRD.md...[/]")
+        rich.print(f"[yellow]prd.json not found. Extracting from PRD.md...[/]")
         await extract_prd_json(task_id)
         if not prd_file.exists():
-            console.print(
-                f"[red][b]Error:[/] prd.json still not found after extraction.[/]"
-            )
-            raise SystemExit(1)
+            fail(f"{prd_file} still not found after extraction.")
 
     prd = PRD.model_validate(json.loads(prd_file.read_text()))
 
@@ -46,7 +42,7 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
     if not progress_file.exists():
         _init_progress(progress_file)
 
-    console.print(
+    rich.print(
         Panel(
             f"[bold]Tool:[/bold] claude  |  [bold]Max iterations:[/bold] {max_iterations}",
             title="[bold cyan]Ralph Loop[/bold cyan]",
@@ -55,13 +51,13 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
     )
 
     if max_iterations < len(prd.user_stories):
-        console.print(
+        rich.print(
             f"[yellow]Warning: Max iterations ({max_iterations}) is less than the number of user stories ({len(prd.user_stories)}). Some stories may not be attempted.[/]"
         )
 
     for i in range(1, max_iterations + 1):
-        console.print()
-        console.print(
+        rich.print()
+        rich.print(
             Rule(
                 f"[bold yellow]Iteration {i} of {max_iterations}[/bold yellow]",
                 style="yellow",
@@ -76,8 +72,8 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
         all_passed = all(story.passes for story in prd.user_stories)
 
         if all_passed:
-            console.print()
-            console.print(
+            rich.print()
+            rich.print(
                 Panel(
                     f"[bold green]All tasks completed at iteration {i} of {max_iterations}[/bold green]",
                     title="[bold green]Done[/bold green]",
@@ -86,14 +82,14 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
             )
             return
 
-        console.print(
+        rich.print(
             Text(f"Iteration {i} complete. Continuing...", style="dim"),
         )
         if i < max_iterations:
             time.sleep(2)
 
-    console.print()
-    console.print(
+    rich.print()
+    rich.print(
         Panel(
             f"[bold red]Reached max iterations ({max_iterations}) without completing all tasks.[/bold red]\n"
             f"Check [bold]{progress_file}[/bold] for status.",
@@ -133,7 +129,9 @@ async def _run_one_iteration(task_id: str, prd: PRD, task_dir: Path) -> None:
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    await proc.wait()
+
+    async with Spinner() as spinner:
+        await spinner.run(proc)
 
     if proc.stdout:
         stdout = (await proc.stdout.read()).decode()
@@ -142,13 +140,13 @@ async def _run_one_iteration(task_id: str, prd: PRD, task_dir: Path) -> None:
     # print(stdout, file=sys.stdout)
 
     if proc.returncode != 0:
+        # Save stdout and stderr to log files for debugging
         if stdout:
             print(stdout, file=sys.stdout)
         if proc.stderr:
             stderr = await proc.stderr.read()
             print(stderr.decode(), file=sys.stderr)
-        console.print(f"[bold red]Claude process exited with code {proc.returncode}[/]")
-        raise SystemExit(proc.returncode)
+        fail(f"Claude process exited with code {proc.returncode}")
 
     # Propagate changes to prd.json if updated
     prd_file = task_dir / "prd.json"

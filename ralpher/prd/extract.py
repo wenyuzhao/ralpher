@@ -3,13 +3,12 @@ import json
 from pathlib import Path
 import sys
 
-from rich.console import Console
+import rich
 from ..models import PRD
-
+from ..utils.spinner import Spinner
+from ..utils.error import fail
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
-
-console = Console()
 
 
 async def __try_extract_prd(task_dir: Path, task_id: str):
@@ -30,12 +29,15 @@ async def __try_extract_prd(task_dir: Path, task_id: str):
         "haiku",
         prompt,
     ]
+
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
-    await proc.wait()
+
+    async with Spinner() as spinner:
+        await spinner.run(proc)
 
     if proc.returncode != 0:
         if proc.stdout:
@@ -62,22 +64,19 @@ async def extract_prd_json(task_id: str, retries: int = 3) -> None:
 
     task_dir = Path.cwd() / ".ralpher" / "tasks" / task_id
     if not task_dir.exists():
-        console.print(f"[bold red]Task directory {task_dir} does not exist.[/]")
-        raise SystemExit(1)
+        fail(f"{task_dir} does not exist.")
 
     if not (task_dir / "PRD.md").exists():
-        console.print(f"[bold red]PRD.md not found in {task_dir}[/]")
-        raise SystemExit(1)
+        fail(f"{task_dir / 'PRD.md'} does not exist.")
 
     for i in range(retries):
         success = await __try_extract_prd(task_dir, task_id)
         if success:
             return
         else:
-            console.print(
+            rich.print(
                 f"[red]Failed to extract prd.json. Retrying... ({i+1}/{retries})[/]"
             )
 
     if not (task_dir / "prd.json").exists():
-        console.print(f"[bold red]Failed to extract prd.json.[/]")
-        raise SystemExit(1)
+        fail(f"Failed to extract prd.json after {retries} attempts.")

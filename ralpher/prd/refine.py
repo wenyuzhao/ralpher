@@ -3,6 +3,7 @@ import tempfile
 
 from rich.console import Console
 from .prd import _run_agent_with_qa
+from ..utils.error import fail
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
@@ -15,12 +16,10 @@ async def refine_prd(task_id: str, user_input: str) -> str:
     task_dir = Path.cwd() / ".ralpher" / "tasks" / task_id
 
     if not task_dir.exists():
-        console.print(f"[bold red]Task directory {task_dir} does not exist.[/]")
-        raise SystemExit(1)
+        fail(f"{task_dir} does not exist.")
 
     if not (task_dir / "PRD.md").exists():
-        console.print(f"[bold red]PRD.md not found in {task_dir}[/]")
-        raise SystemExit(1)
+        fail(f"{task_dir / 'PRD.md'} does not exist.")
 
     with tempfile.NamedTemporaryFile(prefix=f"ralpher-refine-", suffix=".md") as tmp:
         tmp_path = Path(tmp.name)
@@ -29,7 +28,6 @@ async def refine_prd(task_id: str, user_input: str) -> str:
         await _run_agent_with_qa(f"/ralpher:refine-prd {task_id} {tmp_path}")
 
     if not (task_dir / "PRD.md").exists():
-        console.print(f"[bold red]PRD.md not found in {task_dir}[/]")
-        raise SystemExit(1)
+        fail(f"{task_dir / 'PRD.md'} was not created after refinement.")
 
     return task_id

@@ -1,3 +1,4 @@
+import datetime
 from pathlib import Path
 
 import click
@@ -10,6 +11,8 @@ from ralpher.prd.prd import generate_prd
 from ralpher.prd.extract import extract_prd_json
 from ralpher.prd.refine import refine_prd
 import asyncio
+from slugify import slugify
+from .utils.error import fail
 
 
 class DefaultCommandGroup(TyperGroup):
@@ -62,13 +65,21 @@ def run(
     asyncio.run(_run(prompt, name, max_iterations))
 
 
+def _gen_task_id(name: str | None) -> str:
+    task_id = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    if name:
+        task_id += f"-{slugify(name)}"
+    return task_id
+
+
 async def _run(prompt: str, name: str | None, max_iterations: int) -> None:
     """Generate PRD, extract JSON, and run loop."""
-    task_id = await generate_prd(prompt, name)
-    rich.print(f"[green]PRD generated at .ralpher/tasks/{task_id}/PRD.md[/]")
+    task_id = _gen_task_id(name)
+    await generate_prd(task_id, prompt, name)
+    rich.print(f"[green]✔ PRD generated at .ralpher/tasks/{task_id}/PRD.md[/]")
 
     await extract_prd_json(task_id)
-    rich.print(f"[green]Extracted JSON for task {task_id}[/]")
+    rich.print(f"[green]✔ Extracted JSON for task {task_id}[/]")
 
     await _loop(task_id, max_iterations)
 
@@ -83,21 +94,24 @@ def prd(
     """Generate a PRD."""
     if Path(prompt).is_file():
         prompt = Path(prompt).read_text()
-    task_id = asyncio.run(generate_prd(prompt, name))
-    rich.print(f"[green]PRD generated at .ralpher/tasks/{task_id}/PRD.md[/]")
+
+    task_id = _gen_task_id(name)
+    rich.print(f"[bold blue]Generating PRD for new task: [i]{task_id}[/][/]\n")
+
+    asyncio.run(generate_prd(task_id, prompt, name))
+
+    rich.print(f"[green]✔ PRD generated at .ralpher/tasks/{task_id}/PRD.md[/]")
 
 
 def _get_latest_task_id() -> str:
     tasks_dir = Path.cwd() / ".ralpher" / "tasks"
     if not tasks_dir.exists():
-        rich.print("[red][b]Error:[/] No tasks found in .ralpher/tasks.[/]")
-        raise SystemExit(1)
+        fail("No tasks found in .ralpher/tasks.")
     task_dirs = sorted(
         [f.name for f in tasks_dir.iterdir() if f.is_dir()], reverse=True
     )
     if not task_dirs:
-        rich.print("[red][b]Error:[/] No tasks found in .ralpher/tasks.[/]")
-        raise SystemExit(1)
+        fail("No tasks found in .ralpher/tasks.")
     return task_dirs[0]
 
 
@@ -114,11 +128,11 @@ def refine(
     if not task_id:
         # Default to the latest task if no task_id is provided
         task_id = _get_latest_task_id()
-        rich.print(f"[blue]Refining the latest task: [i]{task_id}[/][/]\n")
+        rich.print(f"[bold blue]Refining the latest task: [i]{task_id}[/][/]\n")
     else:
-        rich.print(f"[blue]Refining task: [i]{task_id}[/][/]\n")
+        rich.print(f"[bold blue]Refining task: [i]{task_id}[/][/]\n")
     task_id = asyncio.run(refine_prd(task_id, prompt))
-    rich.print(f"[green]PRD refined at .ralpher/tasks/{task_id}/PRD.md[/]")
+    rich.print(f"[green]✔ PRD refined at .ralpher/tasks/{task_id}/PRD.md[/]")
 
 
 @app.command(hidden=True)
@@ -130,11 +144,13 @@ def extract(
     """Extract PRD JSON for a given task ID."""
     if not task_id:
         task_id = _get_latest_task_id()
-        rich.print(f"[blue]Extracting JSON for the latest task: [i]{task_id}[/][/]")
+        rich.print(
+            f"[bold blue]Extracting prd.json for the latest task: [i]{task_id}[/][/]\n"
+        )
     else:
-        rich.print(f"[blue]Extracting JSON for task: [i]{task_id}[/][/]")
+        rich.print(f"[bold blue]Extracting prd.json for task: [i]{task_id}[/][/]\n")
     asyncio.run(extract_prd_json(task_id))
-    rich.print(f"[green]Extracted JSON for task {task_id}[/]")
+    rich.print(f"[green]✔ Extracted to .ralpher/tasks/{task_id}/prd.json[/]")
 
 
 @app.command()
@@ -152,9 +168,9 @@ def loop(
     """Run Claude in a loop until tasks are complete or max iterations reached."""
     if not task_id:
         task_id = _get_latest_task_id()
-        rich.print(f"[blue]Running the latest task: [i]{task_id}[/][/]\n")
+        rich.print(f"[bold blue]Running the latest task: [i]{task_id}[/][/]\n")
     else:
-        rich.print(f"[blue]Running task: [i]{task_id}[/][/]\n")
+        rich.print(f"[bold blue]Running task: [i]{task_id}[/][/]\n")
     asyncio.run(_loop(task_id, max_iterations))
 
 
