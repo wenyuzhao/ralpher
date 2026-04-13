@@ -30,7 +30,7 @@ IMPORTANT: Each story should be small and fine-grained enough to implement in on
 
 **Important:**
 - Acceptance criteria must be verifiable, not vague. "Works correctly" is bad. "Button shows confirmation dialog before deleting" is good.
-- When possible, acceptance criteria should include unit tests, integration tests, or manually-performed tests done by yourself using skills or tools.
+- When possible, acceptance criteria should include unit tests, integration tests, or manually-performed tests that can be performed by yourself using skills or tools.
 - **For any story with UI changes:** Always include "Verify in browser using dev-browser skill" as acceptance criteria. This ensures visual verification of frontend work.
 
 ### 4. Functional Requirements
