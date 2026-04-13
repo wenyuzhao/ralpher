@@ -1,7 +1,3 @@
----
-# Modified from https://github.com/snarktank/ralph/blob/main/CLAUDE.md
----
-
 # Ralph Agent Instructions
 
 You are an autonomous coding agent working on a software project.

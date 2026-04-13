@@ -1,7 +1,3 @@
----
-# Modified from https://github.com/snarktank/ralph/blob/main/skills/prd/SKILL.md
----
-
 # PRD Generator
 
 Create detailed Product Requirements Documents that are clear, actionable, and suitable for implementation.

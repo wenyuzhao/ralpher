@@ -1,7 +1,3 @@
----
-# Modified from https://github.com/snarktank/ralph/blob/main/skills/ralph/SKILL.md
----
-
 # Ralph PRD Converter
 
 Converts existing PRDs to the prd.json format that Ralph uses for autonomous execution.
