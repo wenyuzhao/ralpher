@@ -1,6 +1,7 @@
 import datetime
 import shutil
 from pathlib import Path
+from typing import Annotated
 
 import click
 import rich
@@ -51,11 +52,9 @@ def _gen_task_id(name: str | None) -> str:
 
 @app.command()
 def prd(
-    prompt: str = typer.Argument(..., help="The PRD prompt or file to generate from."),
-    name: str | None = typer.Option(
-        None, "--name", "-n", help="Name for the PRD task."
-    ),
-    model: str | None = typer.Option(None, "--model", "-m", help="Claude model to use"),
+    prompt: Annotated[str, typer.Argument(help="The PRD prompt or file to generate from.")],
+    name: Annotated[str | None, typer.Option("--name", "-n", help="Name for the PRD task.")] = None,
+    model: Annotated[str | None, typer.Option("--model", "-m", help="Claude model to use")] = None,
 ) -> None:
     """Generate a PRD."""
     _require_claude()
@@ -82,11 +81,9 @@ def _get_latest_task_id() -> str:
 
 @app.command()
 def refine(
-    prompt: str = typer.Argument(..., help="The refinement prompt or file."),
-    task_id: str | None = typer.Option(
-        None, "--task", "-t", help="The task ID of the PRD to refine."
-    ),
-    model: str | None = typer.Option(None, "--model", "-m", help="Claude model to use"),
+    prompt: Annotated[str, typer.Argument(help="The refinement prompt or file.")],
+    task_id: Annotated[str | None, typer.Option("--task", "-t", help="The task ID of the PRD to refine.")] = None,
+    model: Annotated[str | None, typer.Option("--model", "-m", help="Claude model to use")] = None,
 ) -> None:
     """Refine an existing PRD."""
     _require_claude()
@@ -104,9 +101,7 @@ def refine(
 
 @app.command(hidden=True)
 def extract(
-    task_id: str | None = typer.Argument(
-        None, help="The task ID to extract JSON from."
-    ),
+    task_id: Annotated[str | None, typer.Argument(help="The task ID to extract JSON from.")] = None,
 ) -> None:
     """Extract PRD JSON for a given task ID."""
     _require_claude()
@@ -123,16 +118,9 @@ def extract(
 
 @app.command()
 def loop(
-    task_id: str | None = typer.Option(
-        None, "--task", "-t", help="The task ID to run the loop on."
-    ),
-    max_iterations: int = typer.Option(
-        DEFAULT_MAX_ITERATIONS,
-        "--max-iterations",
-        "-n",
-        help="Maximum number of iterations.",
-    ),
-    model: str | None = typer.Option(None, "--model", "-m", help="Claude model to use"),
+    task_id: Annotated[str | None, typer.Option("--task", "-t", help="The task ID to run the loop on.")] = None,
+    max_iterations: Annotated[int, typer.Option("--max-iterations", "-n", help="Maximum number of iterations.")] = DEFAULT_MAX_ITERATIONS,
+    model: Annotated[str | None, typer.Option("--model", "-m", help="Claude model to use")] = None,
 ) -> None:
     """Run Claude in a loop until tasks are complete or max iterations reached."""
     _require_claude()
