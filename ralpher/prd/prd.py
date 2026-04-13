@@ -1,134 +1,7 @@
-import asyncio
-import json
 from pathlib import Path
 
-from prompt_toolkit import PromptSession
-from prompt_toolkit.formatted_text import HTML
-from prompt_toolkit.shortcuts.choice_input import ChoiceInput
-import rich
-from ..utils.spinner import Spinner
+from ..utils.claude import ClaudeError, run_claude
 from ..utils.error import fail
-
-
-PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
-
-
-def _parse_result(data: dict) -> tuple[list[dict] | None, str | None]:
-    """Parse JSON output for AskUserQuestion tool calls.
-
-    Returns (questions, session_id). questions is None if no AskUserQuestion found.
-    """
-    session_id = data.get("session_id")
-    questions: list[dict] = []
-
-    for pd in data.get("permission_denials", []):
-        if pd.get("tool_name") == "AskUserQuestion":
-            qs = pd.get("tool_input", {}).get("questions", [])
-            questions.extend(qs)
-            break
-
-    return questions or None, session_id
-
-
-async def _ask_user_questions(questions: list[dict]) -> str:
-    """Prompt the user for answers to AskUserQuestion questions."""
-    session = PromptSession()
-    answers: list[str] = []
-
-    rich.print(
-        f"[bold blue]Please answer the following questions to clarify the task:[/]"
-    )
-
-    for index, q in enumerate(questions):
-        header = q.get("header", "")
-        question_text = q.get("question", "")
-        options = q.get("options", [])
-        if not options:
-            continue
-
-        print()
-        choice_options = [
-            (
-                opt.get("label", ""),
-                f"{opt.get('label', '')} - {opt.get('description', '')}",
-            )
-            for opt in options
-        ]
-        choice_options.append(("__other__", HTML("Other - <style color='ansibrightblack'>[please specify]</style>")))  # type: ignore
-        result = await ChoiceInput(
-            message=HTML(
-                f"<style color='ansimagenta'><b>[Q{index + 1}] <i>{header}:</i></b> {question_text}</style>"
-            ),
-            options=choice_options,
-        ).prompt_async()
-        if result == "__other__":
-            answer = await session.prompt_async(
-                HTML("<b><i>Enter your answer: </i></b>")
-            )
-        else:
-            answer = result if result else choice_options[0][0]
-
-        answers.append(f"{question_text}: {answer}")
-
-    print()  # Add spacing after questions
-
-    return "\n".join(answers)
-
-
-async def _run_agent_with_qa(prompt: str):
-    """Run a Claude Code session and ask user questions as needed."""
-
-    session_id: str | None = None
-    current_prompt = prompt
-
-    while True:
-        cmd = [
-            "claude",
-            "--output-format",
-            "json",
-            "--dangerously-skip-permissions",
-            "--permission-mode",
-            "dontAsk",
-            "--plugin-dir",
-            str(Path(__file__).resolve().parent.parent / "plugin"),
-        ]
-        if session_id:
-            cmd += ["--resume", session_id]
-        cmd += ["--print", current_prompt]
-
-        proc = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
-
-        async with Spinner() as spinner:
-            await spinner.run(proc)
-
-        if proc.stdout:
-            stdout_bytes = await proc.stdout.read()
-        else:
-            stdout_bytes = b""
-
-        if proc.returncode != 0:
-            fail(f"Claude process exited with code {proc.returncode}")
-
-        try:
-            data = json.loads(stdout_bytes.decode())
-        except json.JSONDecodeError:
-            data = {}
-
-        questions, new_session_id = _parse_result(data)
-        if new_session_id:
-            session_id = new_session_id
-
-        if proc.returncode != 0 and not questions:
-            fail(f"claude exited with code {proc.returncode}")
-
-        if questions:
-            current_prompt = await _ask_user_questions(questions)
-        else:
-            break
 
 
 async def generate_prd(task_id: str, user_input: str, name: str | None = None) -> str:
@@ -138,7 +11,10 @@ async def generate_prd(task_id: str, user_input: str, name: str | None = None) -
     task_dir.mkdir(parents=True, exist_ok=True)
     (task_dir / "PROMPT.md").write_text(user_input)
 
-    await _run_agent_with_qa(f"/ralpher:prd {task_id}")
+    try:
+        await run_claude(f"/ralpher:prd {task_id}", mode="qa")
+    except ClaudeError as e:
+        fail(f"Claude process exited with code {e.returncode}")
 
     if not (task_dir / "PRD.md").exists():
         fail(f"{task_dir / 'PRD.md'} was not created.")

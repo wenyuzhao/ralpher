@@ -1,8 +1,9 @@
-from pathlib import Path
 import tempfile
+from pathlib import Path
 
 from rich.console import Console
-from .prd import _run_agent_with_qa
+
+from ..utils.claude import ClaudeError, run_claude
 from ..utils.error import fail
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
@@ -25,7 +26,10 @@ async def refine_prd(task_id: str, user_input: str) -> str:
         tmp_path = Path(tmp.name)
         tmp_path.write_text(user_input)
 
-        await _run_agent_with_qa(f"/ralpher:refine-prd {task_id} {tmp_path}")
+        try:
+            await run_claude(f"/ralpher:refine-prd {task_id} {tmp_path}", mode="qa")
+        except ClaudeError as e:
+            fail(f"Claude process exited with code {e.returncode}")
 
     if not (task_dir / "PRD.md").exists():
         fail(f"{task_dir / 'PRD.md'} was not created after refinement.")

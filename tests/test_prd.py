@@ -3,14 +3,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ralpher.prd.prd import _ask_user_questions, _parse_result, generate_prd
+from ralpher.utils.claude import _parse_questions, _ask_user_questions
+from ralpher.prd.prd import generate_prd
 from ralpher.prd.extract import extract_prd_json
 
 
 class TestParseResult:
     def test_extracts_session_id(self):
         data = {"session_id": "sess-123", "result": "done"}
-        questions, session_id = _parse_result(data)
+        questions, session_id = _parse_questions(data)
         assert session_id == "sess-123"
         assert questions is None
 
@@ -28,7 +29,7 @@ class TestParseResult:
                 }
             ],
         }
-        questions, session_id = _parse_result(data)
+        questions, session_id = _parse_questions(data)
         assert session_id == "sess-abc"
         assert questions is not None
         assert len(questions) == 1
@@ -41,11 +42,11 @@ class TestParseResult:
                 {"tool_name": "Write", "tool_input": {"path": "foo.txt"}},
             ],
         }
-        questions, _ = _parse_result(data)
+        questions, _ = _parse_questions(data)
         assert questions is None
 
     def test_handles_empty_data(self):
-        questions, session_id = _parse_result({})
+        questions, session_id = _parse_questions({})
         assert questions is None
         assert session_id is None
 
@@ -64,20 +65,20 @@ class TestParseResult:
                 }
             ],
         }
-        questions, _session_id = _parse_result(data)
+        questions, _session_id = _parse_questions(data)
         assert questions is not None
         assert len(questions) == 2
 
     def test_no_permission_denials_key(self):
         data = {"session_id": "sess-no-denials"}
-        questions, session_id = _parse_result(data)
+        questions, session_id = _parse_questions(data)
         assert questions is None
         assert session_id == "sess-no-denials"
 
 
 class TestAskUserQuestions:
     @pytest.mark.asyncio
-    @patch("ralpher.prd.prd.ChoiceInput")
+    @patch("ralpher.utils.claude.ChoiceInput")
     async def test_single_question_with_options(self, mock_choice_cls):
         mock_choice_cls.return_value.prompt_async = AsyncMock(return_value="REST")
         questions = [
@@ -94,7 +95,7 @@ class TestAskUserQuestions:
         assert "API style: REST" in result
 
     @pytest.mark.asyncio
-    @patch("ralpher.prd.prd.ChoiceInput")
+    @patch("ralpher.utils.claude.ChoiceInput")
     async def test_multiple_questions_with_options(self, mock_choice_cls):
         mock_choice_cls.return_value.prompt_async = AsyncMock(side_effect=["Yes", "Mobile"])
         questions = [
@@ -120,7 +121,7 @@ class TestAskUserQuestions:
         assert "Platform: Mobile" in result
 
     @pytest.mark.asyncio
-    @patch("ralpher.prd.prd.ChoiceInput")
+    @patch("ralpher.utils.claude.ChoiceInput")
     async def test_question_with_options(self, mock_choice_cls):
         mock_choice_cls.return_value.prompt_async = AsyncMock(return_value="Monolith")
         questions = [
@@ -145,8 +146,8 @@ class TestAskUserQuestions:
         assert result == ""
 
     @pytest.mark.asyncio
-    @patch("ralpher.prd.prd.PromptSession")
-    @patch("ralpher.prd.prd.ChoiceInput")
+    @patch("ralpher.utils.claude.PromptSession")
+    @patch("ralpher.utils.claude.ChoiceInput")
     async def test_other_option_prompts_freeform(self, mock_choice_cls, mock_session_cls):
         mock_choice_cls.return_value.prompt_async = AsyncMock(return_value="__other__")
         mock_session_cls.return_value.prompt_async = AsyncMock(return_value="Custom answer")
@@ -183,10 +184,10 @@ class TestGeneratePrd:
         mock_spinner.__aexit__ = AsyncMock(return_value=False)
         mock_spinner.run = AsyncMock()
         monkeypatch.setattr(
-            "ralpher.prd.prd.Spinner", lambda: mock_spinner,
+            "ralpher.utils.claude.Spinner", lambda: mock_spinner,
         )
 
-    @patch("ralpher.prd.prd.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_returns_task_id_on_success(self, mock_exec, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -200,7 +201,7 @@ class TestGeneratePrd:
         result = await generate_prd(task_id, "Build a chat app")
         assert result == task_id
 
-    @patch("ralpher.prd.prd.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_raises_on_nonzero_exit(self, mock_exec, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -208,7 +209,7 @@ class TestGeneratePrd:
         with pytest.raises(SystemExit):
             await generate_prd("task-fail", "test")
 
-    @patch("ralpher.prd.prd.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_command_flags(self, mock_exec, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -229,7 +230,7 @@ class TestGeneratePrd:
         assert "--plugin-dir" in call_args
         assert "--print" in call_args
 
-    @patch("ralpher.prd.prd.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_creates_task_directory_and_prompt(self, mock_exec, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -245,8 +246,8 @@ class TestGeneratePrd:
         assert task_dir.exists()
         assert (task_dir / "PROMPT.md").read_text() == "My feature request"
 
-    @patch("ralpher.prd.prd._ask_user_questions", return_value="Q1: A")
-    @patch("ralpher.prd.prd.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude._ask_user_questions", return_value="Q1: A")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_intercepts_ask_user_question_and_resumes(
         self, mock_exec, mock_ask, tmp_path, monkeypatch
@@ -286,7 +287,7 @@ class TestGeneratePrd:
         assert "sess-interactive" in second_call_args
         assert "--print" in second_call_args
 
-    @patch("ralpher.prd.prd.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_raises_when_prd_not_created(self, mock_exec, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -294,7 +295,7 @@ class TestGeneratePrd:
         with pytest.raises(SystemExit):
             await generate_prd("task-no-prd", "test")
 
-    @patch("ralpher.prd.prd.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_prompt_uses_prd_skill_with_task_id(self, mock_exec, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -320,7 +321,7 @@ class TestExtractPrdJson:
         mock_spinner.__aexit__ = AsyncMock(return_value=False)
         mock_spinner.run = AsyncMock()
         monkeypatch.setattr(
-            "ralpher.prd.extract.Spinner", lambda: mock_spinner,
+            "ralpher.utils.claude.Spinner", lambda: mock_spinner,
         )
 
     @pytest.mark.asyncio
@@ -337,7 +338,7 @@ class TestExtractPrdJson:
         with pytest.raises(SystemExit):
             await extract_prd_json("test-task")
 
-    @patch("ralpher.prd.extract.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_returns_on_success(self, mock_exec, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -369,7 +370,7 @@ class TestExtractPrdJson:
         assert "haiku" in call_args
         assert "--print" in call_args
 
-    @patch("ralpher.prd.extract.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_raises_on_all_retries_failed(self, mock_exec, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -381,7 +382,7 @@ class TestExtractPrdJson:
         with pytest.raises(SystemExit):
             await extract_prd_json("test-task", retries=1)
 
-    @patch("ralpher.prd.extract.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_raises_when_prd_json_not_created(self, mock_exec, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -393,7 +394,7 @@ class TestExtractPrdJson:
         with pytest.raises(SystemExit):
             await extract_prd_json("test-task", retries=1)
 
-    @patch("ralpher.prd.extract.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_prompt_includes_task_id(self, mock_exec, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -419,7 +420,7 @@ class TestExtractPrdJson:
         prompt_arg = call_args[-1]
         assert "my-task-123" in prompt_arg
 
-    @patch("ralpher.prd.extract.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_retries_on_invalid_prd_json(self, mock_exec, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -451,7 +452,7 @@ class TestExtractPrdJson:
         await extract_prd_json("retry-task", retries=3)
         assert mock_exec.call_count == 2
 
-    @patch("ralpher.prd.extract.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_retries_on_nonzero_exit_then_succeeds(self, mock_exec, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)

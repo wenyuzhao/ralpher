@@ -1,17 +1,16 @@
-import asyncio
 import json
+import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
-import json
-import subprocess
 
 import rich
-from .prd.extract import extract_prd_json
-from .models import PRD
-from .utils.spinner import Spinner
-from .utils.error import fail
 from rich.prompt import Confirm
+
+from .models import PRD
+from .prd.extract import extract_prd_json
+from .utils.claude import ClaudeError, run_claude
+from .utils.error import fail
 from .utils.hooks import HooksManager
 
 
@@ -122,35 +121,15 @@ async def _run_one_iteration(
     )
     await hooks.on_iteration_start(i, story.id)
 
-    cmd = [
-        "claude",
-        "--dangerously-skip-permissions",
-        "--permission-mode",
-        "dontAsk",
-        "--plugin-dir",
-        str(Path(__file__).resolve().parent / "plugin"),
-        "--print",
-        f"/ralpher:loop {task_id}",
-    ]
-
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-
-    async with Spinner() as spinner:
-        await spinner.run(proc)
-
-    # Save stdout and stderr to log files for debugging
-    stdout = (await proc.stdout.read()).decode() if proc.stdout else ""
-    stderr = (await proc.stderr.read()).decode() if proc.stderr else ""
-    (logs_dir / f"{i}.out.log").write_text(stdout)
-    (logs_dir / f"{i}.err.log").write_text(stderr)
-
-    if proc.returncode != 0:
-        await hooks.on_error(f"Iteration {i} failed with exit code {proc.returncode}")
-        fail(f"Claude process exited with code {proc.returncode}")
+    try:
+        await run_claude(
+            f"/ralpher:loop {task_id}",
+            mode="text",
+            logs=(logs_dir / f"{i}.out.log", logs_dir / f"{i}.err.log"),
+        )
+    except ClaudeError as e:
+        await hooks.on_error(f"Iteration {i} failed with exit code {e.returncode}")
+        fail(f"Claude process exited with code {e.returncode}")
 
     # Propagate changes to prd.json if updated
     prd_file = task_dir / "prd.json"

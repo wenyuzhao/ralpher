@@ -46,11 +46,11 @@ class TestRunOneIteration:
         mock_spinner.__aexit__ = AsyncMock(return_value=False)
         mock_spinner.run = AsyncMock()
         monkeypatch.setattr(
-            "ralpher.loop.Spinner",
+            "ralpher.utils.claude.Spinner",
             lambda: mock_spinner,
         )
 
-    @patch("ralpher.loop.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_marks_story_passed_when_current_story_passes(
         self, mock_exec, tmp_path
@@ -82,7 +82,7 @@ class TestRunOneIteration:
         updated = json.loads((task_dir / "prd.json").read_text())
         assert updated["user_stories"][0]["passes"] is True
 
-    @patch("ralpher.loop.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_raises_on_nonzero_exit(self, mock_exec, tmp_path):
         task_id = "iter-fail"
@@ -104,7 +104,7 @@ class TestRunOneIteration:
         with pytest.raises(SystemExit):
             await _run_one_iteration(task_id, prd, task_dir, 0, HooksManager([]))
 
-    @patch("ralpher.loop.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_writes_log_files(self, mock_exec, tmp_path):
         task_id = "iter-logs"
@@ -119,11 +119,16 @@ class TestRunOneIteration:
             (task_dir / "current_user_story.json").write_text(
                 json.dumps({"id": "us-1", "passes": False})
             )
+            # Write to the file objects passed as stdout/stderr
+            stdout_file = kwargs.get("stdout")
+            stderr_file = kwargs.get("stderr")
+            if stdout_file:
+                stdout_file.write(b"some output")
+            if stderr_file:
+                stderr_file.write(b"some error")
             proc = AsyncMock()
             proc.wait.return_value = None
             proc.returncode = 0
-            proc.stdout.read.return_value = b"some output"
-            proc.stderr.read.return_value = b"some error"
             return proc
 
         mock_exec.side_effect = side_effect
@@ -133,7 +138,7 @@ class TestRunOneIteration:
         assert (logs_dir / "0.out.log").read_text() == "some output"
         assert (logs_dir / "0.err.log").read_text() == "some error"
 
-    @patch("ralpher.loop.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_command_flags(self, mock_exec, tmp_path):
         task_id = "iter-flags"
@@ -175,7 +180,7 @@ class TestLoop:
         mock_spinner.__aexit__ = AsyncMock(return_value=False)
         mock_spinner.run = AsyncMock()
         monkeypatch.setattr(
-            "ralpher.loop.Spinner",
+            "ralpher.utils.claude.Spinner",
             lambda: mock_spinner,
         )
 
@@ -188,7 +193,7 @@ class TestLoop:
             await loop(task_dir, max_iterations=5, hooks=HooksManager([]))
 
     @patch("ralpher.loop._checkout_branch")
-    @patch("ralpher.loop.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_completes_when_all_stories_pass(
         self, mock_exec, mock_checkout, tmp_path, monkeypatch
@@ -220,7 +225,7 @@ class TestLoop:
         assert mock_exec.call_count == 1
 
     @patch("ralpher.loop._checkout_branch")
-    @patch("ralpher.loop.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_exits_with_error_when_max_iterations_reached(
         self, mock_exec, mock_checkout, tmp_path, monkeypatch

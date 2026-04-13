@@ -1,60 +1,33 @@
-import asyncio
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import rich
 from ..models import PRD
-from ..utils.spinner import Spinner
+from ..utils.claude import ClaudeError, run_claude
 from ..utils.error import fail
-
-PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
 
 async def __try_extract_prd(task_dir: Path, task_id: str):
     """Run a Claude Code session with the rendered PRD prompt."""
 
-    prompt = f"/ralpher:ralph {task_id}"
-    cmd = [
-        "claude",
-        "--output-format",
-        "json",
-        "--dangerously-skip-permissions",
-        "--permission-mode",
-        "dontAsk",
-        "--plugin-dir",
-        str(Path(__file__).resolve().parent.parent / "plugin"),
-        "--print",
-        "--model",
-        "haiku",
-        prompt,
-    ]
-
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-
-    async with Spinner() as spinner:
-        await spinner.run(proc)
-
-    if proc.returncode != 0:
-        if proc.stdout:
-            stdout = await proc.stdout.read()
-            print(stdout.decode(), file=sys.stdout)
-            (task_dir / ".claude.out.log").write_bytes(stdout)
-        if proc.stderr:
-            stderr = await proc.stderr.read()
-            (task_dir / ".claude.err.log").write_bytes(stderr)
+    try:
+        await run_claude(
+            f"/ralpher:ralph {task_id}",
+            mode="qa",
+            model="haiku",
+        )
+    except ClaudeError as e:
+        (task_dir / ".claude.out.log").write_bytes(e.stdout)
+        (task_dir / ".claude.err.log").write_bytes(e.stderr)
         return False
 
     if not (task_dir / "prd.json").exists():
         return False
     prd_dict = json.loads((task_dir / "prd.json").read_text())
     try:
-        prd = PRD.model_validate(prd_dict)
-    except Exception as e:
+        PRD.model_validate(prd_dict)
+    except Exception:
         return False
     return True
 

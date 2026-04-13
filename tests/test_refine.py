@@ -14,7 +14,7 @@ class TestRefinePrd:
         mock_spinner.__aexit__ = AsyncMock(return_value=False)
         mock_spinner.run = AsyncMock()
         monkeypatch.setattr(
-            "ralpher.prd.prd.Spinner", lambda: mock_spinner,
+            "ralpher.utils.claude.Spinner", lambda: mock_spinner,
         )
 
     @pytest.mark.asyncio
@@ -31,7 +31,7 @@ class TestRefinePrd:
         with pytest.raises(SystemExit):
             await refine_prd("test-task", "add auth")
 
-    @patch("ralpher.prd.prd.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_returns_task_id_on_success(self, mock_exec, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -51,7 +51,7 @@ class TestRefinePrd:
         result = await refine_prd(task_id, "add user authentication")
         assert result == task_id
 
-    @patch("ralpher.prd.prd.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_raises_when_prd_deleted_after_refine(self, mock_exec, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -74,7 +74,7 @@ class TestRefinePrd:
         with pytest.raises(SystemExit):
             await refine_prd(task_id, "break everything")
 
-    @patch("ralpher.prd.prd.asyncio.create_subprocess_exec")
+    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
     async def test_command_uses_refine_skill(self, mock_exec, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
