@@ -165,51 +165,65 @@ class TestAskUserQuestions:
 
 
 class TestGeneratePrd:
+    @patch("ralpher.prd.prd.init_project")
     @patch("ralpher.prd.prd.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_returns_task_id_on_success(self, mock_run, tmp_path, monkeypatch):
+    async def test_returns_task_id_on_success(self, mock_run, mock_init, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         task_id = "test-task-1"
 
         async def side_effect(**kwargs):
+            (tmp_path / ".ralpher" / "tasks" / task_id / "PRD.md").mkdir(parents=True, exist_ok=True)
+            (tmp_path / ".ralpher" / "tasks" / task_id / "PRD.md").rmdir()
             (tmp_path / ".ralpher" / "tasks" / task_id / "PRD.md").write_text("# PRD")
 
         mock_run.side_effect = side_effect
         result = await generate_prd(task_id=task_id, prompt="Build a chat app", model=None)
         assert result == task_id
 
+    @patch("ralpher.prd.prd.init_project")
     @patch("ralpher.prd.prd.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_raises_on_claude_error(self, mock_run, tmp_path, monkeypatch):
+    async def test_raises_on_claude_error(self, mock_run, mock_init, tmp_path, monkeypatch):
         from ralpher.utils.claude import ClaudeError
         monkeypatch.chdir(tmp_path)
         mock_run.side_effect = ClaudeError(1)
         with pytest.raises(SystemExit):
             await generate_prd(task_id="task-fail", prompt="test", model=None)
 
+    @patch("ralpher.prd.prd.init_project")
     @patch("ralpher.prd.prd.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_creates_task_directory_and_prompt(self, mock_run, tmp_path, monkeypatch):
+    async def test_creates_task_directory_and_prompt(self, mock_run, mock_init, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         task_id = "task-dir-test"
-
-        async def side_effect(**kwargs):
-            (tmp_path / ".ralpher" / "tasks" / task_id / "PRD.md").write_text("# PRD")
-
-        mock_run.side_effect = side_effect
-        result = await generate_prd(task_id=task_id, prompt="My feature request", model=None)
         task_dir = tmp_path / ".ralpher" / "tasks" / task_id
+
+        def init_side_effect(td, prompt):
+            td.mkdir(parents=True, exist_ok=True)
+            (td / "PROMPT.md").write_text(prompt)
+
+        mock_init.side_effect = init_side_effect
+
+        async def run_side_effect(**kwargs):
+            (task_dir / "PRD.md").write_text("# PRD")
+
+        mock_run.side_effect = run_side_effect
+        result = await generate_prd(task_id=task_id, prompt="My feature request", model=None)
         assert task_dir.exists()
         assert (task_dir / "PROMPT.md").read_text() == "My feature request"
 
+    @patch("ralpher.prd.prd.init_project")
     @patch("ralpher.prd.prd.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_calls_run_claude_with_correct_args(self, mock_run, tmp_path, monkeypatch):
+    async def test_calls_run_claude_with_correct_args(self, mock_run, mock_init, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         task_id = "task-flags"
 
         async def side_effect(**kwargs):
-            (tmp_path / ".ralpher" / "tasks" / task_id / "PRD.md").write_text("# PRD")
+            task_dir = tmp_path / ".ralpher" / "tasks" / task_id
+            task_dir.mkdir(parents=True, exist_ok=True)
+            (task_dir / "PRD.md").write_text("# PRD")
 
         mock_run.side_effect = side_effect
         await generate_prd(task_id=task_id, prompt="Implement SSO login", model=None)
@@ -218,9 +232,10 @@ class TestGeneratePrd:
         assert "/ralpher:prd" in call_kwargs["prompt"]
         assert call_kwargs["interactive"] is True
 
+    @patch("ralpher.prd.prd.init_project")
     @patch("ralpher.prd.prd.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_raises_when_prd_not_created(self, mock_run, tmp_path, monkeypatch):
+    async def test_raises_when_prd_not_created(self, mock_run, mock_init, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         mock_run.return_value = None
         with pytest.raises(SystemExit):
