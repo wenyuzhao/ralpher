@@ -22,7 +22,7 @@ def init_project(task_dir: Path, prompt: str) -> None:
         .decode()
         .strip()
     )
-    if branches or True:
+    if branches:
         rich.print(
             f"[yellow][b]Warning:[/] Branch [i]{branch}[/i] already exists and will be reused.[/]"
         )
