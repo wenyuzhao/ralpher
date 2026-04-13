@@ -37,7 +37,7 @@ Ask only critical questions where the initial prompt is ambiguous. Focus on:
 
 Generate the PRD document.
 
-Please refer to @$1/docs/prd-structure.md for a list of required sections and an example.
+Please refer to @!`echo $RALPHER_PLUGIN`/docs/prd-structure.md for a list of required sections and an example.
 
 ---
 

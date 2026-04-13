@@ -39,7 +39,7 @@ Ask only critical questions where the user prompt is ambiguous.
 
 Update the PRD document.
 
-Please refer to @../docs/prd-structure.md for a list of required sections and an example.
+Please refer to @!`echo $RALPHER_PLUGIN`/docs/prd-structure.md for a list of required sections and an example.
 
 Strictly follow the user's instructions, and don't change unrelated parts.
 
