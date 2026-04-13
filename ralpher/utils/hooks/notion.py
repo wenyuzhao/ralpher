@@ -31,25 +31,25 @@ async def __create_page(
 
 
 async def __resolve_page_id(token: str, version: str, title: str) -> str | None:
-    page_id = os.getenv("NOTION_PAGE_ID")
+    page_id = os.getenv("RALPHER_NOTION_PAGE_ID")
     if page_id:
         return page_id
 
-    parent_page_id = os.getenv("NOTION_PARENT_PAGE_ID")
+    parent_page_id = os.getenv("RALPHER_NOTION_PARENT_PAGE_ID")
     if not parent_page_id:
         return None
 
     new_page_id = await __create_page(parent_page_id, title, token, version)
     if new_page_id:
-        os.environ["NOTION_PAGE_ID"] = new_page_id
+        os.environ["RALPHER_NOTION_PAGE_ID"] = new_page_id
     return new_page_id
 
 
 async def __update_page(title: str, content: str) -> bool:
-    token = os.getenv("NOTION_TOKEN")
+    token = os.getenv("RALPHER_NOTION_TOKEN")
     if not token:
         return False
-    version = os.getenv("NOTION_VERSION", "2026-03-11")
+    version = os.getenv("RALPHER_NOTION_VERSION", "2026-03-11")
 
     page_id = await __resolve_page_id(token, version, title)
     if not page_id:
@@ -97,8 +97,9 @@ async def __update_page(title: str, content: str) -> bool:
 
 
 async def update_notion_page(task_dir: Path, status: Status | None) -> bool:
-    if "NOTION_TOKEN" not in os.environ or (
-        "NOTION_PAGE_ID" not in os.environ and "NOTION_PARENT_PAGE_ID" not in os.environ
+    if "RALPHER_NOTION_TOKEN" not in os.environ or (
+        "RALPHER_NOTION_PAGE_ID" not in os.environ
+        and "RALPHER_NOTION_PARENT_PAGE_ID" not in os.environ
     ):
         return False
 
