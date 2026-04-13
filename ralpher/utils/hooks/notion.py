@@ -128,6 +128,7 @@ async def update_notion_page(task_dir: Path, status: Status | None) -> bool:
         progress_md=progress_md,
         active_us=status.active_user_story if status else None,
         status=status,
+        branch=f"ralph/{task_dir.name[18:]}",
     )
     success = await __update_page(task_dir.name, rendered)
     return success

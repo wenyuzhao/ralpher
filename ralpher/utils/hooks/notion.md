@@ -16,6 +16,12 @@
 *N/A*
 {% endif %}
 
+# 📂 Git Branch
+
+```
+{{branch}}
+```
+
 # 📜 PRD
 
 <details>
