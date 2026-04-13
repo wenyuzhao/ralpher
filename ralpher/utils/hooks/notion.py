@@ -173,5 +173,7 @@ async def update_notion_page(task_dir: Path, status: Status | None) -> bool:
 
 
 class NotionHooks(Hooks):
+    name = "Notion"
+
     async def update(self):
         await update_notion_page(self.task_dir, self.status)

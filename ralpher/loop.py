@@ -56,7 +56,9 @@ async def loop(
 
     rich.print(f" • Incomplete user stories: {num_failed_stories} / {num_stories}")
     rich.print(f" • Branch: [i]{branch}[/]")
-    rich.print(f" • Max iterations: {max_iterations}\n")
+    rich.print(f" • Max iterations: {max_iterations}")
+    hooks.report_status()
+    print()
 
     # Track current branch
     _checkout_branch(branch)

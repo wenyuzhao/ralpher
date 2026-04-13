@@ -1,10 +1,14 @@
 from pathlib import Path
 import datetime
 
+import rich
+
 from ...models import PRD, Status
 
 
 class Hooks:
+    name: str = "base"
+
     def __init__(self):
         self.task_id: str
         self.task_dir: Path
@@ -92,6 +96,12 @@ class HooksManager:
 
             hooks = [NotionHooks()]
         self.hooks = hooks
+
+    def report_status(self):
+        if not self.hooks:
+            return
+        names = ", ".join(h.name for h in self.hooks)
+        rich.print(f" • Hooks: [i]{names}[/]")
 
     async def init(self, task_dir: Path, max_iterations: int):
         for h in self.hooks:
