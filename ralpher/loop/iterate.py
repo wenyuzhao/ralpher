@@ -13,9 +13,7 @@ async def implement_and_review(run: RunInfo, hooks: HooksManager):
 
     try:
         await run_claude(
-            prompt=f"/ralpher:iterate {run.id}",
-            task_dir=run.task_dir,
-            model=run.model,
+            prompt=f"/ralpher:iterate {run.id}", task_dir=run.task_dir, model=run.model
         )
     except ClaudeError as e:
         await hooks.on_error(f"Iteration {i} failed with exit code {e.returncode}")

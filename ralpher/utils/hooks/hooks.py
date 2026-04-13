@@ -59,7 +59,7 @@ class Hooks:
         assert prd is not None
         user_story = next((s for s in prd.user_stories if s.id == us), None)
         assert user_story
-        label = f"**[Iteration {index} / {self.max_iterations}]** **{user_story.id}** - {user_story.title}"
+        label = f"**[Iteration {index+1} / {self.max_iterations}]** **{user_story.id}** - {user_story.title}"
         self.status = Status(status="running", label=label)
         await self.update()
 
