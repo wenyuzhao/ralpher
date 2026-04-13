@@ -44,7 +44,6 @@ class TestPRD:
         ]
         return PRD(
             project="Test",
-            branch_name="feat/test",
             description="A test PRD",
             user_stories=stories,
         )

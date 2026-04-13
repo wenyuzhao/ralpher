@@ -7,11 +7,11 @@ from pathlib import Path
 import rich
 from rich.prompt import Confirm
 
-from .models import PRD
-from .prd.extract import extract_prd_json
-from .utils.claude import ClaudeError, run_claude
-from .utils.error import fail
-from .utils.hooks import HooksManager
+from ..models import PRD
+from ..prd.extract import extract_prd_json
+from ..utils.claude import ClaudeError, run_claude
+from ..utils.error import fail
+from ..utils.hooks import HooksManager
 
 
 async def loop(

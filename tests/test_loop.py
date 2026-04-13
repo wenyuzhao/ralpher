@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ralpher.loop import loop, _run_one_iteration, _init_progress
+from ralpher.loop.loop import loop, _run_one_iteration, _init_progress
 from ralpher.models import PRD, UserStory
 from ralpher.utils.hooks import HooksManager
 
@@ -39,7 +39,7 @@ class TestInitProgress:
 
 
 class TestRunOneIteration:
-    @patch("ralpher.loop.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.loop.loop.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_marks_story_passed_when_current_story_passes(
         self, mock_run, tmp_path
@@ -65,7 +65,7 @@ class TestRunOneIteration:
         updated = PRD.load(task_dir / "prd.json")
         assert updated.user_stories[0].passes is True
 
-    @patch("ralpher.loop.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.loop.loop.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_raises_on_claude_error(self, mock_run, tmp_path):
         from ralpher.utils.claude import ClaudeError
@@ -83,7 +83,7 @@ class TestRunOneIteration:
         with pytest.raises(SystemExit):
             await _run_one_iteration(task_id, prd, task_dir, 0, HooksManager([]), None)
 
-    @patch("ralpher.loop.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.loop.loop.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_writes_current_user_story(self, mock_run, tmp_path):
         task_id = "iter-logs"
@@ -105,7 +105,7 @@ class TestRunOneIteration:
         cus = json.loads((task_dir / "current_user_story.json").read_text())
         assert cus["id"] == "us-1"
 
-    @patch("ralpher.loop.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.loop.loop.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_command_uses_loop_skill(self, mock_run, tmp_path):
         task_id = "iter-flags"
@@ -136,10 +136,12 @@ class TestLoop:
         task_dir = tmp_path / ".ralpher" / "tasks" / "no-prd"
         task_dir.mkdir(parents=True)
         with pytest.raises(SystemExit):
-            await loop(task_dir=task_dir, max_iterations=5, hooks=HooksManager([]), model=None)
+            await loop(
+                task_dir=task_dir, max_iterations=5, hooks=HooksManager([]), model=None
+            )
 
-    @patch("ralpher.loop._checkout_branch")
-    @patch("ralpher.loop.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.loop.loop._checkout_branch")
+    @patch("ralpher.loop.loop.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_completes_when_all_stories_pass(
         self, mock_run, mock_checkout, tmp_path, monkeypatch
@@ -160,11 +162,13 @@ class TestLoop:
             )
 
         mock_run.side_effect = side_effect
-        await loop(task_dir=task_dir, max_iterations=5, hooks=HooksManager([]), model=None)
+        await loop(
+            task_dir=task_dir, max_iterations=5, hooks=HooksManager([]), model=None
+        )
         assert mock_run.call_count == 1
 
-    @patch("ralpher.loop._checkout_branch")
-    @patch("ralpher.loop.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.loop.loop._checkout_branch")
+    @patch("ralpher.loop.loop.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_exits_with_error_when_max_iterations_reached(
         self, mock_run, mock_checkout, tmp_path, monkeypatch
@@ -184,12 +188,16 @@ class TestLoop:
             )
 
         mock_run.side_effect = side_effect
-        monkeypatch.setattr("ralpher.loop.time.sleep", lambda _: None)
+        import sys
+        _loop_mod = sys.modules["ralpher.loop.loop"]
+        monkeypatch.setattr(_loop_mod.time, "sleep", lambda _: None)
         with pytest.raises(SystemExit):
-            await loop(task_dir=task_dir, max_iterations=2, hooks=HooksManager([]), model=None)
+            await loop(
+                task_dir=task_dir, max_iterations=2, hooks=HooksManager([]), model=None
+            )
         assert mock_run.call_count == 2
 
-    @patch("ralpher.loop._checkout_branch")
+    @patch("ralpher.loop.loop._checkout_branch")
     @pytest.mark.asyncio
     async def test_skips_loop_when_all_stories_already_pass(
         self, mock_checkout, tmp_path, monkeypatch
@@ -215,4 +223,6 @@ class TestLoop:
         (task_dir / "PRD.md").write_text("# PRD")
         (task_dir / "prd.json").write_text(json.dumps(prd_data))
 
-        await loop(task_dir=task_dir, max_iterations=5, hooks=HooksManager([]), model=None)
+        await loop(
+            task_dir=task_dir, max_iterations=5, hooks=HooksManager([]), model=None
+        )
