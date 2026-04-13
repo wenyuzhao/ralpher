@@ -2,7 +2,7 @@
 
 A CLI tool that orchestrates [Claude Code](https://docs.anthropic.com/en/docs/claude-code) for autonomous software development. Give it a prompt, and it generates a PRD, breaks it into user stories, then runs iterative Claude development loops to implement each one.
 
-Workflow: `User Prompt` ➔ `PRD` ➔ ` Ralph Wiggum Loop⁠`
+Workflow: `User Prompt` ➔ `PRD` ➔ `Ralph Wiggum Loop⁠`
 
 ## Install
 
@@ -41,7 +41,7 @@ Ralpher supports optional Notion integration for syncing task status. Set these 
 
 ```bash
 # Run tests
-uv run pytest tests/ -v
+uv run pytest
 ```
 
 ## Acknowledgements
