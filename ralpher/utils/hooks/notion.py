@@ -84,9 +84,7 @@ async def __resolve_page_id(token: str, version: str, title: str) -> str | None:
 
 
 async def __update_page(title: str, content: str) -> bool:
-    token = os.getenv("RALPHER_NOTION_TOKEN")
-    if not token:
-        return False
+    token = os.environ["RALPHER_NOTION_TOKEN"]
     version = os.getenv("RALPHER_NOTION_VERSION", "2026-03-11")
 
     page_id = await __resolve_page_id(token, version, title)
@@ -95,17 +93,8 @@ async def __update_page(title: str, content: str) -> bool:
 
     url = f"https://api.notion.com/v1/pages/{page_id}"
     payload = {
-        "properties": {
-            "title": {
-                "title": [
-                    {
-                        "text": {
-                            "content": title,
-                        }
-                    }
-                ]
-            }
-        }
+        "properties": {"title": {"title": [{"text": {"content": title}}]}},
+        "is_locked": True,
     }
     headers = {
         "Notion-Version": version,
