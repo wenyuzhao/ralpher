@@ -1,0 +1,46 @@
+# Ralpher
+
+A CLI tool that orchestrates [Claude Code](https://docs.anthropic.com/en/docs/claude-code) for autonomous software development. Give it a prompt, and it generates a PRD, breaks it into user stories, then runs iterative Claude development loops to implement each one.
+
+Workflow: `User Prompt` ➔ `PRD` ➔ `Ralph Loop`
+
+## Install
+
+```bash
+pipx install ralpher
+```
+
+## Usage
+
+```bash
+# 1. Generate a PRD
+uv run ralpher prd "Create a TODO app" --name todo-app
+
+# 2. Run the Ralph-loop on an existing PRD
+uv run ralpher loop
+```
+
+## How it works
+
+1. **PRD generation** -- Sends your prompt to Claude to produce a structured PRD with user stories, saved to `.ralpher/tasks/{task_id}/PRD.md`.
+2. **Run Ralph-loop**
+    1. Parses the PRD into a structured JSON model (project, branch name, user stories with acceptance criteria and priorities).
+    2. Iteratively invokes `claude` to implement each user story on a dedicated git branch (`ralph/{task_id}`), tracking progress and detecting completion.
+
+## [Notion](https://www.notion.so/) integration
+
+Ralpher supports optional Notion integration for syncing task status. Set these in a `.env` file:
+
+- `RALPHER_NOTION_TOKEN` -- Notion API token
+- `RALPHER_NOTION_PARENT_PAGE_ID` -- Parent page for task pages
+
+## Development
+
+```bash
+# Run tests
+uv run pytest tests/ -v
+```
+
+## Acknowledgements
+
+This project draws its design and some of its prompts from [snarktank/ralph](https://github.com/snarktank/ralph).
