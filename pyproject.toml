@@ -20,6 +20,9 @@ dependencies = [
 [project.scripts]
 ralpher = "ralpher.main:main"
 
+[tool.hatch.build]
+exclude = [".claude/", "CLAUDE.md"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["ralpher"]
 artifacts = ["ralpher/**"]
