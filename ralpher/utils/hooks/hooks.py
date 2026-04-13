@@ -1,5 +1,4 @@
 from pathlib import Path
-import json
 import datetime
 
 from ...models import PRD, Status

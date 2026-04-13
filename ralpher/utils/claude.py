@@ -9,7 +9,6 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts.choice_input import ChoiceInput
 import rich
-from asyncio.subprocess import DEVNULL, PIPE
 
 from ralpher.models import Questions
 from ralpher.utils.error import fail

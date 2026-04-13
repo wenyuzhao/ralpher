@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 import os
 import httpx
@@ -8,15 +7,13 @@ from ralpher.models import PRD, Status
 from ralpher.utils.hooks.hooks import Hooks
 
 
-async def __create_page(parent_page_id: str, title: str, token: str, version: str) -> str | None:
+async def __create_page(
+    parent_page_id: str, title: str, token: str, version: str
+) -> str | None:
     url = "https://api.notion.com/v1/pages"
     payload = {
         "parent": {"page_id": parent_page_id},
-        "properties": {
-            "title": {
-                "title": [{"text": {"content": title}}]
-            }
-        },
+        "properties": {"title": {"title": [{"text": {"content": title}}]}},
     }
     headers = {
         "Notion-Version": version,
@@ -100,7 +97,9 @@ async def __update_page(title: str, content: str) -> bool:
 
 
 async def update_notion_page(task_dir: Path, status: Status | None) -> bool:
-    if "NOTION_TOKEN" not in os.environ or ("NOTION_PAGE_ID" not in os.environ and "NOTION_PARENT_PAGE_ID" not in os.environ):
+    if "NOTION_TOKEN" not in os.environ or (
+        "NOTION_PAGE_ID" not in os.environ and "NOTION_PARENT_PAGE_ID" not in os.environ
+    ):
         return False
 
     template_file = Path(__file__).parent / "notion.md"
