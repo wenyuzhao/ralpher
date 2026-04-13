@@ -11,11 +11,10 @@ async def generate_prd(*, task_id: str, prompt: str, model: str | None) -> str:
 
     task_dir = Path.cwd() / ".ralpher" / "tasks" / task_id
     init_project(task_dir, prompt)
-    plugin_path = Path(__file__).parent.parent / "plugin"
 
     try:
         await run_claude(
-            prompt=f"/ralpher:prd {task_id} {plugin_path}",
+            prompt=f"/ralpher:prd {task_id}",
             task_dir=task_dir,
             interactive=True,
             model=model,
