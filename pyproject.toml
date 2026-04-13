@@ -10,11 +10,11 @@ dependencies = [
     "python-frontmatter>=1.1",
     "prompt-toolkit>=3.0",
     "rich>=14.3.4",
-    "slugify>=0.0.1",
     "typer>=0.24.1",
     "yaspin>=3.4.0",
     "python-dotenv>=1.2.2",
     "httpx>=0.28.1",
+    "python-slugify>=8.0.4",
 ]
 
 [project.scripts]

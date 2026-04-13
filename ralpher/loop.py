@@ -52,12 +52,14 @@ async def loop(
         await hooks.on_loop_end(0, True)
         return
 
+    branch = f"ralph/{task_id[18:]}"
+
     rich.print(f" • Incomplete user stories: {num_failed_stories} / {num_stories}")
-    rich.print(f" • Branch: [i]{prd.branch_name}[/]")
+    rich.print(f" • Branch: [i]{branch}[/]")
     rich.print(f" • Max iterations: {max_iterations}\n")
 
     # Track current branch
-    _checkout_branch(prd)
+    _checkout_branch(branch)
 
     # Initialize progress file if it doesn't exist
     if not progress_file.exists():
@@ -159,7 +161,7 @@ async def _run_one_iteration(
     await hooks.on_iteration_end(i, story.id)
 
 
-def _checkout_branch(prd: PRD) -> None:
+def _checkout_branch(branch: str) -> None:
     """Checkout the branch or create from main/master if it's different from the current branch."""
 
     try:
@@ -177,13 +179,15 @@ def _checkout_branch(prd: PRD) -> None:
         subprocess.check_call(
             ["git", "commit", "--allow-empty", "-m", "Initial commit"]
         )
-        subprocess.check_call(["git", "checkout", "-b", prd.branch_name])
+        subprocess.check_call(["git", "checkout", "-b", branch])
         return
 
-    if prd.branch_name != current_branch:
+    if branch != current_branch:
         # Check if branch exists
         branches = (
-            subprocess.check_output(["git", "branch", "--list", prd.branch_name])
+            subprocess.check_output(
+                ["git", "branch", "--list", branch], stderr=subprocess.DEVNULL
+            )
             .decode()
             .strip()
         )
@@ -199,13 +203,13 @@ def _checkout_branch(prd: PRD) -> None:
             except subprocess.CalledProcessError:
                 base_branch = "master"
             subprocess.check_call(
-                ["git", "checkout", "-b", prd.branch_name, base_branch],
+                ["git", "checkout", "-b", branch, base_branch],
                 stderr=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
             )
         else:
             subprocess.check_call(
-                ["git", "checkout", prd.branch_name],
+                ["git", "checkout", branch],
                 stderr=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
             )

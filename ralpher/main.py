@@ -43,18 +43,24 @@ app = typer.Typer(cls=DefaultCommandGroup)
 DEFAULT_MAX_ITERATIONS = 30
 
 
-def _gen_task_id(name: str | None) -> str:
+def _gen_task_id(name: str) -> str:
     task_id = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
-    if name:
-        task_id += f"-{slugify(name)}"
+    task_id += f"-{slugify(name)}"
     return task_id
 
 
 @app.command()
 def prd(
-    prompt: Annotated[str, typer.Argument(help="The PRD prompt or file to generate from.")],
-    name: Annotated[str | None, typer.Option("--name", "-n", help="Name for the PRD task.")] = None,
-    model: Annotated[str | None, typer.Option("--model", "-m", help="Claude model to use")] = None,
+    prompt: Annotated[
+        str, typer.Argument(help="The PRD prompt or file to generate from.")
+    ],
+    name: Annotated[
+        str,
+        typer.Option("--name", "-n", help="Name for the project, in kebab-case."),
+    ],
+    model: Annotated[
+        str | None, typer.Option("--model", "-m", help="Claude model to use")
+    ] = None,
 ) -> None:
     """Generate a PRD."""
     _require_claude()
@@ -82,8 +88,13 @@ def _get_latest_task_id() -> str:
 @app.command()
 def refine(
     prompt: Annotated[str, typer.Argument(help="The refinement prompt or file.")],
-    task_id: Annotated[str | None, typer.Option("--task", "-t", help="The task ID of the PRD to refine.")] = None,
-    model: Annotated[str | None, typer.Option("--model", "-m", help="Claude model to use")] = None,
+    task_id: Annotated[
+        str | None,
+        typer.Option("--task", "-t", help="The task ID of the PRD to refine."),
+    ] = None,
+    model: Annotated[
+        str | None, typer.Option("--model", "-m", help="Claude model to use")
+    ] = None,
 ) -> None:
     """Refine an existing PRD."""
     _require_claude()
@@ -101,7 +112,9 @@ def refine(
 
 @app.command(hidden=True)
 def extract(
-    task_id: Annotated[str | None, typer.Argument(help="The task ID to extract JSON from.")] = None,
+    task_id: Annotated[
+        str | None, typer.Argument(help="The task ID to extract JSON from.")
+    ] = None,
 ) -> None:
     """Extract PRD JSON for a given task ID."""
     _require_claude()
@@ -118,9 +131,16 @@ def extract(
 
 @app.command()
 def loop(
-    task_id: Annotated[str | None, typer.Option("--task", "-t", help="The task ID to run the loop on.")] = None,
-    max_iterations: Annotated[int, typer.Option("--max-iterations", "-n", help="Maximum number of iterations.")] = DEFAULT_MAX_ITERATIONS,
-    model: Annotated[str | None, typer.Option("--model", "-m", help="Claude model to use")] = None,
+    task_id: Annotated[
+        str | None, typer.Option("--task", "-t", help="The task ID to run the loop on.")
+    ] = None,
+    max_iterations: Annotated[
+        int,
+        typer.Option("--max-iterations", "-n", help="Maximum number of iterations."),
+    ] = DEFAULT_MAX_ITERATIONS,
+    model: Annotated[
+        str | None, typer.Option("--model", "-m", help="Claude model to use")
+    ] = None,
 ) -> None:
     """Run Claude in a loop until tasks are complete or max iterations reached."""
     _require_claude()

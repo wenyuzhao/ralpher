@@ -17,7 +17,6 @@ class UserStory(BaseModel):
 
 class PRD(BaseModel):
     project: str
-    branch_name: str
     description: str
     user_stories: list[UserStory]
 
