@@ -1,4 +1,5 @@
 import datetime
+import shutil
 from pathlib import Path
 
 import click
@@ -15,6 +16,12 @@ from slugify import slugify
 from .utils.error import fail
 from .utils.hooks import HooksManager
 from dotenv import load_dotenv
+
+
+def _require_claude() -> None:
+    """Exit with an error if the claude CLI is not on PATH."""
+    if not shutil.which("claude"):
+        fail("'claude' CLI not found on PATH. Install it first: https://docs.anthropic.com/en/docs/claude-code")
 
 
 class DefaultCommandGroup(TyperGroup):
@@ -62,6 +69,7 @@ def run(
     ),
 ) -> None:
     """\\[default] Generate PRD, extract JSON, and run loop."""
+    _require_claude()
     if Path(prompt).is_file():
         prompt = Path(prompt).read_text()
     asyncio.run(_run(prompt, name, max_iterations))
@@ -101,6 +109,7 @@ def prd(
     ),
 ) -> None:
     """Generate a PRD."""
+    _require_claude()
     if Path(prompt).is_file():
         prompt = Path(prompt).read_text()
     task_id = _gen_task_id(name)
@@ -130,6 +139,7 @@ def refine(
     ),
 ) -> None:
     """Refine an existing PRD."""
+    _require_claude()
     if Path(prompt).is_file():
         prompt = Path(prompt).read_text()
     if not task_id:
@@ -149,6 +159,7 @@ def extract(
     ),
 ) -> None:
     """Extract PRD JSON for a given task ID."""
+    _require_claude()
     if not task_id:
         task_id = _get_latest_task_id()
         rich.print(
@@ -173,6 +184,7 @@ def loop(
     ),
 ) -> None:
     """Run Claude in a loop until tasks are complete or max iterations reached."""
+    _require_claude()
     load_dotenv()
 
     if not task_id:
