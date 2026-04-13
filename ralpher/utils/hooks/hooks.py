@@ -73,9 +73,9 @@ class Hooks:
         self.total_iterations = iterations
         if completed:
             if iterations == 0:
-                label = f"Project Completed"
+                label = f"Project completed"
             else:
-                label = f"Project Completed in {iterations} iterations"
+                label = f"Project completed in {iterations} iterations"
             status = "completed"
         else:
             label = f"Loop finished in {iterations} iterations (*INCOMPLETE*)"
