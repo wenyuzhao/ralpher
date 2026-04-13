@@ -29,7 +29,11 @@ async def loop(task_dir: Path, max_iterations: int, hooks: HooksManager) -> None
     if not prd_file.exists():
         rich.print(f"[bold blue]Extracting prd.json from PRD.md[/]\n")
         await hooks.on_extract_start()
-        await extract_prd_json(task_id)
+        try:
+            await extract_prd_json(task_id)
+        except Exception as e:
+            await hooks.on_error(f"Failed to extract prd.json: {str(e)}")
+            fail(f"Failed to extract prd.json: {str(e)}")
         if not prd_file.exists():
             await hooks.on_error("Failed to extract prd.json")
             fail(f"{prd_file} still not found after extraction.")
