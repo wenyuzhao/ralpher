@@ -5,7 +5,7 @@ import pytest
 
 from ralpher.loop import loop, _run_one_iteration, _init_progress
 from ralpher.models import PRD, UserStory
-from ralpher.utils.hooks import Hooks
+from ralpher.utils.hooks import HooksManager
 
 
 def _make_prd(stories: list[dict] | None = None) -> dict:
@@ -77,7 +77,7 @@ class TestRunOneIteration:
             return proc
 
         mock_exec.side_effect = side_effect
-        await _run_one_iteration(task_id, prd, task_dir, 0, None)
+        await _run_one_iteration(task_id, prd, task_dir, 0, HooksManager([]))
 
         updated = json.loads((task_dir / "prd.json").read_text())
         assert updated["user_stories"][0]["passes"] is True
@@ -102,7 +102,7 @@ class TestRunOneIteration:
         mock_exec.return_value = proc
 
         with pytest.raises(SystemExit):
-            await _run_one_iteration(task_id, prd, task_dir, 0, None)
+            await _run_one_iteration(task_id, prd, task_dir, 0, HooksManager([]))
 
     @patch("ralpher.loop.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
@@ -127,7 +127,7 @@ class TestRunOneIteration:
             return proc
 
         mock_exec.side_effect = side_effect
-        await _run_one_iteration(task_id, prd, task_dir, 0, None)
+        await _run_one_iteration(task_id, prd, task_dir, 0, HooksManager([]))
 
         logs_dir = task_dir / "logs"
         assert (logs_dir / "0.out.log").read_text() == "some output"
@@ -156,7 +156,7 @@ class TestRunOneIteration:
             return proc
 
         mock_exec.side_effect = side_effect
-        await _run_one_iteration(task_id, prd, task_dir, 0, None)
+        await _run_one_iteration(task_id, prd, task_dir, 0, HooksManager([]))
 
         call_args = mock_exec.call_args[0]
         assert "--dangerously-skip-permissions" in call_args
@@ -185,7 +185,7 @@ class TestLoop:
         task_dir = tmp_path / ".ralpher" / "tasks" / "no-prd"
         task_dir.mkdir(parents=True)
         with pytest.raises(SystemExit):
-            await loop("no-prd")
+            await loop(task_dir, max_iterations=5, hooks=HooksManager([]))
 
     @patch("ralpher.loop._checkout_branch")
     @patch("ralpher.loop.asyncio.create_subprocess_exec")
@@ -215,7 +215,7 @@ class TestLoop:
             return proc
 
         mock_exec.side_effect = side_effect
-        await loop(task_id, max_iterations=5)
+        await loop(task_dir, max_iterations=5, hooks=HooksManager([]))
         # Should complete without raising
         assert mock_exec.call_count == 1
 
@@ -249,7 +249,7 @@ class TestLoop:
         mock_exec.side_effect = side_effect
         monkeypatch.setattr("ralpher.loop.time.sleep", lambda _: None)
         with pytest.raises(SystemExit):
-            await loop(task_id, max_iterations=2)
+            await loop(task_dir, max_iterations=2, hooks=HooksManager([]))
         assert mock_exec.call_count == 2
 
     @patch("ralpher.loop._checkout_branch")
@@ -278,5 +278,5 @@ class TestLoop:
         (task_dir / "PRD.md").write_text("# PRD")
         (task_dir / "prd.json").write_text(json.dumps(prd_data))
 
-        await loop(task_id, max_iterations=5)
+        await loop(task_dir, max_iterations=5, hooks=HooksManager([]))
         # Should return immediately without running any iterations

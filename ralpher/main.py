@@ -13,6 +13,9 @@ from ralpher.prd.refine import refine_prd
 import asyncio
 from slugify import slugify
 from .utils.error import fail
+from .utils.hooks import HooksManager
+from dotenv import load_dotenv
+
 
 class DefaultCommandGroup(TyperGroup):
     """Typer group that falls back to 'run' when the first arg isn't a known command."""
@@ -73,12 +76,21 @@ def _gen_task_id(name: str | None) -> str:
 
 async def _run(prompt: str, name: str | None, max_iterations: int) -> None:
     """Generate PRD, extract JSON, and run loop."""
+    load_dotenv()
+
     task_id = _gen_task_id(name)
 
     rich.print(f"[bold blue]Generating PRD for new task: [i]{task_id}[/][/]\n")
     await generate_prd(task_id, prompt, name)
     rich.print(f"[green]✔ PRD generated at .ralpher/tasks/{task_id}/PRD.md[/]\n")
-    await _loop(task_id, max_iterations)
+    task_dir = Path.cwd() / ".ralpher" / "tasks" / task_id
+    hooks = HooksManager()
+    await hooks.init(task_dir, max_iterations)
+    try:
+        await _loop(task_dir, max_iterations, hooks)
+    except BaseException as e:
+        await hooks.on_error(str(e))
+        raise e
 
 
 @app.command()
@@ -161,12 +173,25 @@ def loop(
     ),
 ) -> None:
     """Run Claude in a loop until tasks are complete or max iterations reached."""
+    load_dotenv()
+
     if not task_id:
         task_id = _get_latest_task_id()
         rich.print(f"[bold blue]Running the latest task: [i]{task_id}[/][/]\n")
     else:
         rich.print(f"[bold blue]Running task: [i]{task_id}[/][/]\n")
-    asyncio.run(_loop(task_id, max_iterations))
+
+    async def run_loop_with_hooks():
+        hooks = HooksManager()
+        task_dir = Path.cwd() / ".ralpher" / "tasks" / task_id
+        await hooks.init(task_dir, max_iterations)
+        try:
+            await _loop(task_dir, max_iterations, hooks)
+        except BaseException as e:
+            await hooks.on_error(str(e))
+            raise e
+
+    asyncio.run(run_loop_with_hooks())
 
 
 def main() -> None:

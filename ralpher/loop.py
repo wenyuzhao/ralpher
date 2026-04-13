@@ -12,28 +12,30 @@ from .models import PRD
 from .utils.spinner import Spinner
 from .utils.error import fail
 from rich.prompt import Confirm
-from .utils.hooks import Hooks
+from .utils.hooks import HooksManager
 
 
-async def loop(task_id: str, max_iterations: int = 10) -> None:
+async def loop(task_dir: Path, max_iterations: int, hooks: HooksManager) -> None:
     """Run Claude in a loop, checking for completion signal each iteration."""
-    task_dir = Path.cwd() / ".ralpher" / "tasks" / task_id
+    task_id = task_dir.name
     prd_file = task_dir / "prd.json"
     prd_doc = task_dir / "PRD.md"
     progress_file = task_dir / "progress.md"
-    hooks = Hooks(task_id, task_dir, max_iterations)
 
     if not prd_doc.exists():
+        await hooks.on_error("PRD.md not found")
         fail(f"{prd_doc} not found.")
 
     if not prd_file.exists():
         rich.print(f"[bold blue]Extracting prd.json from PRD.md[/]\n")
         await hooks.on_extract_start()
         await extract_prd_json(task_id)
-        success = prd_file.exists()
-        await hooks.on_extract_end(success)
-        if success:
+        if not prd_file.exists():
+            await hooks.on_error("Failed to extract prd.json")
             fail(f"{prd_file} still not found after extraction.")
+        await hooks.on_extract_end()
+
+    await hooks.on_loop_start()
 
     prd = PRD.model_validate(json.loads(prd_file.read_text()))
 
@@ -42,13 +44,12 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
 
     if num_failed_stories == 0:
         rich.print(f"[bold green]✔ All {num_stories} user stories already pass![/]")
+        await hooks.on_loop_end(0, True)
         return
 
     rich.print(f" • Incomplete user stories: {num_failed_stories} / {num_stories}")
     rich.print(f" • Branch: [i]{prd.branch_name}[/]\n")
     rich.print(f" • Max iterations: {max_iterations}\n")
-
-    await hooks.on_loop_start()
 
     # Track current branch
     _checkout_branch(prd)
@@ -62,7 +63,9 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
             f"[yellow][b]Warning:[/] Max iterations ({max_iterations}) is less than the number of user stories ({len(prd.user_stories)}). Some stories may not be attempted.[/]\n"
         )
         if not Confirm.ask("Do you want to continue?", default=False):
-            await hooks.on_loop_end(0, "canceled")
+            await hooks.on_cancel(
+                "User aborted due to max_iterations < number of user stories."
+            )
             raise SystemExit(0)
 
     all_passed = False
@@ -83,7 +86,7 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
         if i < max_iterations - 1:
             time.sleep(3)
 
-    await hooks.on_loop_end(iterations, "complete" if all_passed else "incomplete")
+    await hooks.on_loop_end(iterations, all_passed)
     if all_passed:
         rich.print(f"[bold green]✔ Completed in {iterations} iterations![/bold green]")
     else:
@@ -94,7 +97,7 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
 
 
 async def _run_one_iteration(
-    task_id: str, prd: PRD, task_dir: Path, i: int, hooks: Hooks | None
+    task_id: str, prd: PRD, task_dir: Path, i: int, hooks: HooksManager
 ) -> None:
     """Run claude --dangerously-skip-permissions --print with CLAUDE.md as stdin."""
 
@@ -113,8 +116,7 @@ async def _run_one_iteration(
     rich.print(
         f"[bold magenta]\\[#{i}] [i]{story.id}[/] - {story.title}[/bold magenta]\n",
     )
-    if hooks:
-        await hooks.on_iteration_start(i)
+    await hooks.on_iteration_start(i, story.id)
 
     cmd = [
         "claude",
@@ -143,8 +145,7 @@ async def _run_one_iteration(
     (logs_dir / f"{i}.err.log").write_text(stderr)
 
     if proc.returncode != 0:
-        if hooks:
-            await hooks.on_loop_end(i + 1, "crashed")
+        await hooks.on_error(f"Iteration {i} failed with exit code {proc.returncode}")
         fail(f"Claude process exited with code {proc.returncode}")
 
     # Propagate changes to prd.json if updated
@@ -167,8 +168,7 @@ async def _run_one_iteration(
         rich.print(f"  [green]✔ PASSED[/green]\n")
     else:
         rich.print(f"  [red]✘ FAILED[/red]\n")
-    if hooks:
-        await hooks.on_iteration_end(i)
+    await hooks.on_iteration_end(i, story.id)
 
 
 def _checkout_branch(prd: PRD) -> None:

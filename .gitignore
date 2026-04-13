@@ -12,3 +12,4 @@ wheels/
 /.claude/ralpher
 /.ralpher
 /test-project
+/.env
