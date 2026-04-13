@@ -21,7 +21,7 @@ dependencies = [
 ralpher = "ralpher.main:main"
 
 [tool.hatch.build]
-exclude = [".claude/", "CLAUDE.md"]
+exclude = [".claude/", "CLAUDE.md", "tests/"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["ralpher"]
