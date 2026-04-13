@@ -27,6 +27,9 @@ class PRD(BaseModel):
             raise FileNotFoundError(f"{path} not found.")
         return PRD.model_validate(json.loads(path.read_text()))
 
+    def save(self, path: Path) -> None:
+        path.write_text(json.dumps(self.model_dump(), indent=2))
+
     def failed_stories(self) -> list[UserStory]:
         return [s for s in self.user_stories if not s.passes]
 

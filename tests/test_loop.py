@@ -79,8 +79,8 @@ class TestRunOneIteration:
         mock_exec.side_effect = side_effect
         await _run_one_iteration(task_id, prd, task_dir, 0, HooksManager([]))
 
-        updated = json.loads((task_dir / "prd.json").read_text())
-        assert updated["user_stories"][0]["passes"] is True
+        updated = PRD.load(task_dir / "prd.json")
+        assert updated.user_stories[0].passes is True
 
     @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
     @pytest.mark.asyncio
@@ -92,7 +92,7 @@ class TestRunOneIteration:
 
         prd_data = _make_prd()
         (task_dir / "prd.json").write_text(json.dumps(prd_data))
-        prd = PRD.model_validate(prd_data)
+        prd = PRD.load(task_dir / "prd.json")
 
         proc = AsyncMock()
         proc.wait.return_value = None
@@ -113,7 +113,7 @@ class TestRunOneIteration:
 
         prd_data = _make_prd()
         (task_dir / "prd.json").write_text(json.dumps(prd_data))
-        prd = PRD.model_validate(prd_data)
+        prd = PRD.load(task_dir / "prd.json")
 
         def side_effect(*args, **kwargs):
             (task_dir / "current_user_story.json").write_text(
@@ -147,7 +147,7 @@ class TestRunOneIteration:
 
         prd_data = _make_prd()
         (task_dir / "prd.json").write_text(json.dumps(prd_data))
-        prd = PRD.model_validate(prd_data)
+        prd = PRD.load(task_dir / "prd.json")
 
         def side_effect(*args, **kwargs):
             (task_dir / "current_user_story.json").write_text(

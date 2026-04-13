@@ -26,7 +26,7 @@ class Hooks:
         prd_file = self.task_dir / "prd.json"
         if not prd_file.exists():
             return None
-        return PRD.model_validate(json.loads(prd_file.read_text()))
+        return PRD.load(prd_file)
 
     async def on_cancel(self, message: str | None = None):
         label = f"Canceled: {message}" if message else "Canceled"

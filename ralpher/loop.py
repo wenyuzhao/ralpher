@@ -40,7 +40,7 @@ async def loop(task_dir: Path, max_iterations: int, hooks: HooksManager) -> None
 
     await hooks.on_loop_start()
 
-    prd = PRD.model_validate(json.loads(prd_file.read_text()))
+    prd = PRD.load(prd_file)
 
     num_stories = len(prd.user_stories)
     num_failed_stories = len(prd.failed_stories())
@@ -81,7 +81,7 @@ async def loop(task_dir: Path, max_iterations: int, hooks: HooksManager) -> None
         await _run_one_iteration(task_id, prd, task_dir, i, hooks)
 
         # Check for completion
-        prd = PRD.model_validate(json.loads(prd_file.read_text()))
+        prd = PRD.load(prd_file)
         all_passed = len(prd.failed_stories()) == 0
         if all_passed:
             break
@@ -138,12 +138,12 @@ async def _run_one_iteration(
     success = cus.get("passes", False)
     if success:
         # Update the corresponding user story in prd.json
-        prd = PRD.model_validate(json.loads(prd_file.read_text()))
+        prd = PRD.load(prd_file)
         for s in prd.user_stories:
             if s.id == cus["id"]:
                 s.passes = True
                 break
-        prd_file.write_text(json.dumps(prd.model_dump(), indent=2))
+        prd.save(prd_file)
         rich.print(f"  [green]✔ PASSED[/green]\n")
     else:
         rich.print(f"  [red]✘ FAILED[/red]\n")
