@@ -30,6 +30,39 @@ async def __create_page(
         return None
 
 
+async def __find_child_page(
+    parent_page_id: str, title: str, token: str, version: str
+) -> str | None:
+    url = f"https://api.notion.com/v1/blocks/{parent_page_id}/children"
+    headers = {
+        "Notion-Version": version,
+        "Authorization": f"Bearer {token}",
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            cursor = None
+            while True:
+                params = {"page_size": 100}
+                if cursor:
+                    params["start_cursor"] = cursor
+                response = await client.get(url, headers=headers, params=params)
+                if not response.is_success:
+                    return None
+                data = response.json()
+                for block in data.get("results", []):
+                    if block.get("type") != "child_page":
+                        continue
+                    page_title = block.get("child_page", {}).get("title", "")
+                    if page_title == title:
+                        return block["id"]
+                if not data.get("has_more"):
+                    break
+                cursor = data.get("next_cursor")
+    except Exception:
+        return None
+    return None
+
+
 async def __resolve_page_id(token: str, version: str, title: str) -> str | None:
     page_id = os.getenv("RALPHER_NOTION_PAGE_ID")
     if page_id:
@@ -38,6 +71,11 @@ async def __resolve_page_id(token: str, version: str, title: str) -> str | None:
     parent_page_id = os.getenv("RALPHER_NOTION_PARENT_PAGE_ID")
     if not parent_page_id:
         return None
+
+    existing_id = await __find_child_page(parent_page_id, title, token, version)
+    if existing_id:
+        os.environ["RALPHER_NOTION_PAGE_ID"] = existing_id
+        return existing_id
 
     new_page_id = await __create_page(parent_page_id, title, token, version)
     if new_page_id:
