@@ -122,11 +122,7 @@ async def _run_one_iteration(
     await hooks.on_iteration_start(i, story.id)
 
     try:
-        await run_claude(
-            f"/ralpher:loop {task_id}",
-            mode="text",
-            logs=(logs_dir / f"{i}.out.log", logs_dir / f"{i}.err.log"),
-        )
+        await run_claude(prompt=f"/ralpher:loop {task_id}", task_dir=task_dir)
     except ClaudeError as e:
         await hooks.on_error(f"Iteration {i} failed with exit code {e.returncode}")
         fail(f"Claude process exited with code {e.returncode}")
@@ -178,7 +174,7 @@ def _checkout_branch(prd: PRD) -> None:
     if prd.branch_name != current_branch:
         # Check if branch exists
         branches = (
-            subprocess.check_output(["git", "branch", "--list", prd.branch_name],)
+            subprocess.check_output(["git", "branch", "--list", prd.branch_name])
             .decode()
             .strip()
         )

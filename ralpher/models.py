@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional
 
 from pydantic import BaseModel
 
@@ -50,3 +50,31 @@ class Status(BaseModel):
             "error": "red",
             "completed": "green",
         }[self.status]
+
+
+class QuestionOption(BaseModel):
+    label: str
+    description: str
+
+
+class Question(BaseModel):
+    header: str
+    question: str
+    options: list[QuestionOption]
+
+
+class Questions(BaseModel):
+    questions: list[Question]
+
+    @staticmethod
+    def clear(task_dir: Path):
+        questions_path = task_dir / "questions.json"
+        if questions_path.exists():
+            questions_path.unlink()
+
+    @staticmethod
+    def load(task_dir: Path) -> Optional["Questions"]:
+        questions_path = task_dir / "questions.json"
+        if not questions_path.exists():
+            return None
+        return Questions.model_validate(json.loads(questions_path.read_text()))

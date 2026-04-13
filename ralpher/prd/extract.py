@@ -13,13 +13,11 @@ async def __try_extract_prd(task_dir: Path, task_id: str):
 
     try:
         await run_claude(
-            f"/ralpher:ralph {task_id}",
-            mode="qa",
+            prompt=f"/ralpher:ralph {task_id}",
+            task_dir=task_dir,
             model="haiku",
         )
     except ClaudeError as e:
-        (task_dir / ".claude.out.log").write_bytes(e.stdout)
-        (task_dir / ".claude.err.log").write_bytes(e.stderr)
         return False
 
     if not (task_dir / "prd.json").exists():

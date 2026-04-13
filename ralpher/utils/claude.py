@@ -1,13 +1,17 @@
 import asyncio
 import json
 from pathlib import Path
-from typing import IO, Any, Literal, overload
+from datetime import datetime
+from typing import IO, Any
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import HTML
 from prompt_toolkit.shortcuts.choice_input import ChoiceInput
 import rich
 from asyncio.subprocess import DEVNULL, PIPE
+
+from ralpher.models import Questions
+from ralpher.utils.error import fail
 
 from .spinner import Spinner
 
@@ -18,17 +22,14 @@ PLUGIN_DIR = str(Path(__file__).resolve().parent.parent / "plugin")
 class ClaudeError(Exception):
     """Raised when the claude subprocess exits with a non-zero code."""
 
-    def __init__(self, returncode: int, stdout: bytes = b"", stderr: bytes = b""):
+    def __init__(self, returncode: int):
         self.returncode = returncode
-        self.stdout = stdout
-        self.stderr = stderr
         super().__init__(f"Claude process exited with code {returncode}")
 
 
 def _build_cmd(
     prompt: str,
     *,
-    json_output: bool = False,
     model: str | None = None,
     session_id: str | None = None,
 ) -> list[str]:
@@ -37,11 +38,12 @@ def _build_cmd(
         "--dangerously-skip-permissions",
         "--permission-mode",
         "dontAsk",
+        "--output-format",
+        "stream-json",
+        "--verbose",
         "--plugin-dir",
         PLUGIN_DIR,
     ]
-    if json_output:
-        cmd += ["--output-format", "json"]
     if model:
         cmd += ["--model", model]
     if session_id:
@@ -50,35 +52,16 @@ def _build_cmd(
     return cmd
 
 
-async def _exec(
-    cmd: list[str], stdout: int | IO[Any], stderr: int | IO[Any]
-) -> tuple[int, bytes | None, bytes | None]:
+async def _exec(cmd: list[str], logs: int | IO[Any]) -> int:
     """Execute claude subprocess with spinner, return (returncode, stdout, stderr)."""
-    proc = await asyncio.create_subprocess_exec(*cmd, stdout=stdout, stderr=stderr)
+    proc = await asyncio.create_subprocess_exec(*cmd, stdout=logs, stderr=logs)
     async with Spinner() as spinner:
         await spinner.run(proc)
-    out = await proc.stdout.read() if proc.stdout else None
-    err = await proc.stderr.read() if proc.stderr else None
     assert proc.returncode is not None  # returncode should be set after process exits
-    return proc.returncode, out, err
+    return proc.returncode
 
 
-def _parse_questions(data: dict) -> tuple[list[dict] | None, str | None]:
-    """Parse JSON output for AskUserQuestion tool calls.
-
-    Returns (questions, session_id). questions is None if no AskUserQuestion found.
-    """
-    session_id = data.get("session_id")
-    questions: list[dict] = []
-    for pd in data.get("permission_denials", []):
-        if pd.get("tool_name") == "AskUserQuestion":
-            qs = pd.get("tool_input", {}).get("questions", [])
-            questions.extend(qs)
-            break
-    return questions or None, session_id
-
-
-async def _ask_user_questions(questions: list[dict]) -> str:
+async def _ask_user_questions(questions: Questions) -> str:
     """Prompt the user for answers to AskUserQuestion questions."""
     session = PromptSession()
     answers: list[str] = []
@@ -87,20 +70,14 @@ async def _ask_user_questions(questions: list[dict]) -> str:
         "[bold blue]Please answer the following questions to clarify the task:[/]"
     )
 
-    for index, q in enumerate(questions):
-        question_text = q.get("question", "")
-        options = q.get("options", [])
-        if not options:
+    for index, q in enumerate(questions.questions):
+        if not q.options:
             continue
 
         print()
-        header = q.get("header", "")
+        header = q.header
         choice_options = [
-            (
-                opt.get("label", ""),
-                f"{opt.get('label', '')} - {opt.get('description', '')}",
-            )
-            for opt in options
+            (opt.label, f"{opt.label} - {opt.description}") for opt in q.options
         ]
         choice_options.append(
             (
@@ -112,7 +89,7 @@ async def _ask_user_questions(questions: list[dict]) -> str:
         )
         result = await ChoiceInput(
             message=HTML(
-                f"<style color='ansimagenta'><b>[Q{index + 1}] <i>{header}:</i></b> {question_text}</style>"
+                f"<style color='ansimagenta'><b>[Q{index + 1}] <i>{header}:</i></b> {q.question}</style>"
             ),
             options=choice_options,
         ).prompt_async()
@@ -122,80 +99,94 @@ async def _ask_user_questions(questions: list[dict]) -> str:
             )
         else:
             answer = result if result else choice_options[0][0]
-        answers.append(f"{question_text}: {answer}")
+        answers.append(f"{q.question}: {answer}")
 
     print()
     return "\n".join(answers)
 
 
-async def run_claude(
-    prompt: str,
-    *,
-    mode: Literal["qa", "text"] = "text",
-    model: str | None = None,
-    logs: tuple[Path, Path] | None = None,
-) -> dict | None:
-    """Run the claude CLI subprocess.
-
-    In qa mode: runs with --output-format json and handles AskUserQuestion
-    loop automatically. Returns the final parsed JSON dict.
-
-    In text mode: pipes output to log files if logs=(stdout_path, stderr_path)
-    is provided, otherwise discards output.
-
-    Raises ClaudeError on non-zero exit codes (in text mode, or in qa mode
-    when no questions are pending).
-    """
-    if mode == "qa":
-        return await _run_json_looped(prompt, model=model)
-    else:
-        await _run_text(prompt, model=model, logs=logs)
+def _get_session_id(log: Path) -> str | None:
+    try:
+        jsonl = log.read_text()
+        for line in jsonl.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            data = json.loads(line)
+            if "session_id" in data:
+                return data["session_id"]
+        return None
+    except Exception as e:
+        # print(f"Error occurred while fetching session ID: {e}")
         return None
 
 
-async def _run_json_looped(prompt: str, *, model: str | None = None) -> dict:
+async def run_claude(
+    *,
+    prompt: str,
+    task_dir: Path,
+    interactive: bool = False,
+    model: str | None = None,
+):
+    """
+    Run the claude CLI subprocess.
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    logs = task_dir / "logs" / f"claude-{timestamp}.log"
+    if logs:
+        logs.parent.mkdir(parents=True, exist_ok=True)
+    await _run_claude_looped(
+        task_dir=task_dir,
+        prompt=prompt,
+        logs=logs,
+        model=model,
+        interactive=interactive,
+    )
+
+
+async def _run_claude_looped(
+    *,
+    task_dir: Path,
+    prompt: str,
+    logs: Path,
+    model: str | None,
+    interactive: bool,
+):
     """Run claude in JSON mode with Q&A loop."""
     session_id: str | None = None
     current_prompt = prompt
 
-    while True:
-        cmd = _build_cmd(
-            current_prompt, json_output=True, model=model, session_id=session_id
-        )
-        returncode, stdout, stderr = await _exec(cmd, stdout=PIPE, stderr=PIPE)
-        assert stdout is not None and stderr is not None
+    with logs.open("ab") as f:
+        json_s = json.dumps({"initial_prompt": current_prompt})
+        f.write(f"{json_s}\n\n".encode())
+        f.flush()
 
-        try:
-            data = json.loads(stdout.decode())
-        except json.JSONDecodeError:
-            data = {}
+        while True:
+            Questions.clear(task_dir)
 
-        questions, new_session_id = _parse_questions(data)
-        if new_session_id:
-            session_id = new_session_id
+            cmd = _build_cmd(current_prompt, model=model, session_id=session_id)
+            returncode = await _exec(cmd, logs=f)
+            f.flush()
+            if returncode != 0:
+                raise ClaudeError(returncode)
 
-        if returncode != 0 and not questions:
-            raise ClaudeError(returncode, stdout, stderr)
+            if interactive:
+                # Get session id
+                session_id = _get_session_id(logs)
+                if not session_id:
+                    fail("Failed to get claude session ID.")
 
-        if questions:
-            current_prompt = await _ask_user_questions(questions)
-        else:
-            return data
+                try:
+                    questions = Questions.load(task_dir)
+                except Exception:
+                    current_prompt = "Invalid JSON output. Please fix the JSON formatting errors and try again."
+                    continue
 
+                if questions and questions.questions:
+                    current_prompt = await _ask_user_questions(questions)
+                    json_s = json.dumps({"answers": current_prompt})
+                    f.write(f"\n{json_s}\n\n".encode())
+                    f.flush()
+                    continue
 
-async def _run_text(
-    prompt: str,
-    *,
-    model: str | None = None,
-    logs: tuple[Path, Path] | None = None,
-) -> None:
-    """Run claude in text mode, redirecting output to files or DEVNULL."""
-    cmd = _build_cmd(prompt, model=model)
-    if logs:
-        with open(logs[0], "wb") as stdout_file, open(logs[1], "wb") as stderr_file:
-            returncode, _, _ = await _exec(cmd, stdout=stdout_file, stderr=stderr_file)
-    else:
-        returncode, _, _ = await _exec(cmd, stdout=DEVNULL, stderr=DEVNULL)
-
-    if returncode != 0:
-        raise ClaudeError(returncode)
+            break
