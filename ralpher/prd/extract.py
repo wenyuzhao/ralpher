@@ -12,7 +12,7 @@ async def __try_extract_prd(task_dir: Path, task_id: str):
 
     try:
         await run_claude(
-            prompt=f"/ralpher:ralph {task_id}",
+            prompt=f"/ralpher:extract {task_id}",
             task_dir=task_dir,
             model="haiku",
         )

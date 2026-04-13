@@ -8,7 +8,8 @@ import rich
 import typer
 from typer.core import TyperGroup
 
-from ralpher.loop import loop as _loop
+from ralpher.loop import run_ralph_loop
+from ralpher.models import RunInfo
 from ralpher.prd.prd import generate_prd
 from ralpher.prd.extract import extract_prd_json
 from ralpher.prd.refine import refine_prd
@@ -155,15 +156,10 @@ def loop(
 
     async def run_loop_with_hooks():
         hooks = HooksManager()
-        task_dir = Path.cwd() / ".ralpher" / "tasks" / task_id
-        await hooks.init(task_dir, max_iterations)
+        run_info = RunInfo(id=task_id, max_iterations=max_iterations, model=model)
+        await hooks.init(run_info.task_dir, max_iterations)
         try:
-            await _loop(
-                task_dir=task_dir,
-                max_iterations=max_iterations,
-                hooks=hooks,
-                model=model,
-            )
+            await run_ralph_loop(run=run_info, hooks=hooks)
         except BaseException as e:
             await hooks.on_error(str(e))
             raise e

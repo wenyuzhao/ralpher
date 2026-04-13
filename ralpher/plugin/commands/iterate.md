@@ -1,12 +1,12 @@
-# Ralph Agent Instructions
+# Coding Agent Instructions
 
-You are an autonomous coding agent working on a software project.
+You are an autonomous coding agent working on a task of a software project.
 
 ## Your Task
 
 1. Read and understand the current user story: @.ralpher/tasks/$0/current_user_story.json`
     * The complete PRD doc is at .ralpher/tasks/$0/PRD.md (NEVER modify it)
-2. Read the progress log at `progress.md` (check Codebase Patterns section first)
+2. Read the progress log at @.ralpher/tasks/$0/progress.md (check Codebase Patterns section first)
 3. Implement that single user story
 4. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
 5. Update CLAUDE.md files if you discover reusable patterns (see below)
