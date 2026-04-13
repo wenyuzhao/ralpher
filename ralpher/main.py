@@ -16,7 +16,7 @@ import asyncio
 from slugify import slugify
 from .utils.error import fail
 from .utils.hooks import HooksManager
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
 
 def _require_claude() -> None:
@@ -144,7 +144,8 @@ def loop(
 ) -> None:
     """Run Claude in a loop until tasks are complete or max iterations reached."""
     _require_claude()
-    load_dotenv()
+
+    load_dotenv(find_dotenv(usecwd=True))
 
     if not task_id:
         task_id = _get_latest_task_id()

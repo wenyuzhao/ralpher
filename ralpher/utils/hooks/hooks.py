@@ -18,6 +18,8 @@ class Hooks:
         self.task_dir = task_dir
         self.max_iterations = max_iterations
         self.start_time = datetime.datetime.now()
+        self.status: Status = Status(status="starting", label="Starting")
+        await self.update()
 
     async def update(self): ...
 

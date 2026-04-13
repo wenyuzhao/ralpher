@@ -34,15 +34,19 @@ class PRD(BaseModel):
 
 
 class Status(BaseModel):
-    status: Literal["running", "idle", "error", "completed"]
+    status: Literal["running", "idle", "error", "completed", "starting"]
     label: str
     active_user_story: str | None = None
 
     @property
     def icon(self) -> str:
-        return {"running": "🟢", "idle": "🟡", "error": "❌", "completed": "✅"}[
-            self.status
-        ]
+        return {
+            "running": "🟢",
+            "idle": "🟡",
+            "error": "❌",
+            "completed": "✅",
+            "starting": "🟡",
+        }[self.status]
 
     @property
     def color(self) -> str:
@@ -51,6 +55,7 @@ class Status(BaseModel):
             "idle": "yellow",
             "error": "red",
             "completed": "green",
+            "starting": "yellow",
         }[self.status]
 
 
