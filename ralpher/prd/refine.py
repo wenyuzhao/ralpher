@@ -27,7 +27,11 @@ async def refine_prd(task_id: str, user_input: str) -> str:
         tmp_path.write_text(user_input)
 
         try:
-            await run_claude(f"/ralpher:refine-prd {task_id} {tmp_path}", mode="qa")
+            await run_claude(
+                prompt=f"/ralpher:refine-prd {task_id} {tmp_path}",
+                task_dir=task_dir,
+                interactive=True,
+            )
         except ClaudeError as e:
             fail(f"Claude process exited with code {e.returncode}")
 

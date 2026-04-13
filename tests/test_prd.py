@@ -3,77 +3,77 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ralpher.utils.claude import _parse_questions, _ask_user_questions
+from ralpher.utils.claude import _ask_user_questions
+from ralpher.models import Questions, Question, QuestionOption
 from ralpher.prd.prd import generate_prd
 from ralpher.prd.extract import extract_prd_json
 
 
-class TestParseResult:
-    def test_extracts_session_id(self):
-        data = {"session_id": "sess-123", "result": "done"}
-        questions, session_id = _parse_questions(data)
-        assert session_id == "sess-123"
-        assert questions is None
+def _make_questions(raw: list[dict]) -> Questions:
+    """Build a Questions model from a list of raw dicts."""
+    questions = []
+    for q in raw:
+        options = [QuestionOption(**o) for o in q.get("options", [])]
+        questions.append(
+            Question(
+                header=q.get("header", ""),
+                question=q.get("question", ""),
+                options=options,
+            )
+        )
+    return Questions(questions=questions)
 
-    def test_detects_ask_user_question_in_permission_denials(self):
+
+class TestQuestionsLoad:
+    def test_returns_none_when_file_missing(self, tmp_path):
+        assert Questions.load(tmp_path) is None
+
+    def test_loads_valid_questions(self, tmp_path):
         data = {
-            "session_id": "sess-abc",
-            "permission_denials": [
+            "questions": [
                 {
-                    "tool_name": "AskUserQuestion",
-                    "tool_input": {
-                        "questions": [
-                            {"label": "What is the goal?", "description": "Describe the primary objective"}
-                        ]
-                    },
+                    "header": "Goal",
+                    "question": "What is the goal?",
+                    "options": [
+                        {"label": "A", "description": "Option A"},
+                        {"label": "B", "description": "Option B"},
+                    ],
                 }
-            ],
+            ]
         }
-        questions, session_id = _parse_questions(data)
-        assert session_id == "sess-abc"
-        assert questions is not None
-        assert len(questions) == 1
-        assert questions[0]["label"] == "What is the goal?"
+        (tmp_path / "questions.json").write_text(json.dumps(data))
+        result = Questions.load(tmp_path)
+        assert result is not None
+        assert len(result.questions) == 1
+        assert result.questions[0].header == "Goal"
 
-    def test_ignores_other_tool_denials(self):
+    def test_loads_multiple_questions(self, tmp_path):
         data = {
-            "session_id": "sess-x",
-            "permission_denials": [
-                {"tool_name": "Write", "tool_input": {"path": "foo.txt"}},
-            ],
-        }
-        questions, _ = _parse_questions(data)
-        assert questions is None
-
-    def test_handles_empty_data(self):
-        questions, session_id = _parse_questions({})
-        assert questions is None
-        assert session_id is None
-
-    def test_multiple_questions_in_single_denial(self):
-        data = {
-            "session_id": "sess-multi",
-            "permission_denials": [
+            "questions": [
                 {
-                    "tool_name": "AskUserQuestion",
-                    "tool_input": {
-                        "questions": [
-                            {"label": "Q1", "description": "First"},
-                            {"label": "Q2", "description": "Second"},
-                        ]
-                    },
-                }
-            ],
+                    "header": "Q1",
+                    "question": "First",
+                    "options": [{"label": "A", "description": "a"}],
+                },
+                {
+                    "header": "Q2",
+                    "question": "Second",
+                    "options": [{"label": "B", "description": "b"}],
+                },
+            ]
         }
-        questions, _session_id = _parse_questions(data)
-        assert questions is not None
-        assert len(questions) == 2
+        (tmp_path / "questions.json").write_text(json.dumps(data))
+        result = Questions.load(tmp_path)
+        assert result is not None
+        assert len(result.questions) == 2
 
-    def test_no_permission_denials_key(self):
-        data = {"session_id": "sess-no-denials"}
-        questions, session_id = _parse_questions(data)
-        assert questions is None
-        assert session_id == "sess-no-denials"
+    def test_clear_removes_file(self, tmp_path):
+        (tmp_path / "questions.json").write_text("{}")
+        Questions.clear(tmp_path)
+        assert not (tmp_path / "questions.json").exists()
+
+    def test_clear_noop_when_missing(self, tmp_path):
+        Questions.clear(tmp_path)  # should not raise
 
 
 class TestAskUserQuestions:
@@ -81,7 +81,7 @@ class TestAskUserQuestions:
     @patch("ralpher.utils.claude.ChoiceInput")
     async def test_single_question_with_options(self, mock_choice_cls):
         mock_choice_cls.return_value.prompt_async = AsyncMock(return_value="REST")
-        questions = [
+        questions = _make_questions([
             {
                 "header": "API",
                 "question": "API style",
@@ -90,7 +90,7 @@ class TestAskUserQuestions:
                     {"label": "GraphQL", "description": "GraphQL API"},
                 ],
             }
-        ]
+        ])
         result = await _ask_user_questions(questions)
         assert "API style: REST" in result
 
@@ -98,7 +98,7 @@ class TestAskUserQuestions:
     @patch("ralpher.utils.claude.ChoiceInput")
     async def test_multiple_questions_with_options(self, mock_choice_cls):
         mock_choice_cls.return_value.prompt_async = AsyncMock(side_effect=["Yes", "Mobile"])
-        questions = [
+        questions = _make_questions([
             {
                 "header": "Auth",
                 "question": "Auth needed?",
@@ -115,7 +115,7 @@ class TestAskUserQuestions:
                     {"label": "Web", "description": "Web app"},
                 ],
             },
-        ]
+        ])
         result = await _ask_user_questions(questions)
         assert "Auth needed?: Yes" in result
         assert "Platform: Mobile" in result
@@ -124,7 +124,7 @@ class TestAskUserQuestions:
     @patch("ralpher.utils.claude.ChoiceInput")
     async def test_question_with_options(self, mock_choice_cls):
         mock_choice_cls.return_value.prompt_async = AsyncMock(return_value="Monolith")
-        questions = [
+        questions = _make_questions([
             {
                 "header": "Architecture",
                 "question": "Pick a pattern",
@@ -133,15 +133,15 @@ class TestAskUserQuestions:
                     {"label": "Microservices", "description": "Distributed"},
                 ],
             }
-        ]
+        ])
         result = await _ask_user_questions(questions)
         assert "Pick a pattern: Monolith" in result
 
     @pytest.mark.asyncio
     async def test_skips_questions_without_options(self):
-        questions = [
-            {"question": "No options here", "description": "Should be skipped"},
-        ]
+        questions = _make_questions([
+            {"header": "X", "question": "No options here", "options": []},
+        ])
         result = await _ask_user_questions(questions)
         assert result == ""
 
@@ -151,7 +151,7 @@ class TestAskUserQuestions:
     async def test_other_option_prompts_freeform(self, mock_choice_cls, mock_session_cls):
         mock_choice_cls.return_value.prompt_async = AsyncMock(return_value="__other__")
         mock_session_cls.return_value.prompt_async = AsyncMock(return_value="Custom answer")
-        questions = [
+        questions = _make_questions([
             {
                 "header": "Style",
                 "question": "Pick style",
@@ -159,171 +159,75 @@ class TestAskUserQuestions:
                     {"label": "A", "description": "Option A"},
                 ],
             }
-        ]
+        ])
         result = await _ask_user_questions(questions)
         assert "Pick style: Custom answer" in result
 
 
-def _make_mock_process(returncode: int, stdout_json: dict | None = None) -> AsyncMock:
-    proc = AsyncMock()
-    proc.wait.return_value = None
-    proc.returncode = returncode
-
-    stdout_bytes = json.dumps(stdout_json or {}).encode()
-    proc.stdout.read.return_value = stdout_bytes
-    proc.stderr.read.return_value = b""
-    return proc
-
-
 class TestGeneratePrd:
-    @pytest.fixture(autouse=True)
-    def _patch_spinner(self, monkeypatch):
-        """Mock Spinner so tests don't need yaspin."""
-        mock_spinner = MagicMock()
-        mock_spinner.__aenter__ = AsyncMock(return_value=mock_spinner)
-        mock_spinner.__aexit__ = AsyncMock(return_value=False)
-        mock_spinner.run = AsyncMock()
-        monkeypatch.setattr(
-            "ralpher.utils.claude.Spinner", lambda: mock_spinner,
-        )
-
-    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
+    @patch("ralpher.prd.prd.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_returns_task_id_on_success(self, mock_exec, tmp_path, monkeypatch):
+    async def test_returns_task_id_on_success(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         task_id = "test-task-1"
 
-        def create_prd_side_effect(*args, **kwargs):
+        async def side_effect(**kwargs):
             (tmp_path / ".ralpher" / "tasks" / task_id / "PRD.md").write_text("# PRD")
-            return _make_mock_process(0, {"session_id": "s1", "result": "done"})
 
-        mock_exec.side_effect = create_prd_side_effect
+        mock_run.side_effect = side_effect
         result = await generate_prd(task_id, "Build a chat app")
         assert result == task_id
 
-    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
+    @patch("ralpher.prd.prd.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_raises_on_nonzero_exit(self, mock_exec, tmp_path, monkeypatch):
+    async def test_raises_on_claude_error(self, mock_run, tmp_path, monkeypatch):
+        from ralpher.utils.claude import ClaudeError
         monkeypatch.chdir(tmp_path)
-        mock_exec.return_value = _make_mock_process(1)
+        mock_run.side_effect = ClaudeError(1)
         with pytest.raises(SystemExit):
             await generate_prd("task-fail", "test")
 
-    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
+    @patch("ralpher.prd.prd.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_command_flags(self, mock_exec, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        task_id = "task-flags"
-
-        def side_effect(*args, **kwargs):
-            (tmp_path / ".ralpher" / "tasks" / task_id / "PRD.md").write_text("# PRD")
-            return _make_mock_process(0, {"session_id": "s1"})
-
-        mock_exec.side_effect = side_effect
-        await generate_prd(task_id, "Implement SSO login")
-        call_args = mock_exec.call_args[0]
-        assert "--output-format" in call_args
-        assert "json" in call_args
-        assert "--dangerously-skip-permissions" in call_args
-        assert "--permission-mode" in call_args
-        assert "dontAsk" in call_args
-        assert "--plugin-dir" in call_args
-        assert "--print" in call_args
-
-    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
-    @pytest.mark.asyncio
-    async def test_creates_task_directory_and_prompt(self, mock_exec, tmp_path, monkeypatch):
+    async def test_creates_task_directory_and_prompt(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         task_id = "task-dir-test"
 
-        def side_effect(*args, **kwargs):
+        async def side_effect(**kwargs):
             (tmp_path / ".ralpher" / "tasks" / task_id / "PRD.md").write_text("# PRD")
-            return _make_mock_process(0, {"session_id": "s1"})
 
-        mock_exec.side_effect = side_effect
+        mock_run.side_effect = side_effect
         result = await generate_prd(task_id, "My feature request")
         task_dir = tmp_path / ".ralpher" / "tasks" / task_id
         assert task_dir.exists()
         assert (task_dir / "PROMPT.md").read_text() == "My feature request"
 
-    @patch("ralpher.utils.claude._ask_user_questions", return_value="Q1: A")
-    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
+    @patch("ralpher.prd.prd.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_intercepts_ask_user_question_and_resumes(
-        self, mock_exec, mock_ask, tmp_path, monkeypatch
-    ):
+    async def test_calls_run_claude_with_correct_args(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        task_id = "task-interactive"
-        ask_result = {
-            "session_id": "sess-interactive",
-            "permission_denials": [
-                {
-                    "tool_name": "AskUserQuestion",
-                    "tool_input": {
-                        "questions": [{"label": "Goal?", "description": "What is the primary goal?"}]
-                    },
-                }
-            ],
-        }
+        task_id = "task-flags"
 
-        call_count = 0
+        async def side_effect(**kwargs):
+            (tmp_path / ".ralpher" / "tasks" / task_id / "PRD.md").write_text("# PRD")
 
-        def side_effect(*args, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
-                return _make_mock_process(0, ask_result)
-            else:
-                (tmp_path / ".ralpher" / "tasks" / task_id / "PRD.md").write_text("# PRD")
-                return _make_mock_process(0, {"session_id": "sess-interactive"})
+        mock_run.side_effect = side_effect
+        await generate_prd(task_id, "Implement SSO login")
+        call_kwargs = mock_run.call_args[1]
+        assert task_id in call_kwargs["prompt"]
+        assert "/ralpher:prd" in call_kwargs["prompt"]
+        assert call_kwargs["interactive"] is True
 
-        mock_exec.side_effect = side_effect
-        result = await generate_prd(task_id, "Build feature")
-        assert result == task_id
-        assert mock_exec.call_count == 2
-
-        second_call_args = mock_exec.call_args_list[1][0]
-        assert "--resume" in second_call_args
-        assert "sess-interactive" in second_call_args
-        assert "--print" in second_call_args
-
-    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
+    @patch("ralpher.prd.prd.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_raises_when_prd_not_created(self, mock_exec, tmp_path, monkeypatch):
+    async def test_raises_when_prd_not_created(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        mock_exec.return_value = _make_mock_process(0, {"session_id": "s1"})
+        mock_run.return_value = None
         with pytest.raises(SystemExit):
             await generate_prd("task-no-prd", "test")
 
-    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
-    @pytest.mark.asyncio
-    async def test_prompt_uses_prd_skill_with_task_id(self, mock_exec, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        task_id = "task-skill-check"
-
-        def side_effect(*args, **kwargs):
-            (tmp_path / ".ralpher" / "tasks" / task_id / "PRD.md").write_text("# PRD")
-            return _make_mock_process(0, {"session_id": "s1"})
-
-        mock_exec.side_effect = side_effect
-        await generate_prd(task_id, "Some feature")
-        call_args = mock_exec.call_args[0]
-        prompt_arg = call_args[-1]
-        assert f"/ralpher:prd {task_id}" == prompt_arg
-
 
 class TestExtractPrdJson:
-    @pytest.fixture(autouse=True)
-    def _patch_spinner(self, monkeypatch):
-        """Mock Spinner so tests don't need yaspin."""
-        mock_spinner = MagicMock()
-        mock_spinner.__aenter__ = AsyncMock(return_value=mock_spinner)
-        mock_spinner.__aexit__ = AsyncMock(return_value=False)
-        mock_spinner.run = AsyncMock()
-        monkeypatch.setattr(
-            "ralpher.utils.claude.Spinner", lambda: mock_spinner,
-        )
-
     @pytest.mark.asyncio
     async def test_raises_when_task_dir_missing(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -338,9 +242,9 @@ class TestExtractPrdJson:
         with pytest.raises(SystemExit):
             await extract_prd_json("test-task")
 
-    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
+    @patch("ralpher.prd.extract.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_returns_on_success(self, mock_exec, tmp_path, monkeypatch):
+    async def test_returns_on_success(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         task_dir = tmp_path / ".ralpher" / "tasks" / "test-task"
         task_dir.mkdir(parents=True)
@@ -353,50 +257,42 @@ class TestExtractPrdJson:
             "user_stories": [],
         })
 
-        def side_effect(*args, **kwargs):
+        async def side_effect(**kwargs):
             (task_dir / "prd.json").write_text(valid_prd)
-            return _make_mock_process(0, {})
 
-        mock_exec.side_effect = side_effect
+        mock_run.side_effect = side_effect
         await extract_prd_json("test-task")
+        call_kwargs = mock_run.call_args[1]
+        assert call_kwargs["model"] == "haiku"
 
-        call_args = mock_exec.call_args[0]
-        assert "--output-format" in call_args
-        assert "json" in call_args
-        assert "--dangerously-skip-permissions" in call_args
-        assert "--permission-mode" in call_args
-        assert "dontAsk" in call_args
-        assert "--model" in call_args
-        assert "haiku" in call_args
-        assert "--print" in call_args
-
-    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
+    @patch("ralpher.prd.extract.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_raises_on_all_retries_failed(self, mock_exec, tmp_path, monkeypatch):
+    async def test_raises_on_all_retries_failed(self, mock_run, tmp_path, monkeypatch):
+        from ralpher.utils.claude import ClaudeError
         monkeypatch.chdir(tmp_path)
         task_dir = tmp_path / ".ralpher" / "tasks" / "test-task"
         task_dir.mkdir(parents=True)
         (task_dir / "PRD.md").write_text("# My PRD")
 
-        mock_exec.return_value = _make_mock_process(1)
+        mock_run.side_effect = ClaudeError(1)
         with pytest.raises(SystemExit):
             await extract_prd_json("test-task", retries=1)
 
-    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
+    @patch("ralpher.prd.extract.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_raises_when_prd_json_not_created(self, mock_exec, tmp_path, monkeypatch):
+    async def test_raises_when_prd_json_not_created(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         task_dir = tmp_path / ".ralpher" / "tasks" / "test-task"
         task_dir.mkdir(parents=True)
         (task_dir / "PRD.md").write_text("# My PRD")
 
-        mock_exec.return_value = _make_mock_process(0, {})
+        mock_run.return_value = None
         with pytest.raises(SystemExit):
             await extract_prd_json("test-task", retries=1)
 
-    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
+    @patch("ralpher.prd.extract.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_prompt_includes_task_id(self, mock_exec, tmp_path, monkeypatch):
+    async def test_prompt_includes_task_id(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         task_dir = tmp_path / ".ralpher" / "tasks" / "my-task-123"
         task_dir.mkdir(parents=True)
@@ -409,20 +305,18 @@ class TestExtractPrdJson:
             "user_stories": [],
         })
 
-        def side_effect(*args, **kwargs):
+        async def side_effect(**kwargs):
             (task_dir / "prd.json").write_text(valid_prd)
-            return _make_mock_process(0, {})
 
-        mock_exec.side_effect = side_effect
+        mock_run.side_effect = side_effect
         await extract_prd_json("my-task-123")
 
-        call_args = mock_exec.call_args[0]
-        prompt_arg = call_args[-1]
-        assert "my-task-123" in prompt_arg
+        call_kwargs = mock_run.call_args[1]
+        assert "my-task-123" in call_kwargs["prompt"]
 
-    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
+    @patch("ralpher.prd.extract.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_retries_on_invalid_prd_json(self, mock_exec, tmp_path, monkeypatch):
+    async def test_retries_on_invalid_prd_json(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         task_dir = tmp_path / ".ralpher" / "tasks" / "retry-task"
         task_dir.mkdir(parents=True)
@@ -437,24 +331,22 @@ class TestExtractPrdJson:
 
         call_count = 0
 
-        def side_effect(*args, **kwargs):
+        async def side_effect(**kwargs):
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                # First attempt: write invalid JSON
                 (task_dir / "prd.json").write_text('{"invalid": true}')
             else:
-                # Second attempt: write valid PRD JSON
                 (task_dir / "prd.json").write_text(valid_prd)
-            return _make_mock_process(0, {})
 
-        mock_exec.side_effect = side_effect
+        mock_run.side_effect = side_effect
         await extract_prd_json("retry-task", retries=3)
-        assert mock_exec.call_count == 2
+        assert mock_run.call_count == 2
 
-    @patch("ralpher.utils.claude.asyncio.create_subprocess_exec")
+    @patch("ralpher.prd.extract.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_retries_on_nonzero_exit_then_succeeds(self, mock_exec, tmp_path, monkeypatch):
+    async def test_retries_on_claude_error_then_succeeds(self, mock_run, tmp_path, monkeypatch):
+        from ralpher.utils.claude import ClaudeError
         monkeypatch.chdir(tmp_path)
         task_dir = tmp_path / ".ralpher" / "tasks" / "retry-exit"
         task_dir.mkdir(parents=True)
@@ -469,15 +361,14 @@ class TestExtractPrdJson:
 
         call_count = 0
 
-        def side_effect(*args, **kwargs):
+        async def side_effect(**kwargs):
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                return _make_mock_process(1)
+                raise ClaudeError(1)
             else:
                 (task_dir / "prd.json").write_text(valid_prd)
-                return _make_mock_process(0, {})
 
-        mock_exec.side_effect = side_effect
+        mock_run.side_effect = side_effect
         await extract_prd_json("retry-exit", retries=3)
-        assert mock_exec.call_count == 2
+        assert mock_run.call_count == 2
