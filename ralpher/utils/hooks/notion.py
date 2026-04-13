@@ -8,10 +8,55 @@ from ralpher.models import PRD, Status
 from ralpher.utils.hooks.hooks import Hooks
 
 
+async def __create_page(parent_page_id: str, title: str, token: str, version: str) -> str | None:
+    url = "https://api.notion.com/v1/pages"
+    payload = {
+        "parent": {"page_id": parent_page_id},
+        "properties": {
+            "title": {
+                "title": [{"text": {"content": title}}]
+            }
+        },
+    }
+    headers = {
+        "Notion-Version": version,
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json=payload, headers=headers)
+            if response.is_success:
+                return response.json()["id"]
+            return None
+    except Exception:
+        return None
+
+
+async def __resolve_page_id(token: str, version: str, title: str) -> str | None:
+    page_id = os.getenv("NOTION_PAGE_ID")
+    if page_id:
+        return page_id
+
+    parent_page_id = os.getenv("NOTION_PARENT_PAGE_ID")
+    if not parent_page_id:
+        return None
+
+    new_page_id = await __create_page(parent_page_id, title, token, version)
+    if new_page_id:
+        os.environ["NOTION_PAGE_ID"] = new_page_id
+    return new_page_id
+
+
 async def __update_page(title: str, content: str) -> bool:
     token = os.getenv("NOTION_TOKEN")
-    page_id = os.getenv("NOTION_PAGE_ID")
+    if not token:
+        return False
     version = os.getenv("NOTION_VERSION", "2026-03-11")
+
+    page_id = await __resolve_page_id(token, version, title)
+    if not page_id:
+        return False
 
     url = f"https://api.notion.com/v1/pages/{page_id}"
     payload = {
@@ -55,7 +100,7 @@ async def __update_page(title: str, content: str) -> bool:
 
 
 async def update_notion_page(task_dir: Path, status: Status | None) -> bool:
-    if "NOTION_TOKEN" not in os.environ or "NOTION_PAGE_ID" not in os.environ:
+    if "NOTION_TOKEN" not in os.environ or ("NOTION_PAGE_ID" not in os.environ and "NOTION_PARENT_PAGE_ID" not in os.environ):
         return False
 
     template_file = Path(__file__).parent / "notion.md"
