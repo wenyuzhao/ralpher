@@ -52,7 +52,7 @@ async def loop(task_dir: Path, max_iterations: int, hooks: HooksManager) -> None
         return
 
     rich.print(f" • Incomplete user stories: {num_failed_stories} / {num_stories}")
-    rich.print(f" • Branch: [i]{prd.branch_name}[/]\n")
+    rich.print(f" • Branch: [i]{prd.branch_name}[/]")
     rich.print(f" • Max iterations: {max_iterations}\n")
 
     # Track current branch
@@ -199,7 +199,7 @@ def _checkout_branch(prd: PRD) -> None:
     if prd.branch_name != current_branch:
         # Check if branch exists
         branches = (
-            subprocess.check_output(["git", "branch", "--list", prd.branch_name])
+            subprocess.check_output(["git", "branch", "--list", prd.branch_name],)
             .decode()
             .strip()
         )
@@ -207,14 +207,24 @@ def _checkout_branch(prd: PRD) -> None:
             # Create branch from main or master
             base_branch = "main"
             try:
-                subprocess.check_call(["git", "rev-parse", "--verify", base_branch])
+                subprocess.check_call(
+                    ["git", "rev-parse", "--verify", base_branch],
+                    stderr=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                )
             except subprocess.CalledProcessError:
                 base_branch = "master"
             subprocess.check_call(
-                ["git", "checkout", "-b", prd.branch_name, base_branch]
+                ["git", "checkout", "-b", prd.branch_name, base_branch],
+                stderr=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
             )
         else:
-            subprocess.check_call(["git", "checkout", prd.branch_name])
+            subprocess.check_call(
+                ["git", "checkout", prd.branch_name],
+                stderr=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+            )
 
 
 def _init_progress(progress_file: Path) -> None:

@@ -8,20 +8,42 @@ from ralpher.models import PRD, Status
 from ralpher.utils.hooks.hooks import Hooks
 
 
-async def __update_page(content: str) -> bool:
+async def __update_page(title: str, content: str) -> bool:
     token = os.getenv("NOTION_TOKEN")
     page_id = os.getenv("NOTION_PAGE_ID")
     version = os.getenv("NOTION_VERSION", "2026-03-11")
 
-    url = f"https://api.notion.com/v1/pages/{page_id}/markdown"
+    url = f"https://api.notion.com/v1/pages/{page_id}"
     payload = {
-        "type": "replace_content",
-        "replace_content": {"new_str": content, "allow_deleting_content": True},
+        "properties": {
+            "title": {
+                "title": [
+                    {
+                        "text": {
+                            "content": title,
+                        }
+                    }
+                ]
+            }
+        }
     }
     headers = {
         "Notion-Version": version,
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.patch(url, json=payload, headers=headers)
+            if not response.is_success:
+                return False
+    except Exception as e:
+        return False
+
+    url = f"https://api.notion.com/v1/pages/{page_id}/markdown"
+    payload = {
+        "type": "replace_content",
+        "replace_content": {"new_str": content, "allow_deleting_content": True},
     }
     try:
         async with httpx.AsyncClient() as client:
@@ -62,7 +84,7 @@ async def update_notion_page(task_dir: Path, status: Status | None) -> bool:
         active_us=status.active_user_story if status else None,
         status=status,
     )
-    success = await __update_page(rendered)
+    success = await __update_page(task_dir.name, rendered)
     return success
 
 

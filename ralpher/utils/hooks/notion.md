@@ -10,7 +10,7 @@
 
 {% if prd %}
 {% for us in prd.user_stories %}
-- [{% if us.passes %}x{% else %} {% endif %}] *{{ us.id }}* - {{ us.title }} {% if us.passes %}{{'{color="green"}'}}{% elif us.id == active_us %}{{'{color="blue"}'}}{% else %} {{'{color="yellow"}'}}{% endif %}
+- [{% if us.passes %}x{% else %} {% endif %}] **{{ us.id }}** - {{ us.title }} {% if us.passes %}{{'{color="green"}'}}{% elif us.id == active_us %}{{'{color="blue"}'}}{% else %} {{'{color="yellow"}'}}{% endif %}
 {% endfor %}
 {% else %}
 *N/A*

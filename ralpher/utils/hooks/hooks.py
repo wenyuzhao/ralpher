@@ -53,9 +53,8 @@ class Hooks:
         prd = self.load_prd()
         assert prd is not None
         user_story = next((s for s in prd.user_stories if s.id == us), None)
-        label = f"Iteration {index} / {self.max_iterations}"
-        if user_story:
-            label += f": *{user_story.id}* - {user_story.title}"
+        assert user_story
+        label = f"**[Iteration {index} / {self.max_iterations}]** **{user_story.id}** - {user_story.title}"
         self.status = Status(status="running", label=label)
         await self.update()
 
