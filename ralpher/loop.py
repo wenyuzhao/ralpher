@@ -14,7 +14,9 @@ from .utils.error import fail
 from .utils.hooks import HooksManager
 
 
-async def loop(task_dir: Path, max_iterations: int, hooks: HooksManager) -> None:
+async def loop(
+    *, task_dir: Path, max_iterations: int, hooks: HooksManager, model: str | None
+) -> None:
     """Run Claude in a loop, checking for completion signal each iteration."""
     task_id = task_dir.name
     prd_file = task_dir / "prd.json"
@@ -78,7 +80,7 @@ async def loop(task_dir: Path, max_iterations: int, hooks: HooksManager) -> None
         iterations += 1
 
         # Run claude
-        await _run_one_iteration(task_id, prd, task_dir, i, hooks)
+        await _run_one_iteration(task_id, prd, task_dir, i, hooks, model)
 
         # Check for completion
         prd = PRD.load(prd_file)
@@ -100,7 +102,12 @@ async def loop(task_dir: Path, max_iterations: int, hooks: HooksManager) -> None
 
 
 async def _run_one_iteration(
-    task_id: str, prd: PRD, task_dir: Path, i: int, hooks: HooksManager
+    task_id: str,
+    prd: PRD,
+    task_dir: Path,
+    i: int,
+    hooks: HooksManager,
+    model: str | None,
 ) -> None:
     """Run claude --dangerously-skip-permissions --print with CLAUDE.md as stdin."""
 
@@ -122,7 +129,9 @@ async def _run_one_iteration(
     await hooks.on_iteration_start(i, story.id)
 
     try:
-        await run_claude(prompt=f"/ralpher:loop {task_id}", task_dir=task_dir)
+        await run_claude(
+            prompt=f"/ralpher:loop {task_id}", task_dir=task_dir, model=model
+        )
     except ClaudeError as e:
         await hooks.on_error(f"Iteration {i} failed with exit code {e.returncode}")
         fail(f"Claude process exited with code {e.returncode}")

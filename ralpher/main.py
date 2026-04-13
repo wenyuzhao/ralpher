@@ -21,7 +21,9 @@ from dotenv import load_dotenv
 def _require_claude() -> None:
     """Exit with an error if the claude CLI is not on PATH."""
     if not shutil.which("claude"):
-        fail("'claude' CLI not found on PATH. Install it first: https://docs.anthropic.com/en/docs/claude-code")
+        fail(
+            "'claude' CLI not found on PATH. Install it first: https://docs.anthropic.com/en/docs/claude-code"
+        )
 
 
 class DefaultCommandGroup(TyperGroup):
@@ -40,65 +42,11 @@ app = typer.Typer(cls=DefaultCommandGroup)
 DEFAULT_MAX_ITERATIONS = 30
 
 
-@app.callback()
-def callback() -> None:
-    """
-    Ralpher - autonomous agent tooling.
-
-    [b]Example usage:[/]
-        • [b]ralpher[/] "build a todo app" \\[--name todo-app] \\[--max-iterations 20]
-        • [b]ralpher[/] prd "build a todo app"
-        • [b]ralpher[/] refine "add user authentication" \\[--task <task_id>]
-        • [b]ralpher[/] loop \\[--task <task_id>]
-    """
-
-
-@app.command()
-def run(
-    prompt: str = typer.Argument(
-        ..., help="Prompt or file to generate PRD, extract, and run loop."
-    ),
-    name: str | None = typer.Option(
-        None, "--name", "-t", help="Name for the PRD task."
-    ),
-    max_iterations: int = typer.Option(
-        DEFAULT_MAX_ITERATIONS,
-        "--max-iterations",
-        "-n",
-        help="Maximum loop iterations.",
-    ),
-) -> None:
-    """\\[default] Generate PRD, extract JSON, and run loop."""
-    _require_claude()
-    if Path(prompt).is_file():
-        prompt = Path(prompt).read_text()
-    asyncio.run(_run(prompt, name, max_iterations))
-
-
 def _gen_task_id(name: str | None) -> str:
     task_id = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
     if name:
         task_id += f"-{slugify(name)}"
     return task_id
-
-
-async def _run(prompt: str, name: str | None, max_iterations: int) -> None:
-    """Generate PRD, extract JSON, and run loop."""
-    load_dotenv()
-
-    task_id = _gen_task_id(name)
-
-    rich.print(f"[bold blue]Generating PRD for new task: [i]{task_id}[/][/]\n")
-    await generate_prd(task_id, prompt, name)
-    rich.print(f"[green]✔ PRD generated at .ralpher/tasks/{task_id}/PRD.md[/]\n")
-    task_dir = Path.cwd() / ".ralpher" / "tasks" / task_id
-    hooks = HooksManager()
-    await hooks.init(task_dir, max_iterations)
-    try:
-        await _loop(task_dir, max_iterations, hooks)
-    except BaseException as e:
-        await hooks.on_error(str(e))
-        raise e
 
 
 @app.command()
@@ -107,6 +55,7 @@ def prd(
     name: str | None = typer.Option(
         None, "--name", "-n", help="Name for the PRD task."
     ),
+    model: str | None = typer.Option(None, "--model", "-m", help="Claude model to use"),
 ) -> None:
     """Generate a PRD."""
     _require_claude()
@@ -115,7 +64,7 @@ def prd(
     task_id = _gen_task_id(name)
 
     rich.print(f"[bold blue]Generating PRD for new task: [i]{task_id}[/][/]\n")
-    asyncio.run(generate_prd(task_id, prompt, name))
+    asyncio.run(generate_prd(task_id=task_id, prompt=prompt, model=model))
     rich.print(f"[green]✔ PRD generated at .ralpher/tasks/{task_id}/PRD.md[/]")
 
 
@@ -137,6 +86,7 @@ def refine(
     task_id: str | None = typer.Option(
         None, "--task", "-t", help="The task ID of the PRD to refine."
     ),
+    model: str | None = typer.Option(None, "--model", "-m", help="Claude model to use"),
 ) -> None:
     """Refine an existing PRD."""
     _require_claude()
@@ -148,7 +98,7 @@ def refine(
         rich.print(f"[bold blue]Refining the latest task: [i]{task_id}[/][/]\n")
     else:
         rich.print(f"[bold blue]Refining task: [i]{task_id}[/][/]\n")
-    task_id = asyncio.run(refine_prd(task_id, prompt))
+    task_id = asyncio.run(refine_prd(task_id=task_id, prompt=prompt, model=model))
     rich.print(f"[green]✔ PRD refined at .ralpher/tasks/{task_id}/PRD.md[/]")
 
 
@@ -182,6 +132,7 @@ def loop(
         "-n",
         help="Maximum number of iterations.",
     ),
+    model: str | None = typer.Option(None, "--model", "-m", help="Claude model to use"),
 ) -> None:
     """Run Claude in a loop until tasks are complete or max iterations reached."""
     _require_claude()
@@ -198,7 +149,12 @@ def loop(
         task_dir = Path.cwd() / ".ralpher" / "tasks" / task_id
         await hooks.init(task_dir, max_iterations)
         try:
-            await _loop(task_dir, max_iterations, hooks)
+            await _loop(
+                task_dir=task_dir,
+                max_iterations=max_iterations,
+                hooks=hooks,
+                model=model,
+            )
         except BaseException as e:
             await hooks.on_error(str(e))
             raise e

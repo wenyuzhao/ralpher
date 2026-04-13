@@ -175,7 +175,7 @@ class TestGeneratePrd:
             (tmp_path / ".ralpher" / "tasks" / task_id / "PRD.md").write_text("# PRD")
 
         mock_run.side_effect = side_effect
-        result = await generate_prd(task_id, "Build a chat app")
+        result = await generate_prd(task_id=task_id, prompt="Build a chat app", model=None)
         assert result == task_id
 
     @patch("ralpher.prd.prd.run_claude", new_callable=AsyncMock)
@@ -185,7 +185,7 @@ class TestGeneratePrd:
         monkeypatch.chdir(tmp_path)
         mock_run.side_effect = ClaudeError(1)
         with pytest.raises(SystemExit):
-            await generate_prd("task-fail", "test")
+            await generate_prd(task_id="task-fail", prompt="test", model=None)
 
     @patch("ralpher.prd.prd.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
@@ -197,7 +197,7 @@ class TestGeneratePrd:
             (tmp_path / ".ralpher" / "tasks" / task_id / "PRD.md").write_text("# PRD")
 
         mock_run.side_effect = side_effect
-        result = await generate_prd(task_id, "My feature request")
+        result = await generate_prd(task_id=task_id, prompt="My feature request", model=None)
         task_dir = tmp_path / ".ralpher" / "tasks" / task_id
         assert task_dir.exists()
         assert (task_dir / "PROMPT.md").read_text() == "My feature request"
@@ -212,7 +212,7 @@ class TestGeneratePrd:
             (tmp_path / ".ralpher" / "tasks" / task_id / "PRD.md").write_text("# PRD")
 
         mock_run.side_effect = side_effect
-        await generate_prd(task_id, "Implement SSO login")
+        await generate_prd(task_id=task_id, prompt="Implement SSO login", model=None)
         call_kwargs = mock_run.call_args[1]
         assert task_id in call_kwargs["prompt"]
         assert "/ralpher:prd" in call_kwargs["prompt"]
@@ -224,7 +224,7 @@ class TestGeneratePrd:
         monkeypatch.chdir(tmp_path)
         mock_run.return_value = None
         with pytest.raises(SystemExit):
-            await generate_prd("task-no-prd", "test")
+            await generate_prd(task_id="task-no-prd", prompt="test", model=None)
 
 
 class TestExtractPrdJson:

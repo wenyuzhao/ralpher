@@ -60,7 +60,7 @@ class TestRunOneIteration:
             )
 
         mock_run.side_effect = side_effect
-        await _run_one_iteration(task_id, prd, task_dir, 0, HooksManager([]))
+        await _run_one_iteration(task_id, prd, task_dir, 0, HooksManager([]), None)
 
         updated = PRD.load(task_dir / "prd.json")
         assert updated.user_stories[0].passes is True
@@ -81,7 +81,7 @@ class TestRunOneIteration:
         mock_run.side_effect = ClaudeError(1)
 
         with pytest.raises(SystemExit):
-            await _run_one_iteration(task_id, prd, task_dir, 0, HooksManager([]))
+            await _run_one_iteration(task_id, prd, task_dir, 0, HooksManager([]), None)
 
     @patch("ralpher.loop.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
@@ -100,7 +100,7 @@ class TestRunOneIteration:
             )
 
         mock_run.side_effect = side_effect
-        await _run_one_iteration(task_id, prd, task_dir, 0, HooksManager([]))
+        await _run_one_iteration(task_id, prd, task_dir, 0, HooksManager([]), None)
 
         cus = json.loads((task_dir / "current_user_story.json").read_text())
         assert cus["id"] == "us-1"
@@ -122,7 +122,7 @@ class TestRunOneIteration:
             )
 
         mock_run.side_effect = side_effect
-        await _run_one_iteration(task_id, prd, task_dir, 0, HooksManager([]))
+        await _run_one_iteration(task_id, prd, task_dir, 0, HooksManager([]), None)
 
         call_kwargs = mock_run.call_args[1]
         assert f"/ralpher:loop {task_id}" in call_kwargs["prompt"]
@@ -136,7 +136,7 @@ class TestLoop:
         task_dir = tmp_path / ".ralpher" / "tasks" / "no-prd"
         task_dir.mkdir(parents=True)
         with pytest.raises(SystemExit):
-            await loop(task_dir, max_iterations=5, hooks=HooksManager([]))
+            await loop(task_dir=task_dir, max_iterations=5, hooks=HooksManager([]), model=None)
 
     @patch("ralpher.loop._checkout_branch")
     @patch("ralpher.loop.run_claude", new_callable=AsyncMock)
@@ -160,7 +160,7 @@ class TestLoop:
             )
 
         mock_run.side_effect = side_effect
-        await loop(task_dir, max_iterations=5, hooks=HooksManager([]))
+        await loop(task_dir=task_dir, max_iterations=5, hooks=HooksManager([]), model=None)
         assert mock_run.call_count == 1
 
     @patch("ralpher.loop._checkout_branch")
@@ -186,7 +186,7 @@ class TestLoop:
         mock_run.side_effect = side_effect
         monkeypatch.setattr("ralpher.loop.time.sleep", lambda _: None)
         with pytest.raises(SystemExit):
-            await loop(task_dir, max_iterations=2, hooks=HooksManager([]))
+            await loop(task_dir=task_dir, max_iterations=2, hooks=HooksManager([]), model=None)
         assert mock_run.call_count == 2
 
     @patch("ralpher.loop._checkout_branch")
@@ -215,4 +215,4 @@ class TestLoop:
         (task_dir / "PRD.md").write_text("# PRD")
         (task_dir / "prd.json").write_text(json.dumps(prd_data))
 
-        await loop(task_dir, max_iterations=5, hooks=HooksManager([]))
+        await loop(task_dir=task_dir, max_iterations=5, hooks=HooksManager([]), model=None)
