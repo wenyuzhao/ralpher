@@ -2,7 +2,7 @@
 
 A CLI tool that orchestrates [Claude Code](https://docs.anthropic.com/en/docs/claude-code) for autonomous software development. Give it a prompt, and it generates a PRD, breaks it into user stories, then runs iterative Claude development loops to implement each one.
 
-Workflow: `User Prompt` ➔ `PRD` ➔ `Ralph Loop`
+Workflow: `User Prompt` ➔ `PRD` ➔ ` Ralph Wiggum Loop⁠`
 
 ## Install
 
@@ -14,10 +14,13 @@ pipx install ralpher
 
 ```bash
 # 1. Generate a PRD
-uv run ralpher prd "Create a TODO app" --name todo-app
+ralpher prd "Create a TODO app" --name todo-app
+
+# (Optional) Refine the RPD
+ralpher refine "Use MySQL"
 
 # 2. Run the Ralph-loop on an existing PRD
-uv run ralpher loop
+ralpher loop
 ```
 
 ## How it works
