@@ -14,7 +14,7 @@ Each story needs:
 - **Description:** "As a [user], I want [feature] so that [benefit]"
 - **Acceptance Criteria:** Verifiable checklist of what "done" means
 
-Each story should be small enough to implement in one focused session.
+IMPORTANT: Each story should be small and fine-grained enough to implement in one focused session.
 
 **Format:**
 ```markdown
@@ -30,6 +30,7 @@ Each story should be small enough to implement in one focused session.
 
 **Important:**
 - Acceptance criteria must be verifiable, not vague. "Works correctly" is bad. "Button shows confirmation dialog before deleting" is good.
+- When possible, acceptance criteria should include unit tests, integration tests, or manually-performed tests done by yourself using skills or tools.
 - **For any story with UI changes:** Always include "Verify in browser using dev-browser skill" as acceptance criteria. This ensures visual verification of frontend work.
 
 ### 4. Functional Requirements
