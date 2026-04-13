@@ -94,7 +94,7 @@ async def loop(task_id: str, max_iterations: int = 10) -> None:
 
 
 async def _run_one_iteration(
-    task_id: str, prd: PRD, task_dir: Path, i: int, hooks: Hooks
+    task_id: str, prd: PRD, task_dir: Path, i: int, hooks: Hooks | None
 ) -> None:
     """Run claude --dangerously-skip-permissions --print with CLAUDE.md as stdin."""
 
@@ -113,7 +113,8 @@ async def _run_one_iteration(
     rich.print(
         f"[bold magenta]\\[#{i}] [i]{story.id}[/] - {story.title}[/bold magenta]\n",
     )
-    await hooks.on_iteration_start(i)
+    if hooks:
+        await hooks.on_iteration_start(i)
 
     cmd = [
         "claude",
@@ -142,7 +143,8 @@ async def _run_one_iteration(
     (logs_dir / f"{i}.err.log").write_text(stderr)
 
     if proc.returncode != 0:
-        await hooks.on_loop_end(i + 1, "crashed")
+        if hooks:
+            await hooks.on_loop_end(i + 1, "crashed")
         fail(f"Claude process exited with code {proc.returncode}")
 
     # Propagate changes to prd.json if updated
@@ -165,7 +167,8 @@ async def _run_one_iteration(
         rich.print(f"  [green]✔ PASSED[/green]\n")
     else:
         rich.print(f"  [red]✘ FAILED[/red]\n")
-    await hooks.on_iteration_end(i)
+    if hooks:
+        await hooks.on_iteration_end(i)
 
 
 def _checkout_branch(prd: PRD) -> None:

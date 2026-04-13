@@ -30,7 +30,7 @@ Take a PRD (markdown file or text) and convert it to `.ralpher/tasks/$0/prd.json
   "description": "[Feature description from PRD title/intro]",
   "user_stories": [
     {
-      "id": "US-001",
+      "id": "us-001",
       "title": "[Story title]",
       "description": "As a [user], I want [feature] so that [benefit]",
       "acceptance_criteria": [
@@ -124,7 +124,7 @@ Frontend stories are NOT complete until visually verified. Ralph will use the de
 ## Conversion Rules
 
 1. **Each user story becomes one JSON entry**
-2. **IDs**: Sequential (US-001, US-002, etc.)
+2. **IDs**: Sequential (us-001, us-002, etc.)
 3. **Priority**: Based on dependency order, then document order
 4. **All stories**: `passes: false` and empty `notes`
 5. **branchName**: Derive from feature name, kebab-case, prefixed with `ralph/`
@@ -140,12 +140,12 @@ If a PRD has big features, split them:
 > "Add user notification system"
 
 **Split into:**
-1. US-001: Add notifications table to database
-2. US-002: Create notification service for sending notifications
-3. US-003: Add notification bell icon to header
-4. US-004: Create notification dropdown panel
-5. US-005: Add mark-as-read functionality
-6. US-006: Add notification preferences page
+1. us-001: Add notifications table to database
+2. us-002: Create notification service for sending notifications
+3. us-003: Add notification bell icon to header
+4. us-004: Create notification dropdown panel
+5. us-005: Add mark-as-read functionality
+6. us-006: Add notification preferences page
 
 Each is one focused change that can be completed and verified independently.
 
@@ -174,7 +174,7 @@ Add ability to mark tasks with different statuses.
   "description": "Task Status Feature - Track task progress with status indicators",
   "user_stories": [
     {
-      "id": "US-001",
+      "id": "us-001",
       "title": "Add status field to tasks table",
       "description": "As a developer, I need to store task status in the database.",
       "acceptance_criteria": [
@@ -187,7 +187,7 @@ Add ability to mark tasks with different statuses.
       "notes": ""
     },
     {
-      "id": "US-002",
+      "id": "us-002",
       "title": "Display status badge on task cards",
       "description": "As a user, I want to see task status at a glance.",
       "acceptance_criteria": [
@@ -201,7 +201,7 @@ Add ability to mark tasks with different statuses.
       "notes": ""
     },
     {
-      "id": "US-003",
+      "id": "us-003",
       "title": "Add status toggle to task list rows",
       "description": "As a user, I want to change task status directly from the list.",
       "acceptance_criteria": [
@@ -216,7 +216,7 @@ Add ability to mark tasks with different statuses.
       "notes": ""
     },
     {
-      "id": "US-004",
+      "id": "us-004",
       "title": "Filter tasks by status",
       "description": "As a user, I want to filter the list to see only certain statuses.",
       "acceptance_criteria": [

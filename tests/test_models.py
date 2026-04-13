@@ -4,7 +4,7 @@ from ralpher.models import PRD, UserStory
 class TestUserStory:
     def test_defaults(self):
         story = UserStory(
-            id="US-1",
+            id="us-1",
             title="Login",
             description="User can log in",
             acceptance_criteria=["Can enter email"],
@@ -15,7 +15,7 @@ class TestUserStory:
 
     def test_all_fields(self):
         story = UserStory(
-            id="US-2",
+            id="us-2",
             title="Signup",
             description="User can sign up",
             acceptance_criteria=["Email", "Password"],
@@ -33,7 +33,7 @@ class TestPRD:
             stories_pass = [True, False, True]
         stories = [
             UserStory(
-                id=f"US-{i}",
+                id=f"us-{i}",
                 title=f"Story {i}",
                 description=f"Desc {i}",
                 acceptance_criteria=[],
@@ -70,7 +70,7 @@ class TestPRD:
             "description": "d",
             "user_stories": [
                 {
-                    "id": "US-1",
+                    "id": "us-1",
                     "title": "T",
                     "description": "D",
                     "acceptance_criteria": ["AC1"],
