@@ -9,7 +9,7 @@ from ralpher.utils.git import (
 )
 
 
-def init_project_config(
+def _resolve_branches(
     project: Project, base_branch: str | None, target_branch: str | None
 ) -> tuple[str, str]:
     # Validate branches and save config
@@ -36,11 +36,13 @@ def init_project_config(
         if not Confirm.ask("Do you want to continue?", default=True):
             raise SystemExit(0)
 
+    return base_branch, target_branch
+
+
+def _init_project_config(project: Project, base_branch: str, target_branch: str):
     project.project_dir.mkdir(parents=True, exist_ok=True)
     config = ProjectConfig(base_branch=base_branch, target_branch=target_branch)
     project.save_config(config)
-
-    return target_branch, base_branch
 
 
 def init_project(
@@ -50,12 +52,12 @@ def init_project(
     target_branch: str | None = None,
 ) -> None:
     """Initialize project directory and files for a new project."""
-    target_branch, base_branch = init_project_config(
-        project, base_branch, target_branch
-    )
 
-    # Create the target branch pointing at base_branch, then switch back
+    target_branch, base_branch = _resolve_branches(project, base_branch, target_branch)
+
     checkout_branch(target_branch, base_branch)
+
+    _init_project_config(project, base_branch, target_branch)
 
     # Save the prompt to PROMPT.md
     project.prompt_md.write_text(prompt)
