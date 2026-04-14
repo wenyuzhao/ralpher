@@ -27,7 +27,7 @@ def _resolve_branches(
         base_branch = resolve_default_base_branch()
 
     if not target_branch:
-        target_branch = f"ralph/{project.id[18:]}"
+        target_branch = f"ralph/{project.id}"
 
     if branch_exists(target_branch):
         rich.print(

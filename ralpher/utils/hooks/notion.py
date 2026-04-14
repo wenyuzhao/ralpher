@@ -137,6 +137,8 @@ async def update_notion_page(project: Project, status: Status | None) -> bool:
     template_file = Path(__file__).parent / "notion.md"
     template_content = template_file.read_text()
 
+    config = project.load_config()
+    branch = config.target_branch if config else "N/A"
     plan = project.load_plan()
     if plan:
         plan.tasks.sort(key=lambda t: t.priority)
@@ -158,7 +160,7 @@ async def update_notion_page(project: Project, status: Status | None) -> bool:
         progress_md=progress_md,
         active_task=status.active_task if status else None,
         status=status,
-        branch=f"ralph/{project_dir.name[18:]}",
+        branch=branch,
     )
     success = await __update_page(project_dir.name, rendered)
     return success
