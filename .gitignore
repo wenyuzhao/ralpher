@@ -13,3 +13,4 @@ wheels/
 /.ralpher
 /test-project
 /.env
+/.no-checkout

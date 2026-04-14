@@ -1,3 +1,4 @@
+from pathlib import Path
 import subprocess
 from subprocess import DEVNULL
 
@@ -41,6 +42,11 @@ def _check_empty_git_history() -> None:
 def checkout_branch(target_branch: str, base_branch: str) -> None:
     """Checkout the target branch, creating it from base_branch if provided."""
     _check_empty_git_history()
+
+    if (Path.cwd() / ".no-checkout").exists():
+        fail(
+            "This repository does not allow automatic branch checkouts. Please remove the .no-checkout file and try again."
+        )
 
     if branch_exists(target_branch):
         # Just checkout the existing branch
