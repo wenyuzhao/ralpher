@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 from datetime import datetime
 from typing import IO, Any
+import html
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import HTML
@@ -90,7 +91,7 @@ async def _ask_user_questions(questions: Questions) -> str:
         )
         result = await ChoiceInput(
             message=HTML(
-                f"<style color='ansimagenta'><b>[Q{index + 1}] <i>{header}:</i></b> {q.question}</style>"
+                f"<style color='ansimagenta'><b>[Q{index + 1}] <i>{html.escape(header)}:</i></b> {html.escape(q.question)}</style>"
             ),
             options=choice_options,
         ).prompt_async()

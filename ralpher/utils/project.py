@@ -36,7 +36,7 @@ def _resolve_branches(
         if not Confirm.ask("Do you want to continue?", default=True):
             raise SystemExit(0)
 
-    return base_branch, target_branch
+    return target_branch, base_branch
 
 
 def _init_project_config(project: Project, base_branch: str, target_branch: str):
