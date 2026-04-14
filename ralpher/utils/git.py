@@ -38,25 +38,25 @@ def _check_empty_git_history() -> None:
         )
 
 
-def create_branch(branch: str, start_point: str) -> None:
-    """Create a new branch at start_point without switching to it."""
-    _check_empty_git_history()
-
-    subprocess.check_call(
-        ["git", "branch", branch, start_point], stderr=DEVNULL, stdout=DEVNULL
-    )
-
-
 def checkout_branch(target_branch: str, base_branch: str) -> None:
     """Checkout the target branch, creating it from base_branch if provided."""
     _check_empty_git_history()
 
-    # Create new branch from base
-    subprocess.check_call(
-        ["git", "checkout", "-b", target_branch, base_branch],
-        stderr=DEVNULL,
-        stdout=DEVNULL,
-    )
+    if branch_exists(target_branch):
+        # Just checkout the existing branch
+        ret = subprocess.check_call(
+            ["git", "checkout", target_branch], stderr=DEVNULL, stdout=DEVNULL
+        )
+    else:
+        # Create new branch from base
+        ret = subprocess.check_call(
+            ["git", "checkout", "-b", target_branch, base_branch],
+            stderr=DEVNULL,
+            stdout=DEVNULL,
+        )
+
+    if ret != 0:
+        fail(f"Failed to checkout branch '{target_branch}' from '{base_branch}'.")
 
 
 def resolve_default_base_branch() -> str:

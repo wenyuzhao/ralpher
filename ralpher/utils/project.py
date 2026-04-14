@@ -4,7 +4,7 @@ from ralpher.models import Project, ProjectConfig
 from ralpher.utils.error import fail
 from ralpher.utils.git import (
     branch_exists,
-    create_branch,
+    checkout_branch,
     resolve_default_base_branch,
 )
 
@@ -55,8 +55,7 @@ def init_project(
     )
 
     # Create the target branch pointing at base_branch, then switch back
-    if not branch_exists(target_branch):
-        create_branch(target_branch, base_branch)
+    checkout_branch(target_branch, base_branch)
 
     # Save the prompt to PROMPT.md
     project.prompt_md.write_text(prompt)

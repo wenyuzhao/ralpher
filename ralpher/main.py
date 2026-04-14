@@ -93,7 +93,7 @@ def plan(
         )
     )
     rich.print(
-        f"[green]✔ Project Plan generated at .ralpher/projects/{project.id}/PLAN.md[/]"
+        f"[green]✔ Project plan generated at .ralpher/projects/{project.id}/PLAN.md[/]"
     )
 
 

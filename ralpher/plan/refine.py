@@ -4,6 +4,7 @@ from pathlib import Path
 from rich.console import Console
 
 from ralpher.models import Project
+from ralpher.utils.git import checkout_branch
 
 from ..utils.claude import ClaudeError, run_claude
 from ..utils.error import fail
@@ -21,6 +22,11 @@ async def refine_plan(*, project: Project, prompt: str, model: str | None) -> st
 
     if not (project.plan_md).exists():
         fail(f"{project.plan_md} does not exist.")
+
+    # Checkout the project branch before refinement
+    config = project.load_config()
+    assert config is not None, "Project config should exist at this point."
+    checkout_branch(config.target_branch, config.base_branch)
 
     with tempfile.NamedTemporaryFile(prefix=f"ralpher-refine-", suffix=".md") as tmp:
         tmp_path = Path(tmp.name)
