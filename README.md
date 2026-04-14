@@ -44,6 +44,15 @@ Ralpher supports optional Notion integration for syncing task status. Set these 
 uv run pytest
 ```
 
+## TODO
+
+- [ ] Add git worktree support
+- [ ] Create PRs automatically
+- [ ] Run repeating tasks in a loop (useful for continuous optimization, refactoring, or research)
+- [ ] Implement a standalone reviewer agent (or subagent) in both the planning and loop stages
+- [ ] Support Gemini-CLI
+- [ ] Support Codex CLI
+
 ## Acknowledgements
 
 This project draws its design and some of its prompts from [snarktank/ralph](https://github.com/snarktank/ralph).
