@@ -1,15 +1,17 @@
-import shutil
-
 import rich
 from rich.prompt import Confirm
 from ralpher.models import Project, ProjectConfig
 from ralpher.utils.error import fail
-from ralpher.utils.git import branch_exists, resolve_default_base_branch
+from ralpher.utils.git import (
+    branch_exists,
+    create_branch,
+    resolve_default_base_branch,
+)
 
 
 def init_project_config(
     project: Project, base_branch: str | None, target_branch: str | None
-) -> None:
+) -> tuple[str, str]:
     # Validate branches and save config
     if base_branch is not None and not branch_exists(base_branch):
         fail(f"Base branch '{base_branch}' does not exist.")
@@ -38,6 +40,8 @@ def init_project_config(
     config = ProjectConfig(base_branch=base_branch, target_branch=target_branch)
     project.save_config(config)
 
+    return target_branch, base_branch
+
 
 def init_project(
     project: Project,
@@ -46,7 +50,13 @@ def init_project(
     target_branch: str | None = None,
 ) -> None:
     """Initialize project directory and files for a new project."""
-    init_project_config(project, base_branch, target_branch)
+    target_branch, base_branch = init_project_config(
+        project, base_branch, target_branch
+    )
 
-    # Save the prompt to a PROMPT.md
+    # Create the target branch pointing at base_branch, then switch back
+    if not branch_exists(target_branch):
+        create_branch(target_branch, base_branch)
+
+    # Save the prompt to PROMPT.md
     project.prompt_md.write_text(prompt)

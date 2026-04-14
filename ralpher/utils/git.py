@@ -1,4 +1,5 @@
 import subprocess
+from subprocess import DEVNULL
 
 from ralpher.utils.error import fail
 
@@ -8,8 +9,7 @@ def get_current_branch() -> str | None:
     try:
         return (
             subprocess.check_output(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                stderr=subprocess.DEVNULL,
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"], stderr=DEVNULL
             )
             .decode()
             .strip()
@@ -21,36 +21,41 @@ def get_current_branch() -> str | None:
 def branch_exists(branch: str) -> bool:
     """Check whether a local branch exists."""
     result = (
-        subprocess.check_output(
-            ["git", "branch", "--list", branch], stderr=subprocess.DEVNULL
-        )
+        subprocess.check_output(["git", "branch", "--list", branch], stderr=DEVNULL)
         .decode()
         .strip()
     )
     return bool(result)
 
 
-def checkout_branch(target_branch: str, base_branch: str) -> None:
-    """Checkout the target branch, creating it from base_branch if provided.
-
-    If no git history exists (no HEAD), creates 'main' with an empty commit first.
-    """
+def _check_empty_git_history() -> None:
+    """Check if the git repository has any commits."""
     current = get_current_branch()
 
-    if current is None:
-        # No commits yet — create main first
-        subprocess.check_call(["git", "checkout", "-b", "main"])
-        subprocess.check_call(
-            ["git", "commit", "--allow-empty", "-m", "Initial commit"]
+    if not current:
+        fail(
+            "No git history found. Please create the [i]main[/] branch with an initial commit before running ralpher."
         )
-        if base_branch is None:
-            base_branch = "main"
+
+
+def create_branch(branch: str, start_point: str) -> None:
+    """Create a new branch at start_point without switching to it."""
+    _check_empty_git_history()
+
+    subprocess.check_call(
+        ["git", "branch", branch, start_point], stderr=DEVNULL, stdout=DEVNULL
+    )
+
+
+def checkout_branch(target_branch: str, base_branch: str) -> None:
+    """Checkout the target branch, creating it from base_branch if provided."""
+    _check_empty_git_history()
 
     # Create new branch from base
     subprocess.check_call(
         ["git", "checkout", "-b", target_branch, base_branch],
-        stderr=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
+        stderr=DEVNULL,
+        stdout=DEVNULL,
     )
 
 
