@@ -8,7 +8,19 @@ Brief description of the feature and the problem it solves.
 ### 2. Goals
 Specific, measurable objectives (bullet list).
 
-### 3. Tasks
+### 3. Design
+High-level software design covering architecture, system components, and API contracts. This section bridges goals and implementation by describing *how* the system will be structured.
+
+Include as applicable:
+- **Architecture:** Key components/modules and how they interact (e.g., client → API → service → database). A brief diagram or description of the data flow.
+- **Source Layout:** New or modified files, directories, and modules. Describe where code lives and how it's organized (e.g., "new `src/priority/` module with `model.py`, `service.py`, `routes.py`"). Reference existing files being changed.
+- **Data Model:** New or modified entities, their fields, and relationships.
+- **API Design:** New or modified endpoints/interfaces with method, path, request/response shape, and key behaviors.
+- **Key Design Decisions:** Important trade-offs or choices (e.g., "polling vs. WebSockets", "separate table vs. JSON column") with brief rationale.
+
+Keep it concise — enough for a developer to understand the overall shape before reading individual tasks.
+
+### 4. Tasks
 Each task needs:
 - **Title:** Short descriptive name
 - **Description:** Clear, concise explanation of what needs to be done and why
@@ -33,32 +45,32 @@ IMPORTANT: Each task should be small and fine-grained enough to implement in one
 - When possible, acceptance criteria should include unit tests, integration tests, or manually-performed tests that can be performed by yourself using skills or tools.
 - **For any task with UI changes:** Always include "Verify in browser using dev-browser skill" as acceptance criteria. This ensures visual verification of frontend work.
 
-### 4. Functional Requirements
+### 5. Functional Requirements
 Numbered list of specific functionalities:
 - "FR-1: The system must allow users to..."
 - "FR-2: When a user clicks X, the system must..."
 
 Be explicit and unambiguous.
 
-### 5. Non-Goals (Out of Scope)
+### 6. Non-Goals (Out of Scope)
 What this feature will NOT include. Critical for managing scope.
 
-### 6. Design Considerations (Optional)
+### 7. Design Considerations (Optional)
 - UI/UX requirements
 - Link to mockups if available
 - Relevant existing components to reuse
 
-### 7. Technical Considerations (Optional)
+### 8. Technical Considerations (Optional)
 - Known constraints or dependencies
 - Integration points with existing systems
 - Performance requirements
 
-### 8. Success Metrics
+### 9. Success Metrics
 How will success be measured?
 - "Reduce time to complete X by 50%"
 - "Increase conversion rate by 10%"
 
-### 9. Open Questions
+### 10. Open Questions
 Remaining questions or areas needing clarification.
 
 ---
@@ -90,6 +102,30 @@ Add priority levels to tasks so users can focus on what matters most. Tasks can 
 - Provide clear visual differentiation between priority levels
 - Enable filtering and sorting by priority
 - Default new tasks to medium priority
+
+## Design
+
+**Architecture:** Priority is a persisted property on the task entity. The flow is: UI priority selector → API PATCH endpoint → database column. No new services or modules needed — this extends the existing task CRUD.
+
+**Source Layout:**
+- `db/migrations/003_add_priority.sql` — new migration file.
+- `src/models/task.py` — add `priority` field to the Task model.
+- `src/api/tasks.py` — extend existing PATCH/GET handlers with priority filtering.
+- `src/components/TaskCard.tsx` — add priority badge to existing card component.
+- `src/components/PriorityFilter.tsx` — new filter dropdown component.
+
+**Data Model:**
+- `tasks` table gains a `priority` column: enum `'high' | 'medium' | 'low'`, default `'medium'`, not null.
+
+**API Design:**
+- Existing `PATCH /api/tasks/:id` accepts an optional `priority` field in the request body.
+- `GET /api/tasks` response includes `priority` on each task object.
+- `GET /api/tasks?priority=high` filters by priority level.
+
+**Key Design Decisions:**
+- Priority stored as a database column (not computed) so it can be indexed and queried efficiently.
+- Reuse the existing badge component with color variants rather than creating a new component.
+- Filter state managed via URL search params for shareability and back-button support.
 
 ## Tasks
 

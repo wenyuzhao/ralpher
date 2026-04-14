@@ -5,17 +5,17 @@ You are an autonomous coding agent working on a task of a software project.
 ## Your Task
 
 1. Read and understand the current task: @.ralpher/projects/$0/current_task.json`
-    * The complete Project Plan is at .ralpher/projects/$0/PLAN.md (NEVER modify it)
-2. Read the progress log at @.ralpher/projects/$0/progress.md (check Codebase Patterns section first)
-3. Implement that single task
-4. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
-5. Update CLAUDE.md files if you discover reusable patterns (see below)
-6. If checks pass, commit ALL changes with message: `[Task ID] feat: [Task Title]`. e.g. `[T-001] feat: Add notifications table to database`.
+2. Read and understand the complete Project Plan: @.ralpher/projects/$0/PLAN.md (NEVER modify it)
+3. Read the progress log at @.ralpher/projects/$0/progress.md (check Codebase Patterns section first)
+4. Implement that single task
+5. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
+6. Update CLAUDE.md files if you discover reusable patterns (see below)
+7. If checks pass, commit ALL changes with message: `[Task ID] feat: [Task Title]`. e.g. `[T-001] feat: Add notifications table to database`.
    * The prefix "feat" can be any of: feat/fix/docs/style/refactor/test/chore/perf/ci/build/revert
    * When the checks are not passed, DON'T commit or update current_task.json
-7. Update current_task.json to set `passes: true`
+8. Update current_task.json to set `passes: true`
    * Don't set `passes: true` if checks are not passed.
-8. Append your progress and additional notes to `progress.md`
+9. Append your progress and additional notes to `progress.md`
 
 ## Progress Report Format
 
