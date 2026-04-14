@@ -90,6 +90,11 @@ class Questions(BaseModel):
         return Questions.model_validate(json.loads(questions_path.read_text()))
 
 
+class ProjectConfig(BaseModel):
+    base_branch: str
+    target_branch: str
+
+
 class Project(BaseModel):
     id: str
     model: Optional[str] = None
@@ -102,8 +107,16 @@ class Project(BaseModel):
         return Path.cwd() / ".ralpher" / "projects" / self.id
 
     @property
-    def branch(self) -> str:
-        return f"ralph/{self.id[18:]}"
+    def config_json(self) -> Path:
+        return self.project_dir / "config.json"
+
+    def load_config(self) -> ProjectConfig | None:
+        if not self.config_json.exists():
+            return None
+        return ProjectConfig.model_validate(json.loads(self.config_json.read_text()))
+
+    def save_config(self, config: ProjectConfig) -> None:
+        self.config_json.write_text(config.model_dump_json())
 
     @property
     def prompt_md(self) -> Path:

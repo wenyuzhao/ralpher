@@ -60,6 +60,20 @@ def plan(
     model: Annotated[
         str | None, typer.Option("--model", "-m", help="Claude model to use")
     ] = None,
+    base_branch: Annotated[
+        str | None,
+        typer.Option(
+            "--base-branch",
+            help="Base branch to fork from when creating the target branch. Must exist. Defaults to main or master.",
+        ),
+    ] = None,
+    target_branch: Annotated[
+        str | None,
+        typer.Option(
+            "--target-branch",
+            help="Target branch to work on. Created from base-branch if it doesn't exist.",
+        ),
+    ] = None,
 ) -> None:
     """Generate a Project Plan."""
     _require_claude()
@@ -69,7 +83,15 @@ def plan(
 
     rich.print(f"[bold blue]Generating plan for new project: [i]{project_id}[/][/]\n")
     project = Project(id=project_id, model=model)
-    asyncio.run(generate_plan(project=project, prompt=prompt, model=model))
+    asyncio.run(
+        generate_plan(
+            project=project,
+            prompt=prompt,
+            model=model,
+            base_branch=base_branch,
+            target_branch=target_branch,
+        )
+    )
     rich.print(
         f"[green]✔ Project Plan generated at .ralpher/projects/{project.id}/PLAN.md[/]"
     )

@@ -6,7 +6,7 @@ import pytest
 from ralpher.loop.prepare import _init_progress
 from ralpher.loop.iterate import iterate
 from ralpher.loop.loop import run_ralph_loop
-from ralpher.models import ProjectPlan, Project
+from ralpher.models import ProjectConfig, ProjectPlan, Project
 from ralpher.utils.hooks import HooksManager
 
 
@@ -43,7 +43,14 @@ _TASK_TEMPLATE = {
 def _make_project(
     task_id: str, max_iterations: int = 5, model: str | None = None
 ) -> Project:
-    return Project(id=task_id, max_iterations=max_iterations, model=model)
+    project = Project(id=task_id, max_iterations=max_iterations, model=model)
+    return project
+
+
+def _write_config(project: Project) -> None:
+    """Write a default config.json so prepare() can load it."""
+    config = ProjectConfig(base_branch="main", target_branch=f"ralph/{project.id}")
+    project.save_config(config)
 
 
 class TestInitProgress:
@@ -166,7 +173,7 @@ class TestLoop:
         with pytest.raises(SystemExit):
             await run_ralph_loop(project=project, hooks=HooksManager([]))
 
-    @patch("ralpher.loop.prepare._checkout_branch")
+    @patch("ralpher.loop.prepare.checkout_branch")
     @patch("ralpher.loop.prepare.extract_plan_json", new_callable=AsyncMock)
     @patch("ralpher.loop.iterate.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
@@ -176,6 +183,7 @@ class TestLoop:
         monkeypatch.chdir(tmp_path)
         project = _make_project("loop-done")
         project.project_dir.mkdir(parents=True)
+        _write_config(project)
 
         plan_data = _make_plan()
         project.plan_md.write_text("# Plan")
@@ -190,7 +198,7 @@ class TestLoop:
         await run_ralph_loop(project=project, hooks=HooksManager([]))
         assert mock_run.call_count == 1
 
-    @patch("ralpher.loop.prepare._checkout_branch")
+    @patch("ralpher.loop.prepare.checkout_branch")
     @patch("ralpher.loop.prepare.extract_plan_json", new_callable=AsyncMock)
     @patch("ralpher.loop.iterate.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
@@ -200,6 +208,7 @@ class TestLoop:
         monkeypatch.chdir(tmp_path)
         project = _make_project("loop-fail", max_iterations=2)
         project.project_dir.mkdir(parents=True)
+        _write_config(project)
 
         plan_data = _make_plan()
         project.plan_md.write_text("# Plan")
@@ -219,7 +228,7 @@ class TestLoop:
             await run_ralph_loop(project=project, hooks=HooksManager([]))
         assert mock_run.call_count == 2
 
-    @patch("ralpher.loop.prepare._checkout_branch")
+    @patch("ralpher.loop.prepare.checkout_branch")
     @patch("ralpher.loop.prepare.extract_plan_json", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_skips_loop_when_all_tasks_already_pass(
@@ -228,6 +237,7 @@ class TestLoop:
         monkeypatch.chdir(tmp_path)
         project = _make_project("loop-skip")
         project.project_dir.mkdir(parents=True)
+        _write_config(project)
 
         plan_data = _make_plan(
             [

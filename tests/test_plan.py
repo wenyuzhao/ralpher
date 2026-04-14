@@ -222,7 +222,7 @@ class TestGeneratePlan:
         task_id = "task-dir-test"
         project = Project(id=task_id)
 
-        def init_side_effect(proj, prompt):
+        def init_side_effect(proj, prompt, **kwargs):
             proj.project_dir.mkdir(parents=True, exist_ok=True)
             proj.prompt_md.write_text(prompt)
 

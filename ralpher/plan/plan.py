@@ -7,10 +7,17 @@ from ..utils.claude import ClaudeError, run_claude
 from ..utils.error import fail
 
 
-async def generate_plan(*, project: Project, prompt: str, model: str | None) -> str:
+async def generate_plan(
+    *,
+    project: Project,
+    prompt: str,
+    model: str | None,
+    base_branch: str | None = None,
+    target_branch: str | None = None,
+) -> str:
     """Run a Claude Code session to generate a Project Plan."""
 
-    init_project(project, prompt)
+    init_project(project, prompt, base_branch=base_branch, target_branch=target_branch)
 
     try:
         await run_claude(

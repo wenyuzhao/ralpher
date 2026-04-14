@@ -1,34 +1,52 @@
-import subprocess
+import shutil
 
 import rich
 from rich.prompt import Confirm
-from ralpher.models import Project
+from ralpher.models import Project, ProjectConfig
+from ralpher.utils.error import fail
+from ralpher.utils.git import branch_exists, resolve_default_base_branch
 
 
-def init_project(project: Project, prompt: str) -> None:
-    """Initialize project directory and files for a new project."""
+def init_project_config(
+    project: Project, base_branch: str | None, target_branch: str | None
+) -> None:
+    # Validate branches and save config
+    if base_branch is not None and not branch_exists(base_branch):
+        fail(f"Base branch '{base_branch}' does not exist.")
+
+    if target_branch and base_branch and branch_exists(target_branch):
+        fail(
+            f"Target branch '{target_branch}' already exists. "
+            f"Remove --base-branch to use the existing branch, "
+            f"or choose a different --target-branch."
+        )
+
+    if not base_branch:
+        base_branch = resolve_default_base_branch()
+
+    if not target_branch:
+        target_branch = f"ralph/{project.id[18:]}"
+
+    if branch_exists(target_branch):
+        rich.print(
+            f"[yellow][b]Warning:[/] Target branch [i]{target_branch}[/i] already exists and will be reused.[/]"
+        )
+        if not Confirm.ask("Do you want to continue?", default=True):
+            raise SystemExit(0)
+
     project.project_dir.mkdir(parents=True, exist_ok=True)
+    config = ProjectConfig(base_branch=base_branch, target_branch=target_branch)
+    project.save_config(config)
+
+
+def init_project(
+    project: Project,
+    prompt: str,
+    base_branch: str | None = None,
+    target_branch: str | None = None,
+) -> None:
+    """Initialize project directory and files for a new project."""
+    init_project_config(project, base_branch, target_branch)
 
     # Save the prompt to a PROMPT.md
     project.prompt_md.write_text(prompt)
-
-    # Check if branch already exists
-    branches = (
-        subprocess.check_output(
-            ["git", "branch", "--list", project.branch], stderr=subprocess.DEVNULL
-        )
-        .decode()
-        .strip()
-    )
-    if branches:
-        rich.print(
-            f"[yellow][b]Warning:[/] Branch [i]{project.branch}[/i] already exists and will be reused.[/]"
-        )
-        if not Confirm.ask("Do you want to continue?", default=True):
-            # Delete the project directory if the user cancels
-            subprocess.check_call(
-                ["rm", "-rf", str(project.project_dir)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            raise SystemExit(0)

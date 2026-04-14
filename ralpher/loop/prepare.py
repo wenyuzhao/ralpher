@@ -1,6 +1,5 @@
 from datetime import datetime
 from pathlib import Path
-import subprocess
 import sys
 
 import rich
@@ -8,6 +7,7 @@ from rich.prompt import Confirm
 
 from ralpher.models import Project
 from ralpher.utils.error import fail
+from ralpher.utils.git import checkout_branch
 from ralpher.utils.hooks.hooks import HooksManager
 from ..plan.extract import extract_plan_json
 
@@ -60,8 +60,10 @@ async def prepare(project: Project, hooks: HooksManager) -> bool:
             sys.exit(0)
 
     # Report important info before starting the loop
+    config = project.load_config()
+    assert config is not None
     rich.print(f" • Incomplete tasks: {num_failed_tasks} / {num_tasks}")
-    rich.print(f" • Branch: [i]{project.branch}[/]")
+    rich.print(f" • Branch: [i]{config.target_branch}[/]")
     rich.print(
         f" • Max iterations: {project.max_iterations if project.max_iterations is not None else 'Unlimited'}"
     )
@@ -72,64 +74,10 @@ async def prepare(project: Project, hooks: HooksManager) -> bool:
     if not project.progress_md.exists():
         _init_progress(project.progress_md)
 
-    # Track current branch
-    _checkout_branch(project.branch)
+    # Track target branch
+    checkout_branch(config.target_branch, config.base_branch)
 
     return True
-
-
-def _checkout_branch(branch: str) -> None:
-    """Checkout the branch or create from main/master if it's different from the current branch."""
-
-    try:
-        current_branch = (
-            subprocess.check_output(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                stderr=subprocess.DEVNULL,
-            )
-            .decode()
-            .strip()
-        )
-    except subprocess.CalledProcessError:
-        # No commits yet — HEAD doesn't exist; create main first, then the target branch
-        subprocess.check_call(["git", "checkout", "-b", "main"])
-        subprocess.check_call(
-            ["git", "commit", "--allow-empty", "-m", "Initial commit"]
-        )
-        subprocess.check_call(["git", "checkout", "-b", branch])
-        return
-
-    if branch != current_branch:
-        # Check if branch exists
-        branches = (
-            subprocess.check_output(
-                ["git", "branch", "--list", branch], stderr=subprocess.DEVNULL
-            )
-            .decode()
-            .strip()
-        )
-        if not branches:
-            # Create branch from main or master
-            base_branch = "main"
-            try:
-                subprocess.check_call(
-                    ["git", "rev-parse", "--verify", base_branch],
-                    stderr=subprocess.DEVNULL,
-                    stdout=subprocess.DEVNULL,
-                )
-            except subprocess.CalledProcessError:
-                base_branch = "master"
-            subprocess.check_call(
-                ["git", "checkout", "-b", branch, base_branch],
-                stderr=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-            )
-        else:
-            subprocess.check_call(
-                ["git", "checkout", branch],
-                stderr=subprocess.DEVNULL,
-                stdout=subprocess.DEVNULL,
-            )
 
 
 def _init_progress(progress_file: Path) -> None:
