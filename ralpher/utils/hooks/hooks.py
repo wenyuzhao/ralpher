@@ -50,21 +50,21 @@ class Hooks:
     async def on_iteration_start(self, index: int, task_id: str):
         plan = self.load_plan()
         assert plan is not None
-        task = next((t for t in plan.tasks if t.id == task_id), None)
+        task = plan.get_task_by_id(task_id)
         assert task
         label = f"**[Iteration {index+1} / {self.project.max_iterations}]** **{task.id}** - {task.title}"
-        self.status = Status(status="running", label=label)
+        self.status = Status(status="running", label=label, active_task=task_id)
         await self.update()
 
     async def on_iteration_end(self, index: int, task_id: str):
         plan = self.load_plan()
         assert plan is not None
-        task = next((t for t in plan.tasks if t.id == task_id), None)
+        task = plan.get_task_by_id(task_id)
         label = f"Iteration {index} / {self.project.max_iterations}"
         if task:
             result = "PASSED" if task.passes else "FAILED"
             label += f": *{task.id}* - {task.title} ({result})"
-        self.status = Status(status="running", label=label)
+        self.status = Status(status="running", label=label, active_task=None)
         await self.update()
 
     async def on_loop_end(self, iterations: int, completed: bool):
