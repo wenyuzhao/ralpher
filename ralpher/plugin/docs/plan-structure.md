@@ -11,7 +11,7 @@ Specific, measurable objectives (bullet list).
 ### 3. Tasks
 Each task needs:
 - **Title:** Short descriptive name
-- **Description:** "As a [user], I want [feature] so that [benefit]"
+- **Description:** Clear, concise explanation of what needs to be done and why
 - **Acceptance Criteria:** Verifiable checklist of what "done" means
 
 IMPORTANT: Each task should be small and fine-grained enough to implement in one focused session.
@@ -19,7 +19,7 @@ IMPORTANT: Each task should be small and fine-grained enough to implement in one
 **Format:**
 ```markdown
 ### `T-001` - [Title]
-**Description:** As a [user], I want [feature] so that [benefit].
+**Description:** Clear, concise explanation of what needs to be done and why.
 
 **Acceptance Criteria:**
 - Specific verifiable criterion
@@ -94,7 +94,7 @@ Add priority levels to tasks so users can focus on what matters most. Tasks can 
 ## Tasks
 
 ### `T-001` - Add priority field to database
-**Description:** As a developer, I need to store task priority so it persists across sessions.
+**Description:** Add a priority column to the tasks database table so that task priority persists across sessions.
 
 **Acceptance Criteria:**
 - Add priority column to tasks table: 'high' | 'medium' | 'low' (default 'medium')
@@ -102,7 +102,7 @@ Add priority levels to tasks so users can focus on what matters most. Tasks can 
 - Typecheck passes
 
 ### `T-002` - Display priority indicator on task cards
-**Description:** As a user, I want to see task priority at a glance so I know what needs attention first.
+**Description:** Show a colored priority badge on each task card for quick visual identification of priority level.
 
 **Acceptance Criteria:**
 - Each task card shows colored priority badge (red=high, yellow=medium, gray=low)
@@ -111,7 +111,7 @@ Add priority levels to tasks so users can focus on what matters most. Tasks can 
 - Verify in browser using dev-browser skill
 
 ### `T-003` - Add priority selector to task edit
-**Description:** As a user, I want to change a task's priority when editing it.
+**Description:** Add a priority dropdown to the task edit modal that allows changing a task's priority level.
 
 **Acceptance Criteria:**
 - Priority dropdown in task edit modal
@@ -121,7 +121,7 @@ Add priority levels to tasks so users can focus on what matters most. Tasks can 
 - Verify in browser using dev-browser skill
 
 ### `T-004` - Filter tasks by priority
-**Description:** As a user, I want to filter the task list to see only high-priority items when I'm focused.
+**Description:** Add a priority filter dropdown to the task list that filters tasks by their priority level.
 
 **Acceptance Criteria:**
 - Filter dropdown with options: All | High | Medium | Low

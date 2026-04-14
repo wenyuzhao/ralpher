@@ -27,7 +27,7 @@ Take a Project Plan (markdown file or text) and convert it to `.ralpher/projects
     {
       "id": "T-001",
       "title": "[Task title]",
-      "description": "Detailed task description and information",
+      "description": "Clear, concise explanation of what needs to be done and why",
       "acceptance_criteria": [
         "Criterion 1",
         "Criterion 2",
@@ -169,7 +169,7 @@ Add ability to mark tasks with different statuses.
     {
       "id": "T-001",
       "title": "Add status field to tasks table",
-      "description": "As a developer, I need to store task status in the database.",
+      "description": "Add a status column to the tasks database table to persist task progress state.",
       "acceptance_criteria": [
         "Add status column: 'pending' | 'in_progress' | 'done' (default 'pending')",
         "Generate and run migration successfully",
@@ -182,7 +182,7 @@ Add ability to mark tasks with different statuses.
     {
       "id": "T-002",
       "title": "Display status badge on task cards",
-      "description": "As a user, I want to see task status at a glance.",
+      "description": "Show a colored status badge on each task card for quick visual identification.",
       "acceptance_criteria": [
         "Each task card shows colored status badge",
         "Badge colors: gray=pending, blue=in_progress, green=done",
@@ -196,7 +196,7 @@ Add ability to mark tasks with different statuses.
     {
       "id": "T-003",
       "title": "Add status toggle to task list rows",
-      "description": "As a user, I want to change task status directly from the list.",
+      "description": "Add a status dropdown or toggle to each task list row for inline status changes.",
       "acceptance_criteria": [
         "Each row has status dropdown or toggle",
         "Changing status saves immediately",
@@ -211,7 +211,7 @@ Add ability to mark tasks with different statuses.
     {
       "id": "T-004",
       "title": "Filter tasks by status",
-      "description": "As a user, I want to filter the list to see only certain statuses.",
+      "description": "Add a status filter dropdown to the task list header to filter tasks by their current status.",
       "acceptance_criteria": [
         "Filter dropdown: All | Pending | In Progress | Done",
         "Filter persists in URL params",
