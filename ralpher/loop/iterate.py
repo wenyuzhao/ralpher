@@ -1,28 +1,34 @@
 import rich
 
-from ..models import RunInfo
+from ..models import Project
 from ..utils.claude import ClaudeError, run_claude
 from ..utils.error import fail
 from ..utils.hooks import HooksManager
 
 
-async def implement_and_review(run: RunInfo, hooks: HooksManager):
-    assert run.current_iteration is not None
+async def implement_and_review(project: Project, hooks: HooksManager):
+    assert project.current_iteration is not None
 
-    i = run.current_iteration
+    i = project.current_iteration
 
     try:
         await run_claude(
-            prompt=f"/ralpher:iterate {run.id}", task_dir=run.task_dir, model=run.model
+            prompt=f"/ralpher:iterate {project.id}",
+            project_dir=project.project_dir,
+            model=project.model,
         )
     except ClaudeError as e:
         await hooks.on_error(f"Iteration {i} failed with exit code {e.returncode}")
         fail(f"Claude process exited with code {e.returncode}")
 
 
-async def iterate(run: RunInfo, hooks: HooksManager) -> None:
-    i = run.current_iteration
-    task = run.load_original_current_task()
+async def iterate(project: Project, hooks: HooksManager) -> None:
+    i = project.current_iteration
+    plan = project.load_plan()
+    assert plan is not None
+    assert project.current_task_id is not None
+    task = plan.get_task_by_id(project.current_task_id)
+    assert task is not None
     assert i is not None
 
     # Start iteration
@@ -32,24 +38,26 @@ async def iterate(run: RunInfo, hooks: HooksManager) -> None:
     await hooks.on_iteration_start(i, task.id)
 
     # save to current_task.json for claude to read
-    run.save_current_task(task)
+    project.save_current_task(task)
 
     # Implement the task using claude
-    await implement_and_review(run, hooks)
+    await implement_and_review(project, hooks)
 
     # Propagate changes to plan.json if updated
-    modified_task = run.load_current_task()
-    plan = run.load_plan()
+    modified_task = project.load_current_task()
+    assert modified_task is not None
+    plan = project.load_plan()
+    assert plan is not None
     if modified_task.passes:
         # Update the corresponding task in plan.json
         for t in plan.tasks:
             if t.id == modified_task.id:
                 t.passes = True
                 break
-        plan.save(run.plan_json_file)
+        project.save_plan(plan)
 
     # Finish iteration
-    run.remove_current_task()
+    project.remove_current_task()
     if modified_task.passes:
         rich.print(f"  [green]✔ PASSED[/green]\n")
     else:

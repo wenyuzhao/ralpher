@@ -25,10 +25,10 @@ ralpher loop
 
 ## How it works
 
-1. **Plan generation** -- Sends your prompt to Claude to produce a structured Project Plan with tasks, saved to `.ralpher/projects/{task_id}/PLAN.md`.
+1. **Plan generation** -- Sends your prompt to Claude to produce a structured Project Plan with tasks, saved to `.ralpher/projects/{project_id}/PLAN.md`.
 2. **Run Ralph-loop**
     1. Parses the plan into a structured JSON model (project, tasks with acceptance criteria and priorities).
-    2. Iteratively invokes `claude` to implement each task on a dedicated git branch (`ralph/{task_id}`), tracking progress and detecting completion.
+    2. Iteratively invokes `claude` to implement each task on a dedicated git branch (`ralph/{project_id}`), tracking progress and detecting completion.
 
 ## [Notion](https://www.notion.so/) integration
 

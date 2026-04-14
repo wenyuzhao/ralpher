@@ -3,7 +3,7 @@ import os
 import httpx
 import jinja2
 
-from ralpher.models import ProjectPlan, Status
+from ralpher.models import Project, ProjectPlan, Status
 from ralpher.utils.hooks.hooks import Hooks
 
 
@@ -123,28 +123,29 @@ async def __update_page(title: str, content: str) -> bool:
         return False
 
 
-async def update_notion_page(task_dir: Path, status: Status | None) -> bool:
+async def update_notion_page(project: Project, status: Status | None) -> bool:
     if "RALPHER_NOTION_TOKEN" not in os.environ or (
         "RALPHER_NOTION_PAGE_ID" not in os.environ
         and "RALPHER_NOTION_PARENT_PAGE_ID" not in os.environ
     ):
         return False
 
+    project_dir = project.project_dir
+
     template_file = Path(__file__).parent / "notion.md"
     template_content = template_file.read_text()
 
-    plan_file = task_dir / "plan.json"
-    plan = ProjectPlan.load(plan_file) if plan_file.exists() else None
+    plan = project.load_plan()
     if plan:
         plan.tasks.sort(key=lambda t: t.priority)
 
-    plan_md_file = task_dir / "PLAN.md"
+    plan_md_file = project_dir / "PLAN.md"
     plan_md = plan_md_file.read_text() if plan_md_file.exists() else "*N/A*"
 
-    promot_md_file = task_dir / "PROMPT.md"
+    promot_md_file = project_dir / "PROMPT.md"
     prompt_md = promot_md_file.read_text() if promot_md_file.exists() else "*N/A*"
 
-    progress_md_file = task_dir / "progress.md"
+    progress_md_file = project_dir / "progress.md"
     progress_md = progress_md_file.read_text() if progress_md_file.exists() else "*N/A*"
 
     template = jinja2.Template(template_content)
@@ -155,9 +156,9 @@ async def update_notion_page(task_dir: Path, status: Status | None) -> bool:
         progress_md=progress_md,
         active_task=status.active_task if status else None,
         status=status,
-        branch=f"ralph/{task_dir.name[18:]}",
+        branch=f"ralph/{project_dir.name[18:]}",
     )
-    success = await __update_page(task_dir.name, rendered)
+    success = await __update_page(project_dir.name, rendered)
     return success
 
 
@@ -165,4 +166,4 @@ class NotionHooks(Hooks):
     name = "Notion"
 
     async def update(self):
-        await update_notion_page(self.task_dir, self.status)
+        await update_notion_page(self.project, self.status)

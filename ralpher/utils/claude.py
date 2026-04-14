@@ -69,9 +69,7 @@ async def _ask_user_questions(questions: Questions) -> str:
     session = PromptSession()
     answers: list[str] = []
 
-    rich.print(
-        "[bold blue]Please answer the following questions to clarify the task:[/]"
-    )
+    rich.print("[bold blue]Please answer the following clarification questions:[/]")
 
     for index, q in enumerate(questions.questions):
         if not q.options:
@@ -127,7 +125,7 @@ def _get_session_id(log: Path) -> str | None:
 async def run_claude(
     *,
     prompt: str,
-    task_dir: Path,
+    project_dir: Path,
     interactive: bool = False,
     model: str | None = None,
 ):
@@ -135,11 +133,11 @@ async def run_claude(
     Run the claude CLI subprocess.
     """
     timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
-    logs = task_dir / "logs" / f"claude-{timestamp}.log"
+    logs = project_dir / "logs" / f"claude-{timestamp}.log"
     if logs:
         logs.parent.mkdir(parents=True, exist_ok=True)
     await _run_claude_looped(
-        task_dir=task_dir,
+        project_dir=project_dir,
         prompt=prompt,
         logs=logs,
         model=model,
@@ -149,7 +147,7 @@ async def run_claude(
 
 async def _run_claude_looped(
     *,
-    task_dir: Path,
+    project_dir: Path,
     prompt: str,
     logs: Path,
     model: str | None,
@@ -165,7 +163,7 @@ async def _run_claude_looped(
         f.flush()
 
         while True:
-            Questions.clear(task_dir)
+            Questions.clear(project_dir)
 
             cmd = _build_cmd(current_prompt, model=model, session_id=session_id)
             returncode = await _exec(cmd, logs=f)
@@ -180,7 +178,7 @@ async def _run_claude_looped(
                     fail("Failed to get claude session ID.")
 
                 try:
-                    questions = Questions.load(task_dir)
+                    questions = Questions.load(project_dir)
                 except Exception:
                     current_prompt = "Invalid JSON output. Please fix the JSON formatting errors and try again."
                     continue

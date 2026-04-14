@@ -3,24 +3,20 @@ import datetime
 
 import rich
 
-from ...models import ProjectPlan, Status
+from ...models import ProjectPlan, Status, Project
 
 
 class Hooks:
     name: str = "base"
 
     def __init__(self):
-        self.task_id: str
-        self.task_dir: Path
-        self.max_iterations: int
+        self.project: Project
         self.start_time: datetime.datetime
         self.total_iterations = 0
         self.status: Status = Status(status="idle", label="Idle")
 
-    async def init(self, task_dir: Path, max_iterations: int):
-        self.task_id = task_dir.name
-        self.task_dir = task_dir
-        self.max_iterations = max_iterations
+    async def init(self, project: Project):
+        self.project = project
         self.start_time = datetime.datetime.now()
         self.status: Status = Status(status="starting", label="Starting")
         await self.update()
@@ -28,10 +24,7 @@ class Hooks:
     async def update(self): ...
 
     def load_plan(self) -> ProjectPlan | None:
-        plan_file = self.task_dir / "plan.json"
-        if not plan_file.exists():
-            return None
-        return ProjectPlan.load(plan_file)
+        return self.project.load_plan()
 
     async def on_cancel(self, message: str | None = None):
         label = f"Canceled: {message}" if message else "Canceled"
@@ -59,7 +52,7 @@ class Hooks:
         assert plan is not None
         task = next((t for t in plan.tasks if t.id == task_id), None)
         assert task
-        label = f"**[Iteration {index+1} / {self.max_iterations}]** **{task.id}** - {task.title}"
+        label = f"**[Iteration {index+1} / {self.project.max_iterations}]** **{task.id}** - {task.title}"
         self.status = Status(status="running", label=label)
         await self.update()
 
@@ -67,7 +60,7 @@ class Hooks:
         plan = self.load_plan()
         assert plan is not None
         task = next((t for t in plan.tasks if t.id == task_id), None)
-        label = f"Iteration {index} / {self.max_iterations}"
+        label = f"Iteration {index} / {self.project.max_iterations}"
         if task:
             result = "PASSED" if task.passes else "FAILED"
             label += f": *{task.id}* - {task.title} ({result})"
@@ -103,9 +96,9 @@ class HooksManager:
         names = ", ".join(h.name for h in self.hooks)
         rich.print(f" • Hooks: [i]{names}[/]")
 
-    async def init(self, task_dir: Path, max_iterations: int):
+    async def init(self, project: Project):
         for h in self.hooks:
-            await h.init(task_dir, max_iterations)
+            await h.init(project)
 
     async def on_cancel(self, message: str | None = None):
         for h in self.hooks:

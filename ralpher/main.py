@@ -9,7 +9,7 @@ import typer
 from typer.core import TyperGroup
 
 from ralpher.loop import run_ralph_loop
-from ralpher.models import RunInfo
+from ralpher.models import Project
 from ralpher.plan.plan import generate_plan
 from ralpher.plan.extract import extract_plan_json
 from ralpher.plan.refine import refine_plan
@@ -44,10 +44,10 @@ app = typer.Typer(cls=DefaultCommandGroup)
 DEFAULT_MAX_ITERATIONS = 30
 
 
-def _gen_task_id(name: str) -> str:
-    task_id = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
-    task_id += f"-{slugify(name)}"
-    return task_id
+def _gen_project_id(name: str) -> str:
+    project_id = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    project_id += f"-{slugify(name)}"
+    return project_id
 
 
 @app.command()
@@ -65,33 +65,38 @@ def plan(
     _require_claude()
     if Path(prompt).is_file():
         prompt = Path(prompt).read_text()
-    task_id = _gen_task_id(name)
+    project_id = _gen_project_id(name)
 
-    rich.print(f"[bold blue]Generating plan for new project: [i]{task_id}[/][/]\n")
-    asyncio.run(generate_plan(task_id=task_id, prompt=prompt, model=model))
+    rich.print(f"[bold blue]Generating plan for new project: [i]{project_id}[/][/]\n")
+    project = Project(id=project_id, model=model)
+    asyncio.run(generate_plan(project=project, prompt=prompt, model=model))
     rich.print(
-        f"[green]✔ Project Plan generated at .ralpher/projects/{task_id}/PLAN.md[/]"
+        f"[green]✔ Project Plan generated at .ralpher/projects/{project.id}/PLAN.md[/]"
     )
 
 
-def _get_latest_task_id() -> str:
-    tasks_dir = Path.cwd() / ".ralpher" / "projects"
-    if not tasks_dir.exists():
+def _get_latest_project_id() -> str:
+    projects_dir = Path.cwd() / ".ralpher" / "projects"
+    if not projects_dir.exists():
         fail("No projects found in .ralpher/projects.")
-    task_dirs = sorted(
-        [f.name for f in tasks_dir.iterdir() if f.is_dir()], reverse=True
+    project_dirs = sorted(
+        [f.name for f in projects_dir.iterdir() if f.is_dir()], reverse=True
     )
-    if not task_dirs:
+    if not project_dirs:
         fail("No projects found in .ralpher/projects.")
-    return task_dirs[0]
+    return project_dirs[0]
 
 
 @app.command()
 def refine(
     prompt: Annotated[str, typer.Argument(help="The refinement prompt or file.")],
-    task_id: Annotated[
+    project_id: Annotated[
         str | None,
-        typer.Option("--task", "-t", help="The task ID of the Project Plan to refine."),
+        typer.Option(
+            "--project",
+            "-p",
+            help="The project ID of the Project Plan to refine. Defaults to the latest project.",
+        ),
     ] = None,
     model: Annotated[
         str | None, typer.Option("--model", "-m", help="Claude model to use")
@@ -101,41 +106,45 @@ def refine(
     _require_claude()
     if Path(prompt).is_file():
         prompt = Path(prompt).read_text()
-    if not task_id:
-        # Default to the latest task if no task_id is provided
-        task_id = _get_latest_task_id()
-        rich.print(f"[bold blue]Refining the latest task: [i]{task_id}[/][/]\n")
-    else:
-        rich.print(f"[bold blue]Refining task: [i]{task_id}[/][/]\n")
-    task_id = asyncio.run(refine_plan(task_id=task_id, prompt=prompt, model=model))
+    if not project_id:
+        # Default to the latest project if no project_id is provided
+        project_id = _get_latest_project_id()
+    rich.print(f"[bold blue]Refining plan for project:[i]{project_id}[/][/]\n")
+    project = Project(id=project_id, model=model)
+    asyncio.run(refine_plan(project=project, prompt=prompt, model=model))
     rich.print(
-        f"[green]✔ Project Plan refined at .ralpher/projects/{task_id}/PLAN.md[/]"
+        f"[green]✔ Project Plan refined at .ralpher/projects/{project_id}/PLAN.md[/]"
     )
 
 
 @app.command(hidden=True)
 def extract(
-    task_id: Annotated[
-        str | None, typer.Argument(help="The task ID to extract JSON from.")
+    project_id: Annotated[
+        str | None,
+        typer.Argument(
+            help="The project ID to extract JSON from. Defaults to the latest project.",
+        ),
     ] = None,
 ) -> None:
-    """Extract plan.json for a given task ID."""
+    """Extract plan.json for a given project ID."""
     _require_claude()
-    if not task_id:
-        task_id = _get_latest_task_id()
-        rich.print(
-            f"[bold blue]Extracting plan.json for the latest task: [i]{task_id}[/][/]\n"
-        )
-    else:
-        rich.print(f"[bold blue]Extracting plan.json for task: [i]{task_id}[/][/]\n")
-    asyncio.run(extract_plan_json(task_id))
-    rich.print(f"[green]✔ Extracted to .ralpher/projects/{task_id}/plan.json[/]")
+    if not project_id:
+        project_id = _get_latest_project_id()
+    rich.print(f"[bold blue]Extracting plan.json for project: [i]{project_id}[/][/]\n")
+    project = Project(id=project_id)
+    asyncio.run(extract_plan_json(project=project))
+    rich.print(f"[green]✔ Extracted to .ralpher/projects/{project_id}/plan.json[/]")
 
 
 @app.command()
 def loop(
-    task_id: Annotated[
-        str | None, typer.Option("--task", "-t", help="The task ID to run the loop on.")
+    project_id: Annotated[
+        str | None,
+        typer.Option(
+            "--project",
+            "-p",
+            help="The project ID to run the loop on. Defaults to the latest project.",
+        ),
     ] = None,
     max_iterations: Annotated[
         int,
@@ -150,18 +159,21 @@ def loop(
 
     load_dotenv(find_dotenv(usecwd=True))
 
-    if not task_id:
-        task_id = _get_latest_task_id()
-        rich.print(f"[bold blue]Running the latest task: [i]{task_id}[/][/]\n")
-    else:
-        rich.print(f"[bold blue]Running task: [i]{task_id}[/][/]\n")
+    if not project_id:
+        project_id = _get_latest_project_id()
+
+    rich.print(f"[bold blue]Running project: [i]{project_id}[/][/]\n")
 
     async def run_loop_with_hooks():
         hooks = HooksManager()
-        run_info = RunInfo(id=task_id, max_iterations=max_iterations, model=model)
-        await hooks.init(run_info.task_dir, max_iterations)
+        project = Project(
+            id=project_id,
+            max_iterations=max_iterations if max_iterations > 0 else None,
+            model=model,
+        )
+        await hooks.init(project)
         try:
-            await run_ralph_loop(run=run_info, hooks=hooks)
+            await run_ralph_loop(project=project, hooks=hooks)
         except BaseException as e:
             await hooks.on_error(str(e))
             raise e
