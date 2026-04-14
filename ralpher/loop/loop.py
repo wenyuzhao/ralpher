@@ -5,7 +5,7 @@ from ralpher.models import Project
 from ralpher.utils.hooks.hooks import HooksManager
 
 from .iterate import iterate
-from .prepare import prepare
+from .prepare import finalize_progress, prepare
 
 
 async def run_ralph_loop(*, project: Project, hooks: HooksManager) -> None:
@@ -51,6 +51,7 @@ async def run_ralph_loop(*, project: Project, hooks: HooksManager) -> None:
 
     await hooks.on_loop_end(iterations, all_passed)
     if all_passed:
+        finalize_progress(project.progress_md)
         rich.print(f"[bold green]✔ Completed in {iterations} iterations![/bold green]")
     else:
         rich.print(

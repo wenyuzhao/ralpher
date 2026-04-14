@@ -82,4 +82,15 @@ async def prepare(project: Project, hooks: HooksManager) -> bool:
 
 def _init_progress(progress_file: Path) -> None:
     """Create or reset the progress file."""
-    progress_file.write_text(f"# Ralph Progress Log\nStarted: {datetime.now()}\n---\n")
+    progress_file.write_text(
+        f"# Ralph Progress Log\n**Started:** {datetime.now()}\n\n---\n\n"
+    )
+
+
+def finalize_progress(progress_file: Path) -> None:
+    """Create or reset the progress file."""
+    content = progress_file.read_text().strip()
+    if not content.endswith("---"):
+        content += "\n\n---"
+    content += f"\n\n**Finished:** {datetime.now()}\n"
+    progress_file.write_text(content)
