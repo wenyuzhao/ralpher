@@ -18,6 +18,15 @@ Include as applicable:
 - **API Design:** New or modified endpoints/interfaces with method, path, request/response shape, and key behaviors.
 - **Key Design Decisions:** Important trade-offs or choices (e.g., "polling vs. WebSockets", "separate table vs. JSON column") with brief rationale.
 
+**Design principles — keep these in mind:**
+- Faithfully follow the user's prompt and answers to questions. The design must serve the user's stated goals.
+- Prioritize sound software engineering (correctness, maintainability, clarity) over implementation speed or ease.
+- Refactor existing code and architecture when the current design doesn't cleanly support the new feature. Don't bolt on workarounds.
+- Favor simplicity and user-friendliness over over-engineering. Build what's needed, not what's hypothetically useful.
+- Prefer extending or reusing existing patterns and components over introducing new abstractions.
+- Design for testability — structures should be easy to unit test without heavy mocking or setup.
+- Consider edge cases and error states upfront, not as afterthoughts during implementation.
+
 Keep it concise — enough for a developer to understand the overall shape before reading individual tasks.
 
 ### 4. Tasks
