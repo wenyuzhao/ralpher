@@ -3,7 +3,7 @@ import os
 import httpx
 import jinja2
 
-from ralpher.models import PRD, Status
+from ralpher.models import ProjectPlan, Status
 from ralpher.utils.hooks.hooks import Hooks
 
 
@@ -133,13 +133,13 @@ async def update_notion_page(task_dir: Path, status: Status | None) -> bool:
     template_file = Path(__file__).parent / "notion.md"
     template_content = template_file.read_text()
 
-    prd_file = task_dir / "prd.json"
-    prd = PRD.load(prd_file) if prd_file.exists() else None
-    if prd:
-        prd.user_stories.sort(key=lambda us: us.priority)
+    plan_file = task_dir / "plan.json"
+    plan = ProjectPlan.load(plan_file) if plan_file.exists() else None
+    if plan:
+        plan.tasks.sort(key=lambda t: t.priority)
 
-    prd_md_file = task_dir / "PRD.md"
-    prd_md = prd_md_file.read_text() if prd_md_file.exists() else "*N/A*"
+    plan_md_file = task_dir / "PLAN.md"
+    plan_md = plan_md_file.read_text() if plan_md_file.exists() else "*N/A*"
 
     promot_md_file = task_dir / "PROMPT.md"
     prompt_md = promot_md_file.read_text() if promot_md_file.exists() else "*N/A*"
@@ -149,11 +149,11 @@ async def update_notion_page(task_dir: Path, status: Status | None) -> bool:
 
     template = jinja2.Template(template_content)
     rendered = template.render(
-        prd=prd,
-        prd_md=prd_md,
+        plan=plan,
+        plan_md=plan_md,
         prompt_md=prompt_md,
         progress_md=progress_md,
-        active_us=status.active_user_story if status else None,
+        active_task=status.active_task if status else None,
         status=status,
         branch=f"ralph/{task_dir.name[18:]}",
     )

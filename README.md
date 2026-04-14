@@ -1,8 +1,8 @@
 # Ralpher
 
-A CLI tool that orchestrates [Claude Code](https://docs.anthropic.com/en/docs/claude-code) for autonomous software development. Give it a prompt, and it generates a PRD, breaks it into user stories, then runs iterative Claude development loops to implement each one.
+A CLI tool that orchestrates [Claude Code](https://docs.anthropic.com/en/docs/claude-code) for autonomous software development. Give it a prompt, and it generates a Project Plan, breaks it into tasks, then runs iterative Claude development loops to implement each one.
 
-Workflow: `User Prompt` ➔ `PRD` ➔ `Ralph Wiggum Loop⁠`
+Workflow: `User Prompt` ➔ `Project Plan` ➔ `Ralph Wiggum Loop⁠`
 
 ## Install
 
@@ -13,22 +13,22 @@ pipx install ralpher
 ## Usage
 
 ```bash
-# 1. Generate a PRD
-ralpher prd "Create a TODO app" --name todo-app
+# 1. Generate a Project Plan
+ralpher plan "Create a TODO app" --name todo-app
 
-# (Optional) Refine the RPD
+# (Optional) Refine the plan
 ralpher refine "Use MySQL"
 
-# 2. Run the Ralph-loop on an existing PRD
+# 2. Run the Ralph-loop on an existing plan
 ralpher loop
 ```
 
 ## How it works
 
-1. **PRD generation** -- Sends your prompt to Claude to produce a structured PRD with user stories, saved to `.ralpher/tasks/{task_id}/PRD.md`.
+1. **Plan generation** -- Sends your prompt to Claude to produce a structured Project Plan with tasks, saved to `.ralpher/projects/{task_id}/PLAN.md`.
 2. **Run Ralph-loop**
-    1. Parses the PRD into a structured JSON model (project, branch name, user stories with acceptance criteria and priorities).
-    2. Iteratively invokes `claude` to implement each user story on a dedicated git branch (`ralph/{task_id}`), tracking progress and detecting completion.
+    1. Parses the plan into a structured JSON model (project, tasks with acceptance criteria and priorities).
+    2. Iteratively invokes `claude` to implement each task on a dedicated git branch (`ralph/{task_id}`), tracking progress and detecting completion.
 
 ## [Notion](https://www.notion.so/) integration
 

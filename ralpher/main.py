@@ -10,9 +10,9 @@ from typer.core import TyperGroup
 
 from ralpher.loop import run_ralph_loop
 from ralpher.models import RunInfo
-from ralpher.prd.prd import generate_prd
-from ralpher.prd.extract import extract_prd_json
-from ralpher.prd.refine import refine_prd
+from ralpher.plan.plan import generate_plan
+from ralpher.plan.extract import extract_plan_json
+from ralpher.plan.refine import refine_plan
 import asyncio
 from slugify import slugify
 from .utils.error import fail
@@ -51,10 +51,8 @@ def _gen_task_id(name: str) -> str:
 
 
 @app.command()
-def prd(
-    prompt: Annotated[
-        str, typer.Argument(help="The PRD prompt or file to generate from.")
-    ],
+def plan(
+    prompt: Annotated[str, typer.Argument(help="The prompt or file to generate from.")],
     name: Annotated[
         str,
         typer.Option("--name", "-n", help="Name for the project, in kebab-case."),
@@ -63,26 +61,28 @@ def prd(
         str | None, typer.Option("--model", "-m", help="Claude model to use")
     ] = None,
 ) -> None:
-    """Generate a PRD."""
+    """Generate a Project Plan."""
     _require_claude()
     if Path(prompt).is_file():
         prompt = Path(prompt).read_text()
     task_id = _gen_task_id(name)
 
-    rich.print(f"[bold blue]Generating PRD for new task: [i]{task_id}[/][/]\n")
-    asyncio.run(generate_prd(task_id=task_id, prompt=prompt, model=model))
-    rich.print(f"[green]✔ PRD generated at .ralpher/tasks/{task_id}/PRD.md[/]")
+    rich.print(f"[bold blue]Generating plan for new project: [i]{task_id}[/][/]\n")
+    asyncio.run(generate_plan(task_id=task_id, prompt=prompt, model=model))
+    rich.print(
+        f"[green]✔ Project Plan generated at .ralpher/projects/{task_id}/PLAN.md[/]"
+    )
 
 
 def _get_latest_task_id() -> str:
-    tasks_dir = Path.cwd() / ".ralpher" / "tasks"
+    tasks_dir = Path.cwd() / ".ralpher" / "projects"
     if not tasks_dir.exists():
-        fail("No tasks found in .ralpher/tasks.")
+        fail("No projects found in .ralpher/projects.")
     task_dirs = sorted(
         [f.name for f in tasks_dir.iterdir() if f.is_dir()], reverse=True
     )
     if not task_dirs:
-        fail("No tasks found in .ralpher/tasks.")
+        fail("No projects found in .ralpher/projects.")
     return task_dirs[0]
 
 
@@ -91,13 +91,13 @@ def refine(
     prompt: Annotated[str, typer.Argument(help="The refinement prompt or file.")],
     task_id: Annotated[
         str | None,
-        typer.Option("--task", "-t", help="The task ID of the PRD to refine."),
+        typer.Option("--task", "-t", help="The task ID of the Project Plan to refine."),
     ] = None,
     model: Annotated[
         str | None, typer.Option("--model", "-m", help="Claude model to use")
     ] = None,
 ) -> None:
-    """Refine an existing PRD."""
+    """Refine an existing Project Plan."""
     _require_claude()
     if Path(prompt).is_file():
         prompt = Path(prompt).read_text()
@@ -107,8 +107,10 @@ def refine(
         rich.print(f"[bold blue]Refining the latest task: [i]{task_id}[/][/]\n")
     else:
         rich.print(f"[bold blue]Refining task: [i]{task_id}[/][/]\n")
-    task_id = asyncio.run(refine_prd(task_id=task_id, prompt=prompt, model=model))
-    rich.print(f"[green]✔ PRD refined at .ralpher/tasks/{task_id}/PRD.md[/]")
+    task_id = asyncio.run(refine_plan(task_id=task_id, prompt=prompt, model=model))
+    rich.print(
+        f"[green]✔ Project Plan refined at .ralpher/projects/{task_id}/PLAN.md[/]"
+    )
 
 
 @app.command(hidden=True)
@@ -117,17 +119,17 @@ def extract(
         str | None, typer.Argument(help="The task ID to extract JSON from.")
     ] = None,
 ) -> None:
-    """Extract PRD JSON for a given task ID."""
+    """Extract plan.json for a given task ID."""
     _require_claude()
     if not task_id:
         task_id = _get_latest_task_id()
         rich.print(
-            f"[bold blue]Extracting prd.json for the latest task: [i]{task_id}[/][/]\n"
+            f"[bold blue]Extracting plan.json for the latest task: [i]{task_id}[/][/]\n"
         )
     else:
-        rich.print(f"[bold blue]Extracting prd.json for task: [i]{task_id}[/][/]\n")
-    asyncio.run(extract_prd_json(task_id))
-    rich.print(f"[green]✔ Extracted to .ralpher/tasks/{task_id}/prd.json[/]")
+        rich.print(f"[bold blue]Extracting plan.json for task: [i]{task_id}[/][/]\n")
+    asyncio.run(extract_plan_json(task_id))
+    rich.print(f"[green]✔ Extracted to .ralpher/projects/{task_id}/plan.json[/]")
 
 
 @app.command()

@@ -5,7 +5,7 @@ from typing import Literal, Optional
 from pydantic import BaseModel
 
 
-class UserStory(BaseModel):
+class Task(BaseModel):
     id: str
     title: str
     description: str
@@ -15,28 +15,28 @@ class UserStory(BaseModel):
     notes: str = ""
 
 
-class PRD(BaseModel):
+class ProjectPlan(BaseModel):
     project: str
     description: str
-    user_stories: list[UserStory]
+    tasks: list[Task]
 
     @staticmethod
-    def load(path: Path) -> "PRD":
+    def load(path: Path) -> "ProjectPlan":
         if not path.exists():
             raise FileNotFoundError(f"{path} not found.")
-        return PRD.model_validate(json.loads(path.read_text()))
+        return ProjectPlan.model_validate(json.loads(path.read_text()))
 
     def save(self, path: Path) -> None:
         path.write_text(json.dumps(self.model_dump(), indent=2))
 
-    def failed_stories(self) -> list[UserStory]:
-        return [s for s in self.user_stories if not s.passes]
+    def failed_tasks(self) -> list[Task]:
+        return [t for t in self.tasks if not t.passes]
 
 
 class Status(BaseModel):
     status: Literal["running", "idle", "error", "completed", "starting"]
     label: str
-    active_user_story: str | None = None
+    active_task: str | None = None
 
     @property
     def icon(self) -> str:
@@ -92,7 +92,7 @@ class RunInfo(BaseModel):
     max_iterations: int
     model: Optional[str] = None
     current_iteration: int | None = None
-    current_user_story_id: Optional[str] = None
+    current_task_id: Optional[str] = None
 
     @property
     def branch(self) -> str:
@@ -100,54 +100,48 @@ class RunInfo(BaseModel):
 
     @property
     def task_dir(self) -> Path:
-        return Path.cwd() / ".ralpher" / "tasks" / self.id
+        return Path.cwd() / ".ralpher" / "projects" / self.id
 
     @property
     def progress_file(self) -> Path:
         return self.task_dir / "progress.md"
 
     @property
-    def prd_json_file(self) -> Path:
-        return self.task_dir / "prd.json"
+    def plan_json_file(self) -> Path:
+        return self.task_dir / "plan.json"
 
     @property
-    def prd_doc_file(self) -> Path:
-        return self.task_dir / "PRD.md"
+    def plan_doc_file(self) -> Path:
+        return self.task_dir / "PLAN.md"
 
     @property
     def questions_file(self) -> Path:
         return self.task_dir / "questions.json"
 
     @property
-    def current_user_story_file(self) -> Path:
-        return self.task_dir / "current_user_story.json"
+    def current_task_file(self) -> Path:
+        return self.task_dir / "current_task.json"
 
-    def load_current_user_story(self) -> UserStory:
-        return UserStory.model_validate(
-            json.loads(self.current_user_story_file.read_text())
-        )
+    def load_current_task(self) -> Task:
+        return Task.model_validate(json.loads(self.current_task_file.read_text()))
 
-    def save_current_user_story(self, story: UserStory) -> None:
-        self.current_user_story_file.write_text(
-            json.dumps(story.model_dump(), indent=2)
-        )
+    def save_current_task(self, task: Task) -> None:
+        self.current_task_file.write_text(json.dumps(task.model_dump(), indent=2))
 
-    def remove_current_user_story(self) -> None:
-        if self.current_user_story_file.exists():
-            self.current_user_story_file.unlink()
+    def remove_current_task(self) -> None:
+        if self.current_task_file.exists():
+            self.current_task_file.unlink()
 
-    def load_original_current_user_story(self) -> UserStory:
-        assert self.current_user_story_id is not None
-        prd = self.load_prd()
-        for s in prd.user_stories:
-            if s.id == self.current_user_story_id:
-                return s
-        raise ValueError(
-            f"User story with id {self.current_user_story_id} not found in prd.json"
-        )
+    def load_original_current_task(self) -> Task:
+        assert self.current_task_id is not None
+        plan = self.load_plan()
+        for t in plan.tasks:
+            if t.id == self.current_task_id:
+                return t
+        raise ValueError(f"Task with id {self.current_task_id} not found in plan.json")
 
-    def load_prd(self) -> PRD:
-        prd_path = self.task_dir / "prd.json"
-        if not prd_path.exists():
-            raise FileNotFoundError(f"prd.json not found in {self.task_dir}")
-        return PRD.load(prd_path)
+    def load_plan(self) -> ProjectPlan:
+        plan_path = self.task_dir / "plan.json"
+        if not plan_path.exists():
+            raise FileNotFoundError(f"plan.json not found in {self.task_dir}")
+        return ProjectPlan.load(plan_path)

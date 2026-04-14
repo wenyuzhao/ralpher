@@ -6,15 +6,15 @@ import pytest
 from ralpher.loop.prepare import _init_progress
 from ralpher.loop.iterate import iterate
 from ralpher.loop.loop import run_ralph_loop
-from ralpher.models import PRD, RunInfo
+from ralpher.models import ProjectPlan, RunInfo
 from ralpher.utils.hooks import HooksManager
 
 
-def _make_prd(stories: list[dict] | None = None) -> dict:
-    if stories is None:
-        stories = [
+def _make_plan(tasks: list[dict] | None = None) -> dict:
+    if tasks is None:
+        tasks = [
             {
-                "id": "us-1",
+                "id": "T-001",
                 "title": "Login",
                 "description": "User can log in",
                 "acceptance_criteria": ["AC1"],
@@ -25,13 +25,13 @@ def _make_prd(stories: list[dict] | None = None) -> dict:
         ]
     return {
         "project": "Test",
-        "description": "Test PRD",
-        "user_stories": stories,
+        "description": "Test Plan",
+        "tasks": tasks,
     }
 
 
-_STORY_TEMPLATE = {
-    "id": "us-1",
+_TASK_TEMPLATE = {
+    "id": "T-001",
     "title": "Login",
     "description": "User can log in",
     "acceptance_criteria": ["AC1"],
@@ -58,28 +58,28 @@ class TestInitProgress:
 class TestIterate:
     @patch("ralpher.loop.iterate.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_marks_story_passed_when_current_story_passes(
+    async def test_marks_task_passed_when_current_task_passes(
         self, mock_run, tmp_path, monkeypatch
     ):
         monkeypatch.chdir(tmp_path)
         run = _make_run("iter-task")
         run.task_dir.mkdir(parents=True)
         run.current_iteration = 0
-        run.current_user_story_id = "us-1"
+        run.current_task_id = "T-001"
 
-        prd_data = _make_prd()
-        (run.task_dir / "prd.json").write_text(json.dumps(prd_data))
+        plan_data = _make_plan()
+        (run.task_dir / "plan.json").write_text(json.dumps(plan_data))
 
         async def side_effect(**kwargs):
-            (run.task_dir / "current_user_story.json").write_text(
-                json.dumps({**_STORY_TEMPLATE, "passes": True})
+            (run.task_dir / "current_task.json").write_text(
+                json.dumps({**_TASK_TEMPLATE, "passes": True})
             )
 
         mock_run.side_effect = side_effect
         await iterate(run, HooksManager([]))
 
-        updated = PRD.load(run.task_dir / "prd.json")
-        assert updated.user_stories[0].passes is True
+        updated = ProjectPlan.load(run.task_dir / "plan.json")
+        assert updated.tasks[0].passes is True
 
     @patch("ralpher.loop.iterate.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
@@ -90,10 +90,10 @@ class TestIterate:
         run = _make_run("iter-fail")
         run.task_dir.mkdir(parents=True)
         run.current_iteration = 0
-        run.current_user_story_id = "us-1"
+        run.current_task_id = "T-001"
 
-        prd_data = _make_prd()
-        (run.task_dir / "prd.json").write_text(json.dumps(prd_data))
+        plan_data = _make_plan()
+        (run.task_dir / "plan.json").write_text(json.dumps(plan_data))
 
         mock_run.side_effect = ClaudeError(1)
 
@@ -102,33 +102,33 @@ class TestIterate:
 
     @patch("ralpher.loop.iterate.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_writes_current_user_story(self, mock_run, tmp_path, monkeypatch):
+    async def test_writes_current_task(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         run = _make_run("iter-logs")
         run.task_dir.mkdir(parents=True)
         run.current_iteration = 0
-        run.current_user_story_id = "us-1"
+        run.current_task_id = "T-001"
 
-        prd_data = _make_prd()
-        (run.task_dir / "prd.json").write_text(json.dumps(prd_data))
+        plan_data = _make_plan()
+        (run.task_dir / "plan.json").write_text(json.dumps(plan_data))
 
-        written_story: dict | None = None
+        written_task: dict | None = None
 
         async def side_effect(**kwargs):
-            nonlocal written_story
+            nonlocal written_task
             # Read what iterate() wrote before claude runs
-            written_story = json.loads(
-                (run.task_dir / "current_user_story.json").read_text()
+            written_task = json.loads(
+                (run.task_dir / "current_task.json").read_text()
             )
-            # Simulate claude leaving the story file as-is
-            (run.task_dir / "current_user_story.json").write_text(
-                json.dumps({**_STORY_TEMPLATE, "passes": False})
+            # Simulate claude leaving the task file as-is
+            (run.task_dir / "current_task.json").write_text(
+                json.dumps({**_TASK_TEMPLATE, "passes": False})
             )
 
         mock_run.side_effect = side_effect
         await iterate(run, HooksManager([]))
 
-        assert written_story["id"] == "us-1"  # type: ignore
+        assert written_task["id"] == "T-001"  # type: ignore
 
     @patch("ralpher.loop.iterate.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
@@ -138,14 +138,14 @@ class TestIterate:
         run = _make_run(task_id)
         run.task_dir.mkdir(parents=True)
         run.current_iteration = 0
-        run.current_user_story_id = "us-1"
+        run.current_task_id = "T-001"
 
-        prd_data = _make_prd()
-        (run.task_dir / "prd.json").write_text(json.dumps(prd_data))
+        plan_data = _make_plan()
+        (run.task_dir / "plan.json").write_text(json.dumps(plan_data))
 
         async def side_effect(**kwargs):
-            (run.task_dir / "current_user_story.json").write_text(
-                json.dumps({**_STORY_TEMPLATE, "passes": False})
+            (run.task_dir / "current_task.json").write_text(
+                json.dumps({**_TASK_TEMPLATE, "passes": False})
             )
 
         mock_run.side_effect = side_effect
@@ -157,35 +157,35 @@ class TestIterate:
 
 
 class TestLoop:
-    @patch("ralpher.loop.prepare.extract_prd_json", new_callable=AsyncMock)
+    @patch("ralpher.loop.prepare.extract_plan_json", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_raises_when_prd_md_missing(
+    async def test_raises_when_plan_md_missing(
         self, mock_extract, tmp_path, monkeypatch
     ):
         monkeypatch.chdir(tmp_path)
-        run = _make_run("no-prd")
+        run = _make_run("no-plan")
         run.task_dir.mkdir(parents=True)
         with pytest.raises(SystemExit):
             await run_ralph_loop(run=run, hooks=HooksManager([]))
 
     @patch("ralpher.loop.prepare._checkout_branch")
-    @patch("ralpher.loop.prepare.extract_prd_json", new_callable=AsyncMock)
+    @patch("ralpher.loop.prepare.extract_plan_json", new_callable=AsyncMock)
     @patch("ralpher.loop.iterate.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_completes_when_all_stories_pass(
+    async def test_completes_when_all_tasks_pass(
         self, mock_run, mock_extract, mock_checkout, tmp_path, monkeypatch
     ):
         monkeypatch.chdir(tmp_path)
         run = _make_run("loop-done")
         run.task_dir.mkdir(parents=True)
 
-        prd_data = _make_prd()
-        (run.task_dir / "PRD.md").write_text("# PRD")
-        (run.task_dir / "prd.json").write_text(json.dumps(prd_data))
+        plan_data = _make_plan()
+        (run.task_dir / "PLAN.md").write_text("# Plan")
+        (run.task_dir / "plan.json").write_text(json.dumps(plan_data))
 
         async def side_effect(**kwargs):
-            (run.task_dir / "current_user_story.json").write_text(
-                json.dumps({**_STORY_TEMPLATE, "passes": True})
+            (run.task_dir / "current_task.json").write_text(
+                json.dumps({**_TASK_TEMPLATE, "passes": True})
             )
 
         mock_run.side_effect = side_effect
@@ -193,7 +193,7 @@ class TestLoop:
         assert mock_run.call_count == 1
 
     @patch("ralpher.loop.prepare._checkout_branch")
-    @patch("ralpher.loop.prepare.extract_prd_json", new_callable=AsyncMock)
+    @patch("ralpher.loop.prepare.extract_plan_json", new_callable=AsyncMock)
     @patch("ralpher.loop.iterate.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_exits_with_error_when_max_iterations_reached(
@@ -203,13 +203,13 @@ class TestLoop:
         run = _make_run("loop-fail", max_iterations=2)
         run.task_dir.mkdir(parents=True)
 
-        prd_data = _make_prd()
-        (run.task_dir / "PRD.md").write_text("# PRD")
-        (run.task_dir / "prd.json").write_text(json.dumps(prd_data))
+        plan_data = _make_plan()
+        (run.task_dir / "PLAN.md").write_text("# Plan")
+        (run.task_dir / "plan.json").write_text(json.dumps(plan_data))
 
         async def side_effect(**kwargs):
-            (run.task_dir / "current_user_story.json").write_text(
-                json.dumps({**_STORY_TEMPLATE, "passes": False})
+            (run.task_dir / "current_task.json").write_text(
+                json.dumps({**_TASK_TEMPLATE, "passes": False})
             )
 
         mock_run.side_effect = side_effect
@@ -222,19 +222,19 @@ class TestLoop:
         assert mock_run.call_count == 2
 
     @patch("ralpher.loop.prepare._checkout_branch")
-    @patch("ralpher.loop.prepare.extract_prd_json", new_callable=AsyncMock)
+    @patch("ralpher.loop.prepare.extract_plan_json", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_skips_loop_when_all_stories_already_pass(
+    async def test_skips_loop_when_all_tasks_already_pass(
         self, mock_extract, mock_checkout, tmp_path, monkeypatch
     ):
         monkeypatch.chdir(tmp_path)
         run = _make_run("loop-skip")
         run.task_dir.mkdir(parents=True)
 
-        prd_data = _make_prd(
+        plan_data = _make_plan(
             [
                 {
-                    "id": "us-1",
+                    "id": "T-001",
                     "title": "Done",
                     "description": "Already done",
                     "acceptance_criteria": [],
@@ -244,7 +244,7 @@ class TestLoop:
                 }
             ]
         )
-        (run.task_dir / "PRD.md").write_text("# PRD")
-        (run.task_dir / "prd.json").write_text(json.dumps(prd_data))
+        (run.task_dir / "PLAN.md").write_text("# Plan")
+        (run.task_dir / "plan.json").write_text(json.dumps(plan_data))
 
         await run_ralph_loop(run=run, hooks=HooksManager([]))

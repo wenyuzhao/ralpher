@@ -9,57 +9,57 @@ from rich.prompt import Confirm
 from ralpher.models import RunInfo
 from ralpher.utils.error import fail
 from ralpher.utils.hooks.hooks import HooksManager
-from ..prd.extract import extract_prd_json
+from ..plan.extract import extract_plan_json
 
 
 async def prepare(run: RunInfo, hooks: HooksManager) -> bool:
-    # Check if PRD.md exists
-    if not run.prd_doc_file.exists():
-        await hooks.on_error("PRD.md not found")
-        fail(f"{run.prd_doc_file } not found.")
+    # Check if PLAN.md exists
+    if not run.plan_doc_file.exists():
+        await hooks.on_error("PLAN.md not found")
+        fail(f"{run.plan_doc_file } not found.")
 
-    # Extract prd.json from PRD.md if it doesn't exist
-    if not run.prd_json_file.exists():
-        rich.print(f"[bold blue]Extracting prd.json from PRD.md[/]\n")
+    # Extract plan.json from PLAN.md if it doesn't exist
+    if not run.plan_json_file.exists():
+        rich.print(f"[bold blue]Extracting plan.json from PLAN.md[/]\n")
         await hooks.on_extract_start()
         try:
-            await extract_prd_json(run.id)
+            await extract_plan_json(run.id)
         except Exception as e:
-            await hooks.on_error(f"Failed to extract prd.json: {str(e)}")
-            fail(f"Failed to extract prd.json: {str(e)}")
-        if not run.prd_json_file.exists():
-            await hooks.on_error("Failed to extract prd.json")
-            fail(f"{run.prd_json_file } still not found after extraction.")
+            await hooks.on_error(f"Failed to extract plan.json: {str(e)}")
+            fail(f"Failed to extract plan.json: {str(e)}")
+        if not run.plan_json_file.exists():
+            await hooks.on_error("Failed to extract plan.json")
+            fail(f"{run.plan_json_file } still not found after extraction.")
         await hooks.on_extract_end()
 
     # Create logs directory
     logs_dir = run.task_dir / "logs"
     logs_dir.mkdir(exist_ok=True)
 
-    # Load PRD and check user stories
-    prd = run.load_prd()
+    # Load plan and check tasks
+    plan = run.load_plan()
 
-    # Check if all user stories already pass
-    num_stories = len(prd.user_stories)
-    num_failed_stories = len(prd.failed_stories())
-    if num_failed_stories == 0:
-        rich.print(f"[bold green]✔ All {num_stories} user stories already pass![/]")
+    # Check if all tasks already pass
+    num_tasks = len(plan.tasks)
+    num_failed_tasks = len(plan.failed_tasks())
+    if num_failed_tasks == 0:
+        rich.print(f"[bold green]✔ All {num_tasks} tasks already pass![/]")
         await hooks.on_loop_end(0, True)
         return False
 
-    # Check if max_iterations is less than number of user stories
-    if run.max_iterations < len(prd.user_stories):
+    # Check if max_iterations is less than number of tasks
+    if run.max_iterations < len(plan.tasks):
         rich.print(
-            f"[yellow][b]Warning:[/] Max iterations ({run.max_iterations}) is less than the number of user stories ({len(prd.user_stories)}). Some stories may not be attempted.[/]\n"
+            f"[yellow][b]Warning:[/] Max iterations ({run.max_iterations}) is less than the number of tasks ({len(plan.tasks)}). Some tasks may not be attempted.[/]\n"
         )
         if not Confirm.ask("Do you want to continue?", default=False):
             await hooks.on_cancel(
-                "User aborted due to max_iterations < number of user stories."
+                "User aborted due to max_iterations < number of tasks."
             )
             sys.exit(0)
 
     # Report important info before starting the loop
-    rich.print(f" • Incomplete user stories: {num_failed_stories} / {num_stories}")
+    rich.print(f" • Incomplete tasks: {num_failed_tasks} / {num_tasks}")
     rich.print(f" • Branch: [i]{run.branch}[/]")
     rich.print(f" • Max iterations: {run.max_iterations}")
     hooks.report_status()

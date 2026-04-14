@@ -1,6 +1,6 @@
-## PRD Structure
+## Project Plan Structure
 
-Generate the PRD with these sections:
+Generate the Project Plan with these sections:
 
 ### 1. Introduction/Overview
 Brief description of the feature and the problem it solves.
@@ -8,30 +8,30 @@ Brief description of the feature and the problem it solves.
 ### 2. Goals
 Specific, measurable objectives (bullet list).
 
-### 3. User Stories
-Each story needs:
+### 3. Tasks
+Each task needs:
 - **Title:** Short descriptive name
 - **Description:** "As a [user], I want [feature] so that [benefit]"
 - **Acceptance Criteria:** Verifiable checklist of what "done" means
 
-IMPORTANT: Each story should be small and fine-grained enough to implement in one focused session.
+IMPORTANT: Each task should be small and fine-grained enough to implement in one focused session.
 
 **Format:**
 ```markdown
-### `us-001` - [Title]
+### `T-001` - [Title]
 **Description:** As a [user], I want [feature] so that [benefit].
 
 **Acceptance Criteria:**
 - Specific verifiable criterion
 - Another criterion
 - Typecheck/lint passes
-- **[UI stories only]** Verify in browser using dev-browser skill
+- **[UI tasks only]** Verify in browser using dev-browser skill
 ```
 
 **Important:**
 - Acceptance criteria must be verifiable, not vague. "Works correctly" is bad. "Button shows confirmation dialog before deleting" is good.
 - When possible, acceptance criteria should include unit tests, integration tests, or manually-performed tests that can be performed by yourself using skills or tools.
-- **For any story with UI changes:** Always include "Verify in browser using dev-browser skill" as acceptance criteria. This ensures visual verification of frontend work.
+- **For any task with UI changes:** Always include "Verify in browser using dev-browser skill" as acceptance criteria. This ensures visual verification of frontend work.
 
 ### 4. Functional Requirements
 Numbered list of specific functionalities:
@@ -65,7 +65,7 @@ Remaining questions or areas needing clarification.
 
 ## Writing for Junior Developers
 
-The PRD reader may be a junior developer or AI agent. Therefore:
+The Project Plan reader may be a junior developer or AI agent. Therefore:
 
 - Be explicit and unambiguous
 - Avoid jargon or explain it
@@ -75,10 +75,10 @@ The PRD reader may be a junior developer or AI agent. Therefore:
 
 ---
 
-## Example PRD
+## Example Project Plan
 
 ```markdown
-# PRD: Task Priority System
+# Project Plan: Task Priority System
 
 ## Introduction
 
@@ -91,9 +91,9 @@ Add priority levels to tasks so users can focus on what matters most. Tasks can 
 - Enable filtering and sorting by priority
 - Default new tasks to medium priority
 
-## User Stories
+## Tasks
 
-### `us-001` - Add priority field to database
+### `T-001` - Add priority field to database
 **Description:** As a developer, I need to store task priority so it persists across sessions.
 
 **Acceptance Criteria:**
@@ -101,7 +101,7 @@ Add priority levels to tasks so users can focus on what matters most. Tasks can 
 - Generate and run migration successfully
 - Typecheck passes
 
-### `us-002` - Display priority indicator on task cards
+### `T-002` - Display priority indicator on task cards
 **Description:** As a user, I want to see task priority at a glance so I know what needs attention first.
 
 **Acceptance Criteria:**
@@ -110,7 +110,7 @@ Add priority levels to tasks so users can focus on what matters most. Tasks can 
 - Typecheck passes
 - Verify in browser using dev-browser skill
 
-### `us-003` - Add priority selector to task edit
+### `T-003` - Add priority selector to task edit
 **Description:** As a user, I want to change a task's priority when editing it.
 
 **Acceptance Criteria:**
@@ -120,7 +120,7 @@ Add priority levels to tasks so users can focus on what matters most. Tasks can 
 - Typecheck passes
 - Verify in browser using dev-browser skill
 
-### `us-004` - Filter tasks by priority
+### `T-004` - Filter tasks by priority
 **Description:** As a user, I want to filter the task list to see only high-priority items when I'm focused.
 
 **Acceptance Criteria:**

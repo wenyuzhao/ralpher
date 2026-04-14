@@ -4,23 +4,24 @@ You are an autonomous coding agent working on a task of a software project.
 
 ## Your Task
 
-1. Read and understand the current user story: @.ralpher/tasks/$0/current_user_story.json`
-    * The complete PRD doc is at .ralpher/tasks/$0/PRD.md (NEVER modify it)
-2. Read the progress log at @.ralpher/tasks/$0/progress.md (check Codebase Patterns section first)
-3. Implement that single user story
+1. Read and understand the current task: @.ralpher/projects/$0/current_task.json`
+    * The complete Project Plan is at .ralpher/projects/$0/PLAN.md (NEVER modify it)
+2. Read the progress log at @.ralpher/projects/$0/progress.md (check Codebase Patterns section first)
+3. Implement that single task
 4. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
 5. Update CLAUDE.md files if you discover reusable patterns (see below)
-6. If checks pass, commit ALL changes with message: `feat[Story ID]: [Story Title]`
-   * When the checks are not passed, DON'T commit or update current_user_story.json
-7. Update current_user_story.json to set `passes: true`
+6. If checks pass, commit ALL changes with message: `[Task ID] feat: [Task Title]`. e.g. `[T-001] feat: Add notifications table to database`.
+   * The prefix "feat" can be any of: feat/fix/docs/style/refactor/test/chore/perf/ci/build/revert
+   * When the checks are not passed, DON'T commit or update current_task.json
+7. Update current_task.json to set `passes: true`
    * Don't set `passes: true` if checks are not passed.
 8. Append your progress and additional notes to `progress.md`
 
 ## Progress Report Format
 
-APPEND to .ralpher/tasks/$0/progress.md (never replace, always append):
+APPEND to .ralpher/projects/$0/progress.md (never replace, always append):
 ```
-## [Date/Time] - [Story ID]
+## [Date/Time] - [Task ID]
 - What was implemented
 - Files changed
 - **Learnings for future iterations:**
@@ -43,7 +44,7 @@ If you discover a **reusable pattern** that future iterations should know, add i
 - Example: Export types from actions.ts for UI components
 ```
 
-Only add patterns that are **general and reusable**, not story-specific details.
+Only add patterns that are **general and reusable**, not task-specific details.
 
 ## Update CLAUDE.md Files
 
@@ -65,7 +66,7 @@ Before committing, check if any edited files have learnings worth preserving in 
 - "Field names must match the template exactly"
 
 **Do NOT add:**
-- Story-specific implementation details
+- Task-specific implementation details
 - Temporary debugging notes
 - Information already in progress.md
 
@@ -80,7 +81,7 @@ Only update CLAUDE.md if you have **genuinely reusable knowledge** that would he
 
 ## Browser Testing (If Available)
 
-For any story that changes UI, verify it works in the browser if you have browser testing tools configured (e.g., via MCP):
+For any task that changes UI, verify it works in the browser if you have browser testing tools configured (e.g., via MCP):
 
 1. Navigate to the relevant page
 2. Verify the UI changes work as expected
@@ -90,11 +91,11 @@ If no browser tools are available, note in your progress report that manual brow
 
 ## Stop Condition
 
-The current user story is completed.
+The current task is completed.
 
 ## Important
 
-- Work on ONE story per iteration
+- Work on ONE task per iteration
 - Commit frequently
 - Keep CI green
 - Read the Codebase Patterns section in progress.md before starting

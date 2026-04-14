@@ -22,20 +22,20 @@ async def run_ralph_loop(*, run: RunInfo, hooks: HooksManager) -> None:
         iterations += 1
         run.current_iteration = i
 
-        # Pick user story
-        prd = run.load_prd()
-        user_stories = prd.failed_stories()
-        user_stories.sort(key=lambda s: s.priority)
-        assert user_stories, "No failing user stories found."
-        story = user_stories[0]  # highest priority failing story
-        run.current_user_story_id = story.id
+        # Pick next failing task
+        plan = run.load_plan()
+        tasks = plan.failed_tasks()
+        tasks.sort(key=lambda t: t.priority)
+        assert tasks, "No failing tasks found."
+        task = tasks[0]  # highest priority failing task
+        run.current_task_id = task.id
 
         # Run iteration
         await iterate(run, hooks)
 
-        # Check if all user stories pass after this iteration
-        prd = run.load_prd()
-        all_passed = len(prd.failed_stories()) == 0
+        # Check if all tasks pass after this iteration
+        plan = run.load_plan()
+        all_passed = len(plan.failed_tasks()) == 0
         if all_passed:
             break
 

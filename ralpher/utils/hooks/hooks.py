@@ -3,7 +3,7 @@ import datetime
 
 import rich
 
-from ...models import PRD, Status
+from ...models import ProjectPlan, Status
 
 
 class Hooks:
@@ -27,11 +27,11 @@ class Hooks:
 
     async def update(self): ...
 
-    def load_prd(self) -> PRD | None:
-        prd_file = self.task_dir / "prd.json"
-        if not prd_file.exists():
+    def load_plan(self) -> ProjectPlan | None:
+        plan_file = self.task_dir / "plan.json"
+        if not plan_file.exists():
             return None
-        return PRD.load(prd_file)
+        return ProjectPlan.load(plan_file)
 
     async def on_cancel(self, message: str | None = None):
         label = f"Canceled: {message}" if message else "Canceled"
@@ -43,34 +43,34 @@ class Hooks:
         await self.update()
 
     async def on_extract_start(self):
-        self.status = Status(status="running", label="Extracting PRD")
+        self.status = Status(status="running", label="Extracting Project Plan")
         await self.update()
 
     async def on_extract_end(self):
-        self.status = Status(status="running", label="Extracted PRD")
+        self.status = Status(status="running", label="Extracted Project Plan")
         await self.update()
 
     async def on_loop_start(self):
         self.status = Status(status="running", label="Loop Started")
         await self.update()
 
-    async def on_iteration_start(self, index: int, us: str):
-        prd = self.load_prd()
-        assert prd is not None
-        user_story = next((s for s in prd.user_stories if s.id == us), None)
-        assert user_story
-        label = f"**[Iteration {index+1} / {self.max_iterations}]** **{user_story.id}** - {user_story.title}"
+    async def on_iteration_start(self, index: int, task_id: str):
+        plan = self.load_plan()
+        assert plan is not None
+        task = next((t for t in plan.tasks if t.id == task_id), None)
+        assert task
+        label = f"**[Iteration {index+1} / {self.max_iterations}]** **{task.id}** - {task.title}"
         self.status = Status(status="running", label=label)
         await self.update()
 
-    async def on_iteration_end(self, index: int, us: str):
-        prd = self.load_prd()
-        assert prd is not None
-        user_story = next((s for s in prd.user_stories if s.id == us), None)
+    async def on_iteration_end(self, index: int, task_id: str):
+        plan = self.load_plan()
+        assert plan is not None
+        task = next((t for t in plan.tasks if t.id == task_id), None)
         label = f"Iteration {index} / {self.max_iterations}"
-        if user_story:
-            result = "PASSED" if user_story.passes else "FAILED"
-            label += f": *{user_story.id}* - {user_story.title} ({result})"
+        if task:
+            result = "PASSED" if task.passes else "FAILED"
+            label += f": *{task.id}* - {task.title} ({result})"
         self.status = Status(status="running", label=label)
         await self.update()
 
@@ -127,13 +127,13 @@ class HooksManager:
         for h in self.hooks:
             await h.on_loop_start()
 
-    async def on_iteration_start(self, index: int, us: str):
+    async def on_iteration_start(self, index: int, task_id: str):
         for h in self.hooks:
-            await h.on_iteration_start(index, us)
+            await h.on_iteration_start(index, task_id)
 
-    async def on_iteration_end(self, index: int, us: str):
+    async def on_iteration_end(self, index: int, task_id: str):
         for h in self.hooks:
-            await h.on_iteration_end(index, us)
+            await h.on_iteration_end(index, task_id)
 
     async def on_loop_end(self, iterations: int, completed: bool):
         for h in self.hooks:

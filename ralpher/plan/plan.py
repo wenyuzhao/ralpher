@@ -6,15 +6,15 @@ from ..utils.claude import ClaudeError, run_claude
 from ..utils.error import fail
 
 
-async def generate_prd(*, task_id: str, prompt: str, model: str | None) -> str:
-    """Run a Claude Code session with the rendered PRD prompt."""
+async def generate_plan(*, task_id: str, prompt: str, model: str | None) -> str:
+    """Run a Claude Code session to generate a Project Plan."""
 
-    task_dir = Path.cwd() / ".ralpher" / "tasks" / task_id
+    task_dir = Path.cwd() / ".ralpher" / "projects" / task_id
     init_project(task_dir, prompt)
 
     try:
         await run_claude(
-            prompt=f"/ralpher:prd {task_id}",
+            prompt=f"/ralpher:plan {task_id}",
             task_dir=task_dir,
             interactive=True,
             model=model,
@@ -22,7 +22,7 @@ async def generate_prd(*, task_id: str, prompt: str, model: str | None) -> str:
     except ClaudeError as e:
         fail(f"Claude process exited with code {e.returncode}")
 
-    if not (task_dir / "PRD.md").exists():
-        fail(f"{task_dir / 'PRD.md'} was not created.")
+    if not (task_dir / "PLAN.md").exists():
+        fail(f"{task_dir / 'PLAN.md'} was not created.")
 
     return task_id

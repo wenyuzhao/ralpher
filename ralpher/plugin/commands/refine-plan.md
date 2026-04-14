@@ -1,25 +1,25 @@
-# PRD Refiner
+# Project Plan Refiner
 
-Refine the Product Requirements Documents based on user's input.
+Refine the Project Plan based on user's input.
 
 ---
 
 ## The Job
 
-1. Receive an refinement instruction from the user
+1. Receive a refinement instruction from the user
 2. (Optional) Ask 3-10 essential clarifying questions using the `AskUserQuestion` tool if the instruction is ambiguous
   * Don't ask the user to provide more details. Just provide them with a list of concrate options.
   * You can use `AskUserQuestion` multiple times.
-3. Update the PRD based on the user prompt and the answers
-4. Save to `.ralpher/tasks/$0/PRD.md`
+3. Update the Project Plan based on the user prompt and the answers
+4. Save to `.ralpher/projects/$0/PLAN.md`
 
-**Important:** Do NOT start implementing. Just create the PRD.
+**Important:** Do NOT start implementing. Just update the Project Plan.
 
 ---
 
-## The Original PRD
+## The Original Project Plan
 
-@.ralpher/tasks/$0/PRD.md
+@.ralpher/projects/$0/PLAN.md
 
 ---
 
@@ -35,25 +35,25 @@ Ask only critical questions where the user prompt is ambiguous.
 
 ---
 
-## Step 2: Update PRD
+## Step 2: Update Project Plan
 
-Update the PRD document.
+Update the Project Plan document.
 
-Please refer to @!`echo $RALPHER_PLUGIN`/docs/prd-structure.md for a list of required sections and an example.
+Please refer to @!`echo $RALPHER_PLUGIN`/docs/plan-structure.md for a list of required sections and an example.
 
 Strictly follow the user's instructions, and don't change unrelated parts.
 
-You may need to add/update/remove user stories to fit the new plan.
+You may need to add, update, or remove tasks to fit the new plan.
 
 ---
 
 ## Checklist
 
-Before saving the PRD:
+Before saving the Project Plan:
 
 - [ ] Incorporated the user's instructions
 - [ ] (Optional) Asked clarifying questions and incorporated user's answers
-- [ ] User stories are small and specific
+- [ ] Tasks are small and specific
 - [ ] Functional requirements are numbered and unambiguous
 - [ ] Non-goals section defines clear boundaries
-- [ ] Save to `.ralpher/tasks/$0/PRD.md`
+- [ ] Save to `.ralpher/projects/$0/PLAN.md`

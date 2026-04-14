@@ -6,11 +6,11 @@
 </callout>
 
 {% endif -%}
-# 👤 User Stories
+# 🔨 Tasks
 
-{% if prd %}
-{% for us in prd.user_stories %}
-- [{% if us.passes %}x{% else %} {% endif %}] **{{ us.id }}** - {{ us.title }} {% if us.passes %}{{'{color="green"}'}}{% elif us.id == active_us %}{{'{color="blue"}'}}{% else %} {{'{color="yellow"}'}}{% endif %}
+{% if plan %}
+{% for t in plan.tasks %}
+- [{% if t.passes %}x{% else %} {% endif %}] **{{ t.id }}** - {{ t.title }} {% if t.passes %}{{'{color="green"}'}}{% elif t.id == active_task %}{{'{color="blue"}'}}{% else %} {{'{color="yellow"}'}}{% endif %}
 {% endfor %}
 {% else %}
 *N/A*
@@ -22,11 +22,11 @@
 {{branch}}
 ```
 
-# 📜 PRD
+# 📜 Project Plan
 
 <details>
 <summary>Click to Expand</summary>
-{{prd_md}}
+{{plan_md}}
 </details>
 
 # 💬 User Prompt

@@ -1,21 +1,21 @@
-from ralpher.models import PRD, UserStory
+from ralpher.models import ProjectPlan, Task
 
 
-class TestUserStory:
+class TestTask:
     def test_defaults(self):
-        story = UserStory(
-            id="us-1",
+        task = Task(
+            id="T-001",
             title="Login",
             description="User can log in",
             acceptance_criteria=["Can enter email"],
             priority=1,
         )
-        assert story.passes is False
-        assert story.notes == ""
+        assert task.passes is False
+        assert task.notes == ""
 
     def test_all_fields(self):
-        story = UserStory(
-            id="us-2",
+        task = Task(
+            id="T-002",
             title="Signup",
             description="User can sign up",
             acceptance_criteria=["Email", "Password"],
@@ -23,53 +23,53 @@ class TestUserStory:
             passes=True,
             notes="Done",
         )
-        assert story.passes is True
-        assert story.notes == "Done"
+        assert task.passes is True
+        assert task.notes == "Done"
 
 
-class TestPRD:
-    def _make_prd(self, stories_pass: list[bool] | None = None) -> PRD:
-        if stories_pass is None:
-            stories_pass = [True, False, True]
-        stories = [
-            UserStory(
-                id=f"us-{i}",
-                title=f"Story {i}",
+class TestProjectPlan:
+    def _make_plan(self, tasks_pass: list[bool] | None = None) -> ProjectPlan:
+        if tasks_pass is None:
+            tasks_pass = [True, False, True]
+        tasks = [
+            Task(
+                id=f"T-{i:03d}",
+                title=f"Task {i}",
                 description=f"Desc {i}",
                 acceptance_criteria=[],
                 priority=i,
                 passes=p,
             )
-            for i, p in enumerate(stories_pass)
+            for i, p in enumerate(tasks_pass)
         ]
-        return PRD(
+        return ProjectPlan(
             project="Test",
-            description="A test PRD",
-            user_stories=stories,
+            description="A test plan",
+            tasks=tasks,
         )
 
-    def test_failed_stories(self):
-        prd = self._make_prd([True, False, True, False])
-        failed = prd.failed_stories()
+    def test_failed_tasks(self):
+        plan = self._make_plan([True, False, True, False])
+        failed = plan.failed_tasks()
         assert len(failed) == 2
-        assert all(not s.passes for s in failed)
+        assert all(not t.passes for t in failed)
 
-    def test_failed_stories_all_pass(self):
-        prd = self._make_prd([True, True, True])
-        assert prd.failed_stories() == []
+    def test_failed_tasks_all_pass(self):
+        plan = self._make_plan([True, True, True])
+        assert plan.failed_tasks() == []
 
-    def test_failed_stories_none_pass(self):
-        prd = self._make_prd([False, False])
-        assert len(prd.failed_stories()) == 2
+    def test_failed_tasks_none_pass(self):
+        plan = self._make_plan([False, False])
+        assert len(plan.failed_tasks()) == 2
 
     def test_model_validate_from_dict(self):
         data = {
             "project": "P",
             "branch_name": "b",
             "description": "d",
-            "user_stories": [
+            "tasks": [
                 {
-                    "id": "us-1",
+                    "id": "T-001",
                     "title": "T",
                     "description": "D",
                     "acceptance_criteria": ["AC1"],
@@ -77,7 +77,7 @@ class TestPRD:
                 }
             ],
         }
-        prd = PRD.model_validate(data)
-        assert prd.project == "P"
-        assert len(prd.user_stories) == 1
-        assert prd.user_stories[0].passes is False
+        plan = ProjectPlan.model_validate(data)
+        assert plan.project == "P"
+        assert len(plan.tasks) == 1
+        assert plan.tasks[0].passes is False

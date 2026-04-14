@@ -1,6 +1,6 @@
-# PRD Generator
+# Project Plan Generator
 
-Create detailed Product Requirements Documents that are clear, actionable, and suitable for implementation.
+Create detailed Project Plans that are clear, actionable, and suitable for implementation.
 
 ---
 
@@ -9,16 +9,16 @@ Create detailed Product Requirements Documents that are clear, actionable, and s
 1. Receive a feature description from the user
 2. Ask 3-10 essential clarifying questions (see the "ask user questions" section below)
   * Don't ask the user to provide more details. Just provide them with a list of concrate options.
-3. Generate a structured PRD based on answers
-4. Save to `.ralpher/tasks/$0/PRD.md`
+3. Generate a structured Project Plan based on answers
+4. Save to `.ralpher/projects/$0/PLAN.md`
 
-**Important:** Do NOT start implementing. Just create the PRD.
+**Important:** Do NOT start implementing. Just create the Project Plan.
 
 ---
 
 ## User Provided Feature Description
 
-@.ralpher/tasks/$0/PROMPT.md
+@.ralpher/projects/$0/PROMPT.md
 
 ---
 
@@ -33,25 +33,25 @@ Ask only critical questions where the initial prompt is ambiguous. Focus on:
 
 ---
 
-## Step 2: Generate PRD
+## Step 2: Generate Project Plan
 
-Generate the PRD document.
+Generate the Project Plan document.
 
-Please refer to @!`echo $RALPHER_PLUGIN`/docs/prd-structure.md for a list of required sections and an example.
+Please refer to @!`echo $RALPHER_PLUGIN`/docs/plan-structure.md for a list of required sections and an example.
 
 ---
 
 ## Output
 
 - **Format:** Markdown (`.md`)
-- **Location:** `.ralpher/tasks/$0/`
-- **Filename:** `PRD.md`
+- **Location:** `.ralpher/projects/$0/`
+- **Filename:** `PLAN.md`
 
 ---
 
 ## Ask User Questions
 
-To ask user questions, output all the questions to `.ralpher/tasks/$0/questions.json` in the following format, and finish your turn. The user will provide answers in the next turn.
+To ask user questions, output all the questions to `.ralpher/projects/$0/questions.json` in the following format, and finish your turn. The user will provide answers in the next turn.
 
 ```json
 {
@@ -80,11 +80,11 @@ To ask user questions, output all the questions to `.ralpher/tasks/$0/questions.
 
 ## Checklist
 
-Before saving the PRD:
+Before saving the Project Plan:
 
 - [ ] Asked clarifying questions
 - [ ] Incorporated user's answers
-- [ ] User stories are small and specific
+- [ ] Tasks are small and specific
 - [ ] Functional requirements are numbered and unambiguous
 - [ ] Non-goals section defines clear boundaries
-- [ ] Save to `.ralpher/tasks/$0/PRD.md`
+- [ ] Save to `.ralpher/projects/$0/PLAN.md`
