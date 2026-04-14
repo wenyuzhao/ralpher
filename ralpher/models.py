@@ -116,7 +116,7 @@ class Project(BaseModel):
         return ProjectConfig.model_validate(json.loads(self.config_json.read_text()))
 
     def save_config(self, config: ProjectConfig) -> None:
-        self.config_json.write_text(config.model_dump_json())
+        self.config_json.write_text(config.model_dump_json(indent=2))
 
     @property
     def prompt_md(self) -> Path:
@@ -148,7 +148,7 @@ class Project(BaseModel):
         return ProjectPlan.model_validate(json.loads(self.plan_json.read_text()))
 
     def save_plan(self, plan: ProjectPlan) -> None:
-        self.plan_json.write_text(plan.model_dump_json())
+        self.plan_json.write_text(plan.model_dump_json(indent=2))
 
     def load_questions(self) -> Questions | None:
         if not self.questions_json.exists():
@@ -161,7 +161,7 @@ class Project(BaseModel):
         return Task.model_validate(json.loads(self.current_task_json.read_text()))
 
     def save_current_task(self, task: Task) -> None:
-        self.current_task_json.write_text(task.model_dump_json())
+        self.current_task_json.write_text(task.model_dump_json(indent=2))
 
     def remove_current_task(self) -> None:
         if self.current_task_json.exists():
