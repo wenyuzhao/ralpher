@@ -13,7 +13,7 @@ dependencies = [
     "typer>=0.24.1",
     "yaspin>=3.4.0",
     "python-dotenv>=1.2.2",
-    "httpx>=0.28.1",
+    "znotion>=0.1.1",
     "python-slugify>=8.0.4",
 ]
 

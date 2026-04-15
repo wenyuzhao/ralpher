@@ -15,6 +15,9 @@ class Hooks:
         self.total_iterations = 0
         self.status: Status = Status(status="idle", label="Idle")
 
+    def report_status(self):
+        pass
+
     async def init(self, project: Project):
         self.project = project
         self.start_time = datetime.datetime.now()
@@ -95,6 +98,8 @@ class HooksManager:
             return
         names = ", ".join(h.name for h in self.hooks)
         rich.print(f" • Hooks: [i]{names}[/]")
+        for h in self.hooks:
+            h.report_status()
 
     async def init(self, project: Project):
         for h in self.hooks:

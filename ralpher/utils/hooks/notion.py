@@ -1,69 +1,43 @@
 from pathlib import Path
 import os
-import httpx
+
 import jinja2
+from znotion import NotionClient
+from znotion.models import ChildPageBlock
 
 from ralpher.models import Project, ProjectPlan, Status
 from ralpher.utils.hooks.hooks import Hooks
 
 
 async def __create_page(
-    parent_page_id: str, title: str, token: str, version: str
+    client: NotionClient, parent_page_id: str, title: str
 ) -> str | None:
-    url = "https://api.notion.com/v1/pages"
-    payload = {
-        "parent": {"page_id": parent_page_id},
-        "properties": {"title": {"title": [{"text": {"content": title}}]}},
-    }
-    headers = {
-        "Notion-Version": version,
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-    }
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, json=payload, headers=headers)
-            if response.is_success:
-                return response.json()["id"]
-            return None
+        page = await client.pages.create(
+            parent={"page_id": parent_page_id},
+            properties={"title": {"title": [{"text": {"content": title}}]}},
+        )
+        return page.id
     except Exception:
         return None
 
 
 async def __find_child_page(
-    parent_page_id: str, title: str, token: str, version: str
+    client: NotionClient, parent_page_id: str, title: str
 ) -> str | None:
-    url = f"https://api.notion.com/v1/blocks/{parent_page_id}/children"
-    headers = {
-        "Notion-Version": version,
-        "Authorization": f"Bearer {token}",
-    }
     try:
-        async with httpx.AsyncClient() as client:
-            cursor = None
-            while True:
-                params = {"page_size": 100}
-                if cursor:
-                    params["start_cursor"] = cursor
-                response = await client.get(url, headers=headers, params=params)
-                if not response.is_success:
-                    return None
-                data = response.json()
-                for block in data.get("results", []):
-                    if block.get("type") != "child_page":
-                        continue
-                    page_title = block.get("child_page", {}).get("title", "")
-                    if page_title == title:
-                        return block["id"]
-                if not data.get("has_more"):
-                    break
-                cursor = data.get("next_cursor")
+        async for block in client.blocks.children(parent_page_id):
+            if (
+                isinstance(block, ChildPageBlock)
+                and block.child_page.get("title") == title
+            ):
+                return block.id
     except Exception:
         return None
     return None
 
 
-async def __resolve_page_id(token: str, version: str, title: str) -> str | None:
+async def __resolve_page_id(client: NotionClient, title: str) -> str | None:
     page_id = os.getenv("RALPHER_NOTION_PAGE_ID")
     if page_id:
         return page_id
@@ -72,12 +46,12 @@ async def __resolve_page_id(token: str, version: str, title: str) -> str | None:
     if not parent_page_id:
         return None
 
-    existing_id = await __find_child_page(parent_page_id, title, token, version)
+    existing_id = await __find_child_page(client, parent_page_id, title)
     if existing_id:
         os.environ["RALPHER_NOTION_PAGE_ID"] = existing_id
         return existing_id
 
-    new_page_id = await __create_page(parent_page_id, title, token, version)
+    new_page_id = await __create_page(client, parent_page_id, title)
     if new_page_id:
         os.environ["RALPHER_NOTION_PAGE_ID"] = new_page_id
     return new_page_id
@@ -85,43 +59,28 @@ async def __resolve_page_id(token: str, version: str, title: str) -> str | None:
 
 async def __update_page(title: str, content: str) -> bool:
     token = os.environ["RALPHER_NOTION_TOKEN"]
-    version = os.getenv("RALPHER_NOTION_VERSION", "2026-03-11")
-
-    page_id = await __resolve_page_id(token, version, title)
-    if not page_id:
-        return False
-
-    url = f"https://api.notion.com/v1/pages/{page_id}"
-    payload = {
-        "properties": {"title": {"title": [{"text": {"content": title}}]}},
-        "is_locked": True,
-    }
-    headers = {
-        "Notion-Version": version,
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-    }
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.patch(url, json=payload, headers=headers)
-            if not response.is_success:
-                return False
-    except Exception as e:
-        return False
-
-    url = f"https://api.notion.com/v1/pages/{page_id}/markdown"
     # Workaround to bypass Cloudflare's stupid security checks
     content = content.replace("`python", "`python\u200e")
-    payload = {
-        "type": "replace_content",
-        "replace_content": {"new_str": content, "allow_deleting_content": True},
-    }
+
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.patch(url, json=payload, headers=headers)
-            return response.is_success
-    except Exception as e:
-        # print(f"Error updating Notion page: {e}")
+        async with NotionClient(token=token) as client:
+            page_id = await __resolve_page_id(client, title)
+            if not page_id:
+                return False
+
+            await client.pages.update(
+                page_id,
+                properties={"title": {"title": [{"text": {"content": title}}]}},
+                is_locked=True,
+            )
+
+            await client.pages.replace_markdown(
+                page_id,
+                content,
+                allow_deleting_content=True,
+            )
+            return True
+    except Exception:
         return False
 
 
@@ -171,3 +130,6 @@ class NotionHooks(Hooks):
 
     async def update(self):
         await update_notion_page(self.project, self.status)
+
+    def report_status(self):
+        pass

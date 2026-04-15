@@ -367,7 +367,6 @@ name = "ralpher"
 version = "0.1.4"
 source = { editable = "." }
 dependencies = [
-    { name = "httpx" },
     { name = "jinja2" },
     { name = "prompt-toolkit" },
     { name = "pydantic" },
@@ -377,6 +376,7 @@ dependencies = [
     { name = "rich" },
     { name = "typer" },
     { name = "yaspin" },
+    { name = "znotion" },
 ]
 
 [package.dev-dependencies]
@@ -387,7 +387,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "httpx", specifier = ">=0.28.1" },
     { name = "jinja2", specifier = ">=3.1" },
     { name = "prompt-toolkit", specifier = ">=3.0" },
     { name = "pydantic", specifier = ">=2.12.5" },
@@ -397,6 +396,7 @@ requires-dist = [
     { name = "rich", specifier = ">=14.3.4" },
     { name = "typer", specifier = ">=0.24.1" },
     { name = "yaspin", specifier = ">=3.4.0" },
+    { name = "znotion", specifier = ">=0.1.1" },
 ]
 
 [package.metadata.requires-dev]
@@ -500,4 +500,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/8d/c5/826a862dcfcb9e85321f96d6f1b4b96b3b9bf37df6f63dce9cffd0b17053/yaspin-3.4.0.tar.gz", hash = "sha256:a83a81ac7a9d161e116fb668a7e4d10d87fb18d02b4b08a17b7e472f465f3c90", size = 42396, upload-time = "2025-12-06T12:33:51.889Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/93/6f/7403e6ae864a0a7f1cdd8814d39690062766e141339127f2b3469201ff6f/yaspin-3.4.0-py3-none-any.whl", hash = "sha256:2a40572a38d39846d0df0a421733459481b7da17789f7a2618c3181bb0a82819", size = 21822, upload-time = "2025-12-06T12:33:50.633Z" },
+]
+
+[[package]]
+name = "znotion"
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/f7/de/e9cd3cab453c7aa1788c84c4d6f0a4378631fa6df2d46bec216963ad0ce6/znotion-0.1.1.tar.gz", hash = "sha256:0a04bafab6016d7fc530a849e57390249814fb58ea0650b0a8b3c5d5fb182156", size = 48819, upload-time = "2026-04-15T01:52:56.4Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ec/e2/86997207502b19047a19972c8b932782dc86b2d5a6b1925767e4977fca64/znotion-0.1.1-py3-none-any.whl", hash = "sha256:771c163d9210f9fe4f5ba3e5ddb65e9d499c94476b799ad3cb1b1303df3e3c82", size = 33433, upload-time = "2026-04-15T01:52:54.824Z" },
 ]
