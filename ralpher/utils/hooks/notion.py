@@ -2,6 +2,7 @@ from pathlib import Path
 import os
 
 import jinja2
+import rich
 from znotion import NotionClient
 from znotion.models import ChildPageBlock
 
@@ -57,7 +58,7 @@ async def __resolve_page_id(client: NotionClient, title: str) -> str | None:
     return new_page_id
 
 
-async def __update_page(title: str, content: str) -> bool:
+async def __update_page(title: str, content: str) -> tuple[bool, str | None]:
     token = os.environ["RALPHER_NOTION_TOKEN"]
     # Workaround to bypass Cloudflare's stupid security checks
     content = content.replace("`python", "`python\u200e")
@@ -66,7 +67,7 @@ async def __update_page(title: str, content: str) -> bool:
         async with NotionClient(token=token) as client:
             page_id = await __resolve_page_id(client, title)
             if not page_id:
-                return False
+                return False, None
 
             await client.pages.update(
                 page_id,
@@ -79,17 +80,19 @@ async def __update_page(title: str, content: str) -> bool:
                 content,
                 allow_deleting_content=True,
             )
-            return True
+            # Add dash to page_id
+            page_id = page_id.replace("-", "")
+            return True, f"https://notion.so/{page_id}"
     except Exception:
-        return False
+        return False, None
 
 
-async def update_notion_page(project: Project, status: Status | None) -> bool:
+async def update_notion_page(project: Project, status: Status | None) -> str | None:
     if "RALPHER_NOTION_TOKEN" not in os.environ or (
         "RALPHER_NOTION_PAGE_ID" not in os.environ
         and "RALPHER_NOTION_PARENT_PAGE_ID" not in os.environ
     ):
-        return False
+        return None
 
     project_dir = project.project_dir
 
@@ -121,15 +124,18 @@ async def update_notion_page(project: Project, status: Status | None) -> bool:
         status=status,
         branch=branch,
     )
-    success = await __update_page(project_dir.name, rendered)
-    return success
+    success, page_id = await __update_page(project_dir.name, rendered)
+    return page_id
 
 
 class NotionHooks(Hooks):
     name = "Notion"
+    url: str | None = None
 
     async def update(self):
-        await update_notion_page(self.project, self.status)
+        url = await update_notion_page(self.project, self.status)
+        if not self.url and url:
+            self.url = url
 
     def report_status(self):
-        pass
+        rich.print(f" • Tracking link: [i][u]{self.url}[/][/]")

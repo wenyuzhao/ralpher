@@ -40,14 +40,6 @@ async def prepare(project: Project, hooks: HooksManager) -> bool:
     plan = project.load_plan()
     assert plan is not None
 
-    # Check if all tasks already pass
-    num_tasks = len(plan.tasks)
-    num_failed_tasks = len(plan.failed_tasks())
-    if num_failed_tasks == 0:
-        rich.print(f"[bold green]✔ All {num_tasks} tasks already pass![/]")
-        await hooks.on_loop_end(0, True)
-        return False
-
     # Check if max_iterations is less than number of tasks
     if project.max_iterations is not None and project.max_iterations < len(plan.tasks):
         rich.print(
@@ -60,6 +52,8 @@ async def prepare(project: Project, hooks: HooksManager) -> bool:
             sys.exit(0)
 
     # Report important info before starting the loop
+    num_tasks = len(plan.tasks)
+    num_failed_tasks = len(plan.failed_tasks())
     config = project.load_config()
     assert config is not None
     rich.print(f" • Incomplete tasks: {num_failed_tasks} / {num_tasks}")
@@ -69,6 +63,12 @@ async def prepare(project: Project, hooks: HooksManager) -> bool:
     )
     hooks.report_status()
     print()
+
+    # Check if all tasks already pass
+    if num_failed_tasks == 0:
+        rich.print(f"[bold green]✔ All {num_tasks} tasks already pass![/]")
+        await hooks.on_loop_end(0, True)
+        return False
 
     # Initialize progress file if it doesn't exist
     if not project.progress_md.exists():
