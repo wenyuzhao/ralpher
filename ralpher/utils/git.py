@@ -39,14 +39,41 @@ def _check_empty_git_history() -> None:
         )
 
 
+def _is_in_git_repo() -> bool:
+    """Check whether CWD is inside a git repository."""
+    try:
+        subprocess.check_output(
+            ["git", "rev-parse", "--is-inside-work-tree"], stderr=DEVNULL
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def _init_repo() -> None:
+    """Initialize a new git repo with an empty commit on main."""
+    subprocess.check_call(["git", "init", "-b", "main"], stderr=DEVNULL, stdout=DEVNULL)
+    subprocess.check_call(
+        ["git", "commit", "--allow-empty", "-m", "Initial commit"],
+        stderr=DEVNULL,
+        stdout=DEVNULL,
+    )
+
+
 def checkout_branch(target_branch: str, base_branch: str) -> None:
     """Checkout the target branch, creating it from base_branch if provided."""
+    if not _is_in_git_repo():
+        _init_repo()
+
     _check_empty_git_history()
 
     if (Path.cwd() / ".no-checkout").exists():
         fail(
             "This repository does not allow automatic branch checkouts. Please remove the .no-checkout file and try again."
         )
+
+    if not branch_exists(base_branch):
+        fail(f"Base branch '{base_branch}' does not exist.")
 
     if branch_exists(target_branch):
         # Just checkout the existing branch

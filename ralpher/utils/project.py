@@ -41,6 +41,9 @@ def _resolve_branches(
 
 def _init_project_config(project: Project, base_branch: str, target_branch: str):
     project.project_dir.mkdir(parents=True, exist_ok=True)
+    # Create a .gitignore to ignore all files in the project directory by default
+    if not (gitignore := project.project_dir / ".gitignore").exists():
+        gitignore.write_text("*")
     config = ProjectConfig(base_branch=base_branch, target_branch=target_branch)
     project.save_config(config)
 
