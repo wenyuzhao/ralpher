@@ -24,10 +24,10 @@ async def implement_and_review(project: Project, hooks: HooksManager):
 
 async def iterate(project: Project, hooks: HooksManager) -> None:
     i = project.current_iteration
-    plan = project.load_plan()
-    assert plan is not None
+    tasks = project.load_tasks()
+    assert tasks is not None
     assert project.current_task_id is not None
-    task = plan.get_task_by_id(project.current_task_id)
+    task = tasks.get_task_by_id(project.current_task_id)
     assert task is not None
     assert i is not None
 
@@ -43,18 +43,18 @@ async def iterate(project: Project, hooks: HooksManager) -> None:
     # Implement the task using claude
     await implement_and_review(project, hooks)
 
-    # Propagate changes to plan.json if updated
+    # Propagate changes to tasks.json if updated
     modified_task = project.load_current_task()
     assert modified_task is not None
-    plan = project.load_plan()
-    assert plan is not None
+    tasks = project.load_tasks()
+    assert tasks is not None
     if modified_task.passes:
-        # Update the corresponding task in plan.json
-        for t in plan.tasks:
+        # Update the corresponding task in tasks.json
+        for t in tasks.tasks:
             if t.id == modified_task.id:
                 t.passes = True
                 break
-        project.save_plan(plan)
+        project.save_tasks(tasks)
 
     # Finish iteration
     project.remove_current_task()

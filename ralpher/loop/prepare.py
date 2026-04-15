@@ -9,7 +9,7 @@ from ralpher.models import Project
 from ralpher.utils.error import fail
 from ralpher.utils.git import checkout_branch
 from ralpher.utils.hooks.hooks import HooksManager
-from ..plan.extract import extract_plan_json
+from ..plan.extract import extract_tasks
 
 
 async def prepare(project: Project, hooks: HooksManager) -> bool:
@@ -18,32 +18,32 @@ async def prepare(project: Project, hooks: HooksManager) -> bool:
         await hooks.on_error("PLAN.md not found")
         fail(f"{project.plan_md} not found.")
 
-    # Extract plan.json from PLAN.md if it doesn't exist
-    if not project.plan_json.exists():
-        rich.print(f"[bold blue]Extracting plan.json from PLAN.md[/]\n")
+    # Extract tasks.json from PLAN.md if it doesn't exist
+    if not project.tasks_json.exists():
+        rich.print(f"[bold blue]Extracting tasks.json from PLAN.md[/]\n")
         await hooks.on_extract_start()
         try:
-            await extract_plan_json(project)
+            await extract_tasks(project)
         except Exception as e:
-            await hooks.on_error(f"Failed to extract plan.json: {str(e)}")
-            fail(f"Failed to extract plan.json: {str(e)}")
-        if not project.plan_json.exists():
-            await hooks.on_error("Failed to extract plan.json")
-            fail(f"{project.plan_json} still not found after extraction.")
+            await hooks.on_error(f"Failed to extract tasks.json: {str(e)}")
+            fail(f"Failed to extract tasks.json: {str(e)}")
+        if not project.tasks_json.exists():
+            await hooks.on_error("Failed to extract tasks.json")
+            fail(f"{project.tasks_json} still not found after extraction.")
         await hooks.on_extract_end()
 
     # Create logs directory
     logs_dir = project.project_dir / "logs"
     logs_dir.mkdir(exist_ok=True)
 
-    # Load plan and check tasks
-    plan = project.load_plan()
-    assert plan is not None
+    # Load and check tasks
+    tasks = project.load_tasks()
+    assert tasks is not None
 
     # Check if max_iterations is less than number of tasks
-    if project.max_iterations is not None and project.max_iterations < len(plan.tasks):
+    if project.max_iterations is not None and project.max_iterations < len(tasks.tasks):
         rich.print(
-            f"[yellow][b]Warning:[/] Max iterations ({project.max_iterations}) is less than the number of tasks ({len(plan.tasks)}). Some tasks may not be attempted.[/]\n"
+            f"[yellow][b]Warning:[/] Max iterations ({project.max_iterations}) is less than the number of tasks ({len(tasks.tasks)}). Some tasks may not be attempted.[/]\n"
         )
         if not Confirm.ask("Do you want to continue?", default=False):
             await hooks.on_cancel(
@@ -52,8 +52,8 @@ async def prepare(project: Project, hooks: HooksManager) -> bool:
             sys.exit(0)
 
     # Report important info before starting the loop
-    num_tasks = len(plan.tasks)
-    num_failed_tasks = len(plan.failed_tasks())
+    num_tasks = len(tasks.tasks)
+    num_failed_tasks = len(tasks.failed_tasks())
     config = project.load_config()
     assert config is not None
     rich.print(f" • Incomplete tasks: {num_failed_tasks} / {num_tasks}")

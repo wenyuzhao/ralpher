@@ -1,3 +1,9 @@
+---
+name: iterate
+description: Iterate on the implementation based on the current task and the project plan.
+disable-model-invocation: true
+---
+
 # Coding Agent Instructions
 
 You are an autonomous coding agent working on a task of a software project.

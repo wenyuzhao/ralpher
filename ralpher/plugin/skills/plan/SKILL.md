@@ -1,6 +1,12 @@
-# Project Plan Generator
+---
+name: plan
+description: Generate a structured project plan.
+disable-model-invocation: true
+---
 
-Create detailed Project Plans that are clear, actionable, and suitable for implementation.
+# Create Project Plan
+
+Create a detailed Project Plan that is clear, actionable, and suitable for implementation.
 
 ---
 
@@ -71,7 +77,7 @@ To ask user questions, output all the questions to `.ralpher/projects/$0/questio
 
 Generate the Project Plan document.
 
-Please refer to @!`echo $RALPHER_PLUGIN`/docs/plan-structure.md for a list of required sections and an example.
+Please refer to @${CLAUDE_SKILL_DIR}/../../docs/plan-structure.md for a list of required sections and an example.
 
 You can do step-2 multiple times to ask more questions when making the plan.
 
@@ -83,8 +89,6 @@ Before saving the Project Plan:
 
 - [ ] Reviewed the repo and the context
 - [ ] Asked clarifying questions
-- [ ] Incorporated user's answers
-- [ ] Tasks are small and specific
-- [ ] Functional requirements are numbered and unambiguous
-- [ ] Non-goals section defines clear boundaries
+- [ ] Incorporated user's instructions and answers in the project plan
+- [ ] The project plan follows the required structure and includes all required sections
 - [ ] Save to `.ralpher/projects/$0/PLAN.md`

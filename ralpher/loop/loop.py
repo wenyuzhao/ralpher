@@ -28,30 +28,30 @@ async def run_ralph_loop(*, project: Project, hooks: HooksManager) -> None:
 
     while next_iteration():
         # Pick next failing task
-        plan = project.load_plan()
-        assert plan is not None
-        tasks = plan.failed_tasks()
-        tasks.sort(key=lambda t: t.priority)
-        assert tasks, "No failing tasks found."
-        task = tasks[0]  # highest priority failing task
+        tasks = project.load_tasks()
+        assert tasks is not None
+        failed_tasks = tasks.failed_tasks()
+        assert failed_tasks, "No failing tasks found."
+        task = failed_tasks[0]  # highest priority failing task
         project.current_task_id = task.id
 
         # Run iteration
         await iterate(project, hooks)
 
         # Check if all tasks pass after this iteration
-        plan = project.load_plan()
-        assert plan is not None
-        all_passed = len(plan.failed_tasks()) == 0
+        tasks = project.load_tasks()
+        assert tasks is not None
+        all_passed = len(tasks.failed_tasks()) == 0
         if all_passed:
             break
 
         if project.max_iterations is None or iterations < project.max_iterations - 1:
             time.sleep(3)
 
-    await hooks.on_loop_end(iterations, all_passed)
     if all_passed:
         finalize_progress(project.progress_md)
+    await hooks.on_loop_end(iterations, all_passed)
+    if all_passed:
         rich.print(f"[bold green]✔ Completed in {iterations} iterations![/bold green]")
     else:
         rich.print(

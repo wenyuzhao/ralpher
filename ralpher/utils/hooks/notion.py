@@ -101,9 +101,7 @@ async def update_notion_page(project: Project, status: Status | None) -> str | N
 
     config = project.load_config()
     branch = config.target_branch if config else "N/A"
-    plan = project.load_plan()
-    if plan:
-        plan.tasks.sort(key=lambda t: t.priority)
+    tasks = project.load_tasks()
 
     plan_md_file = project_dir / "PLAN.md"
     plan_md = plan_md_file.read_text() if plan_md_file.exists() else "*N/A*"
@@ -116,7 +114,7 @@ async def update_notion_page(project: Project, status: Status | None) -> str | N
 
     template = jinja2.Template(template_content)
     rendered = template.render(
-        plan=plan,
+        tasks=tasks.tasks if tasks else None,
         plan_md=plan_md,
         prompt_md=prompt_md,
         progress_md=progress_md,

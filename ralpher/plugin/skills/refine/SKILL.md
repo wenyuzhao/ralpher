@@ -1,4 +1,10 @@
-# Project Plan Refiner
+---
+name: refine
+description: Refine the Project Plan based on user's input.
+disable-model-invocation: true
+---
+
+# Refine the Project Plan
 
 Refine the Project Plan based on user's input.
 
@@ -30,9 +36,11 @@ Refine the Project Plan based on user's input.
 
 ---
 
-## Step 1: Review the current repo
+## Step 1: Review the current repo and the original Project Plan
 
-The repo has been checked out to ther target branch of this project for you. Carefully review the current repo and understand the context before making a plan.
+The repo has been checked out to ther target branch of this project for you. Carefully review the current repo and understand the context.
+
+The original Project Plan is provided above. Review it carefully, and understand the current plan before making any changes.
 
 ---
 
@@ -71,7 +79,7 @@ To ask user questions, output all the questions to `.ralpher/projects/$0/questio
 
 Update the Project Plan document.
 
-Please refer to @!`echo $RALPHER_PLUGIN`/docs/plan-structure.md for a list of required sections and an example.
+Please refer to @${CLAUDE_SKILL_DIR}/../../docs/plan-structure.md for a list of required sections and an example.
 
 Strictly follow the user's instructions, and don't change unrelated parts.
 
@@ -85,9 +93,9 @@ You can do step-2 multiple times to ask more questions when making the plan.
 
 Before saving the Project Plan:
 
+- [ ] Reviewed the repo, the original Project Plan, and any other context
 - [ ] Incorporated the user's instructions
 - [ ] (Optional) Asked clarifying questions and incorporated user's answers
-- [ ] Tasks are small and specific
-- [ ] Functional requirements are numbered and unambiguous
-- [ ] Non-goals section defines clear boundaries
+- [ ] Did not change unrelated parts of the plan
+- [ ] The project plan follows the required structure and includes all required sections
 - [ ] Save to `.ralpher/projects/$0/PLAN.md`

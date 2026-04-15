@@ -1,18 +1,18 @@
-## Project Plan Structure
+# Project Plan Structure
 
 Generate the Project Plan with these sections:
 
-### 1. Introduction/Overview
+## 1. Introduction/Overview
 Brief description of the feature and the problem it solves.
 
-### 2. Goals
+## 2. Goals
 Specific, measurable objectives (bullet list).
 
-### 3. Design
+## 3. Design
 High-level software design covering architecture, system components, and API contracts. This section bridges goals and implementation by describing *how* the system will be structured.
 
 Include as applicable:
-- **Architecture:** Key components/modules and how they interact (e.g., client → API → service → database). A brief diagram or description of the data flow.
+- **Architecture:** Key components/modules and how they interact (e.g., client → API → service → database). Use a Mermaid diagram (recommended) or description of the data flow when possible.
 - **Source Layout:** New or modified files, directories, and modules. Describe where code lives and how it's organized (e.g., "new `src/priority/` module with `model.py`, `service.py`, `routes.py`"). Reference existing files being changed.
 - **Data Model:** New or modified entities, their fields, and relationships.
 - **API Design:** New or modified endpoints/interfaces with method, path, request/response shape, and key behaviors.
@@ -29,7 +29,7 @@ Include as applicable:
 
 Keep it concise — enough for a developer to understand the overall shape before reading individual tasks.
 
-### 4. Tasks
+## 4. Tasks
 Each task needs:
 - **Title:** Short descriptive name
 - **Description:** Clear, concise explanation of what needs to be done and why
@@ -50,41 +50,109 @@ IMPORTANT: Each task should be small and fine-grained enough to implement in one
 ```
 
 **Important:**
-- Acceptance criteria must be verifiable, not vague. "Works correctly" is bad. "Button shows confirmation dialog before deleting" is good.
+- Each task should be small and fine-grained enough to implement in one focused session. See **task size** section below.
+- Tasks should be ordered. See  **task ordering** section below.
+- Acceptance criteria must be verifiable, not vague. "Works correctly" is bad. "Button shows confirmation dialog before deleting" is good. See  **acceptance criteria** section below
 - When possible, acceptance criteria should include unit tests, integration tests, or manually-performed tests that can be performed by yourself using skills or tools.
 - **For any task with UI changes:** Always include "Verify in browser using dev-browser skill" as acceptance criteria. This ensures visual verification of frontend work.
 
-### 5. Functional Requirements
+### Task Size: The Number One Rule
+
+**Each task must be completable in ONE Ralph iteration (one context window).**
+
+Ralph spawns a fresh instance per iteration with no memory of previous work. If a task is too big, the LLM runs out of context before finishing and produces broken code.
+
+**Right-sized tasks**
+- Add a database column and migration
+- Add a UI component to an existing page
+- Update a server action with new logic
+- Add a filter dropdown to a list
+
+**Too big (split these)**
+- "Build the entire dashboard" - Split into: schema, queries, UI components, filters
+- "Add authentication" - Split into: schema, middleware, login UI, session handling
+- "Refactor the API" - Split into one task per endpoint or pattern
+
+**Rule of thumb:** If you cannot describe the change in 2-3 sentences, it is too big.
+
+### Task Ordering: Dependencies First
+
+Tasks execute in sequential order. Earlier tasks must not depend on later ones.
+
+**Correct order:**
+1. Schema/database changes (migrations)
+2. Server actions / backend logic
+3. UI components that use the backend
+4. Dashboard/summary views that aggregate data
+
+**Wrong order:**
+1. UI component (depends on schema that does not exist yet)
+2. Schema change
+
+### Acceptance Criteria: Must Be Verifiable
+
+Each criterion must be something Ralph can CHECK, not something vague.
+
+**Good criteria (verifiable):**
+- "Add `status` column to tasks table with default 'pending'"
+- "Filter dropdown has options: All, Active, Completed"
+- "Clicking delete shows confirmation dialog"
+- "Typecheck passes"
+- "Tests pass"
+
+**Bad criteria (vague):**
+- "Works correctly"
+- "User can do X easily"
+- "Good UX"
+- "Handles edge cases"
+
+**Always include as final criterion when applicable:**
+- Typecheck passes
+- Tests, unit tests, or integration tests passes
+
+For tasks with testable logic, also include:
+```
+"Tests pass"
+```
+
+**For tasks that change UI, also include:**
+```
+"Verify in browser using dev-browser skill"
+```
+
+Frontend tasks are NOT complete until visually verified. Ralph will use the dev-browser skill to navigate to the page, interact with the UI, and confirm changes work.
+
+## 5. Functional Requirements
 Numbered list of specific functionalities:
 - "FR-1: The system must allow users to..."
 - "FR-2: When a user clicks X, the system must..."
 
 Be explicit and unambiguous.
 
-### 6. Non-Goals (Out of Scope)
+## 6. Non-Goals (Out of Scope)
 What this feature will NOT include. Critical for managing scope.
 
-### 7. Design Considerations (Optional)
+## 7. Design Considerations (Optional)
 - UI/UX requirements
 - Link to mockups if available
 - Relevant existing components to reuse
 
-### 8. Technical Considerations (Optional)
+## 8. Technical Considerations (Optional)
 - Known constraints or dependencies
 - Integration points with existing systems
 - Performance requirements
 
-### 9. Success Metrics
+## 9. Success Metrics
 How will success be measured?
 - "Reduce time to complete X by 50%"
 - "Increase conversion rate by 10%"
 
-### 10. Open Questions
+## 10. Open Questions
 Remaining questions or areas needing clarification.
 
 ---
 
-## Writing for Junior Developers
+# Writing for Junior Developers
 
 The Project Plan reader may be a junior developer or AI agent. Therefore:
 
@@ -96,7 +164,7 @@ The Project Plan reader may be a junior developer or AI agent. Therefore:
 
 ---
 
-## Example Project Plan
+# Example Project Plan
 
 ```markdown
 # Project Plan: Task Priority System
@@ -206,3 +274,14 @@ Add priority levels to tasks so users can focus on what matters most. Tasks can 
 - Should priority affect task ordering within a column?
 - Should we add keyboard shortcuts for priority changes?
 ```
+
+---
+
+# Checklist
+
+Always ensure the following:
+
+- [ ] Incorporated user's instructions or answers in the project plan
+- [ ] Tasks are small and specific
+- [ ] Functional requirements are numbered and unambiguous
+- [ ] Non-goals section defines clear boundaries

@@ -6,7 +6,7 @@ import pytest
 from ralpher.utils.claude import _ask_user_questions
 from ralpher.models import Questions, Question, QuestionOption, Project
 from ralpher.plan.plan import generate_plan
-from ralpher.plan.extract import extract_plan_json
+from ralpher.plan.extract import extract_tasks
 
 
 def _make_questions(raw: list[dict]) -> Questions:
@@ -271,12 +271,12 @@ class TestGeneratePlan:
             await generate_plan(project=Project(id="task-no-plan"), prompt="test", model=None)
 
 
-class TestExtractPlanJson:
+class TestExtractTasks:
     @pytest.mark.asyncio
     async def test_raises_when_task_dir_missing(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         with pytest.raises(SystemExit):
-            await extract_plan_json(Project(id="nonexistent-task"))
+            await extract_tasks(Project(id="nonexistent-task"))
 
     @pytest.mark.asyncio
     async def test_raises_when_plan_md_missing(self, tmp_path, monkeypatch):
@@ -284,7 +284,7 @@ class TestExtractPlanJson:
         project = Project(id="test-task")
         project.project_dir.mkdir(parents=True)
         with pytest.raises(SystemExit):
-            await extract_plan_json(project)
+            await extract_tasks(project)
 
     @patch("ralpher.plan.extract.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
@@ -294,20 +294,17 @@ class TestExtractPlanJson:
         project.project_dir.mkdir(parents=True)
         project.plan_md.write_text("# My Plan")
 
-        valid_plan = json.dumps(
+        valid_tasks = json.dumps(
             {
-                "project": "Test",
-                "branch_name": "test-branch",
-                "description": "A test",
                 "tasks": [],
             }
         )
 
         async def side_effect(**kwargs):
-            project.plan_json.write_text(valid_plan)
+            project.tasks_json.write_text(valid_tasks)
 
         mock_run.side_effect = side_effect
-        await extract_plan_json(project)
+        await extract_tasks(project)
         call_kwargs = mock_run.call_args[1]
         assert call_kwargs["model"] == "haiku"
 
@@ -323,11 +320,11 @@ class TestExtractPlanJson:
 
         mock_run.side_effect = ClaudeError(1)
         with pytest.raises(SystemExit):
-            await extract_plan_json(project, retries=1)
+            await extract_tasks(project, retries=1)
 
     @patch("ralpher.plan.extract.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_raises_when_plan_json_not_created(
+    async def test_raises_when_tasks_json_not_created(
         self, mock_run, tmp_path, monkeypatch
     ):
         monkeypatch.chdir(tmp_path)
@@ -337,7 +334,7 @@ class TestExtractPlanJson:
 
         mock_run.return_value = None
         with pytest.raises(SystemExit):
-            await extract_plan_json(project, retries=1)
+            await extract_tasks(project, retries=1)
 
     @patch("ralpher.plan.extract.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
@@ -348,37 +345,31 @@ class TestExtractPlanJson:
         project.project_dir.mkdir(parents=True)
         project.plan_md.write_text("# Plan")
 
-        valid_plan = json.dumps(
+        valid_tasks = json.dumps(
             {
-                "project": "Test",
-                "branch_name": "test-branch",
-                "description": "A test",
                 "tasks": [],
             }
         )
 
         async def side_effect(**kwargs):
-            project.plan_json.write_text(valid_plan)
+            project.tasks_json.write_text(valid_tasks)
 
         mock_run.side_effect = side_effect
-        await extract_plan_json(project)
+        await extract_tasks(project)
 
         call_kwargs = mock_run.call_args[1]
         assert "my-task-123" in call_kwargs["prompt"]
 
     @patch("ralpher.plan.extract.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_retries_on_invalid_plan_json(self, mock_run, tmp_path, monkeypatch):
+    async def test_retries_on_invalid_tasks_json(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         project = Project(id="retry-task")
         project.project_dir.mkdir(parents=True)
         project.plan_md.write_text("# Plan")
 
-        valid_plan = json.dumps(
+        valid_tasks = json.dumps(
             {
-                "project": "Test",
-                "branch_name": "test-branch",
-                "description": "A test",
                 "tasks": [],
             }
         )
@@ -389,12 +380,12 @@ class TestExtractPlanJson:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                project.plan_json.write_text('{"invalid": true}')
+                project.tasks_json.write_text('{"invalid": true}')
             else:
-                project.plan_json.write_text(valid_plan)
+                project.tasks_json.write_text(valid_tasks)
 
         mock_run.side_effect = side_effect
-        await extract_plan_json(project, retries=3)
+        await extract_tasks(project, retries=3)
         assert mock_run.call_count == 2
 
     @patch("ralpher.plan.extract.run_claude", new_callable=AsyncMock)
@@ -409,11 +400,8 @@ class TestExtractPlanJson:
         project.project_dir.mkdir(parents=True)
         project.plan_md.write_text("# Plan")
 
-        valid_plan = json.dumps(
+        valid_tasks = json.dumps(
             {
-                "project": "Test",
-                "branch_name": "test-branch",
-                "description": "A test",
                 "tasks": [],
             }
         )
@@ -426,8 +414,8 @@ class TestExtractPlanJson:
             if call_count == 1:
                 raise ClaudeError(1)
             else:
-                project.plan_json.write_text(valid_plan)
+                project.tasks_json.write_text(valid_tasks)
 
         mock_run.side_effect = side_effect
-        await extract_plan_json(project, retries=3)
+        await extract_tasks(project, retries=3)
         assert mock_run.call_count == 2

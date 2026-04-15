@@ -6,11 +6,11 @@ import pytest
 from ralpher.loop.prepare import _init_progress
 from ralpher.loop.iterate import iterate
 from ralpher.loop.loop import run_ralph_loop
-from ralpher.models import ProjectConfig, ProjectPlan, Project
+from ralpher.models import ProjectConfig, Tasks, Project
 from ralpher.utils.hooks import HooksManager
 
 
-def _make_plan(tasks: list[dict] | None = None) -> dict:
+def _make_tasks_data(tasks: list[dict] | None = None) -> dict:
     if tasks is None:
         tasks = [
             {
@@ -18,16 +18,10 @@ def _make_plan(tasks: list[dict] | None = None) -> dict:
                 "title": "Login",
                 "description": "User can log in",
                 "acceptance_criteria": ["AC1"],
-                "priority": 1,
                 "passes": False,
-                "notes": "",
             }
         ]
-    return {
-        "project": "Test",
-        "description": "Test Plan",
-        "tasks": tasks,
-    }
+    return {"tasks": tasks}
 
 
 _TASK_TEMPLATE = {
@@ -35,8 +29,6 @@ _TASK_TEMPLATE = {
     "title": "Login",
     "description": "User can log in",
     "acceptance_criteria": ["AC1"],
-    "priority": 1,
-    "notes": "",
 }
 
 
@@ -74,8 +66,8 @@ class TestIterate:
         project.current_iteration = 0
         project.current_task_id = "T-001"
 
-        plan_data = _make_plan()
-        project.plan_json.write_text(json.dumps(plan_data))
+        tasks_data = _make_tasks_data()
+        project.tasks_json.write_text(json.dumps(tasks_data))
 
         async def side_effect(**kwargs):
             project.current_task_json.write_text(
@@ -85,7 +77,7 @@ class TestIterate:
         mock_run.side_effect = side_effect
         await iterate(project, HooksManager([]))
 
-        updated = ProjectPlan.model_validate(json.loads(project.plan_json.read_text()))
+        updated = Tasks.model_validate(json.loads(project.tasks_json.read_text()))
         assert updated.tasks[0].passes is True
 
     @patch("ralpher.loop.iterate.run_claude", new_callable=AsyncMock)
@@ -99,8 +91,8 @@ class TestIterate:
         project.current_iteration = 0
         project.current_task_id = "T-001"
 
-        plan_data = _make_plan()
-        project.plan_json.write_text(json.dumps(plan_data))
+        tasks_data = _make_tasks_data()
+        project.tasks_json.write_text(json.dumps(tasks_data))
 
         mock_run.side_effect = ClaudeError(1)
 
@@ -116,8 +108,8 @@ class TestIterate:
         project.current_iteration = 0
         project.current_task_id = "T-001"
 
-        plan_data = _make_plan()
-        project.plan_json.write_text(json.dumps(plan_data))
+        tasks_data = _make_tasks_data()
+        project.tasks_json.write_text(json.dumps(tasks_data))
 
         written_task: dict | None = None
 
@@ -145,8 +137,8 @@ class TestIterate:
         project.current_iteration = 0
         project.current_task_id = "T-001"
 
-        plan_data = _make_plan()
-        project.plan_json.write_text(json.dumps(plan_data))
+        tasks_data = _make_tasks_data()
+        project.tasks_json.write_text(json.dumps(tasks_data))
 
         async def side_effect(**kwargs):
             project.current_task_json.write_text(
@@ -162,7 +154,7 @@ class TestIterate:
 
 
 class TestLoop:
-    @patch("ralpher.loop.prepare.extract_plan_json", new_callable=AsyncMock)
+    @patch("ralpher.loop.prepare.extract_tasks", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_raises_when_plan_md_missing(
         self, mock_extract, tmp_path, monkeypatch
@@ -174,7 +166,7 @@ class TestLoop:
             await run_ralph_loop(project=project, hooks=HooksManager([]))
 
     @patch("ralpher.loop.prepare.checkout_branch")
-    @patch("ralpher.loop.prepare.extract_plan_json", new_callable=AsyncMock)
+    @patch("ralpher.loop.prepare.extract_tasks", new_callable=AsyncMock)
     @patch("ralpher.loop.iterate.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_completes_when_all_tasks_pass(
@@ -185,9 +177,9 @@ class TestLoop:
         project.project_dir.mkdir(parents=True)
         _write_config(project)
 
-        plan_data = _make_plan()
+        tasks_data = _make_tasks_data()
         project.plan_md.write_text("# Plan")
-        project.plan_json.write_text(json.dumps(plan_data))
+        project.tasks_json.write_text(json.dumps(tasks_data))
 
         async def side_effect(**kwargs):
             project.current_task_json.write_text(
@@ -199,7 +191,7 @@ class TestLoop:
         assert mock_run.call_count == 1
 
     @patch("ralpher.loop.prepare.checkout_branch")
-    @patch("ralpher.loop.prepare.extract_plan_json", new_callable=AsyncMock)
+    @patch("ralpher.loop.prepare.extract_tasks", new_callable=AsyncMock)
     @patch("ralpher.loop.iterate.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_exits_with_error_when_max_iterations_reached(
@@ -210,9 +202,9 @@ class TestLoop:
         project.project_dir.mkdir(parents=True)
         _write_config(project)
 
-        plan_data = _make_plan()
+        tasks_data = _make_tasks_data()
         project.plan_md.write_text("# Plan")
-        project.plan_json.write_text(json.dumps(plan_data))
+        project.tasks_json.write_text(json.dumps(tasks_data))
 
         async def side_effect(**kwargs):
             project.current_task_json.write_text(
@@ -229,7 +221,7 @@ class TestLoop:
         assert mock_run.call_count == 2
 
     @patch("ralpher.loop.prepare.checkout_branch")
-    @patch("ralpher.loop.prepare.extract_plan_json", new_callable=AsyncMock)
+    @patch("ralpher.loop.prepare.extract_tasks", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_skips_loop_when_all_tasks_already_pass(
         self, mock_extract, mock_checkout, tmp_path, monkeypatch
@@ -239,20 +231,18 @@ class TestLoop:
         project.project_dir.mkdir(parents=True)
         _write_config(project)
 
-        plan_data = _make_plan(
+        tasks_data = _make_tasks_data(
             [
                 {
                     "id": "T-001",
                     "title": "Done",
                     "description": "Already done",
                     "acceptance_criteria": [],
-                    "priority": 1,
                     "passes": True,
-                    "notes": "",
                 }
             ]
         )
         project.plan_md.write_text("# Plan")
-        project.plan_json.write_text(json.dumps(plan_data))
+        project.tasks_json.write_text(json.dumps(tasks_data))
 
         await run_ralph_loop(project=project, hooks=HooksManager([]))

@@ -10,14 +10,10 @@ class Task(BaseModel):
     title: str
     description: str
     acceptance_criteria: list[str]
-    priority: int
     passes: bool = False
-    notes: str = ""
 
 
-class ProjectPlan(BaseModel):
-    project: str
-    description: str
+class Tasks(BaseModel):
     tasks: list[Task]
 
     def failed_tasks(self) -> list[Task]:
@@ -131,8 +127,8 @@ class Project(BaseModel):
         return self.project_dir / "progress.md"
 
     @property
-    def plan_json(self) -> Path:
-        return self.project_dir / "plan.json"
+    def tasks_json(self) -> Path:
+        return self.project_dir / "tasks.json"
 
     @property
     def questions_json(self) -> Path:
@@ -142,13 +138,13 @@ class Project(BaseModel):
     def current_task_json(self) -> Path:
         return self.project_dir / "current_task.json"
 
-    def load_plan(self) -> ProjectPlan | None:
-        if not self.plan_json.exists():
+    def load_tasks(self) -> Tasks | None:
+        if not self.tasks_json.exists():
             return None
-        return ProjectPlan.model_validate(json.loads(self.plan_json.read_text()))
+        return Tasks.model_validate(json.loads(self.tasks_json.read_text()))
 
-    def save_plan(self, plan: ProjectPlan) -> None:
-        self.plan_json.write_text(plan.model_dump_json(indent=2))
+    def save_tasks(self, tasks: Tasks) -> None:
+        self.tasks_json.write_text(tasks.model_dump_json(indent=2))
 
     def load_questions(self) -> Questions | None:
         if not self.questions_json.exists():

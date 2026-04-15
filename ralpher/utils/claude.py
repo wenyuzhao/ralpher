@@ -55,9 +55,6 @@ def _build_cmd(
 
 async def _exec(cmd: list[str], logs: int | IO[Any]) -> int:
     """Execute claude subprocess with spinner, return (returncode, stdout, stderr)."""
-    os.environ["RALPHER_PLUGIN"] = str(
-        (Path(__file__).parent.parent / "plugin").resolve()
-    )
     proc = await asyncio.create_subprocess_exec(*cmd, stdout=logs, stderr=logs)
     async with Spinner() as spinner:
         await spinner.run(proc)

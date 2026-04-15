@@ -8,8 +8,8 @@
 {% endif -%}
 # 🔨 Tasks
 
-{% if plan %}
-{% for t in plan.tasks %}
+{% if tasks %}
+{% for t in tasks %}
 - [{% if t.passes %}x{% else %} {% endif %}] **{{ t.id }}** - {{ t.title }} {% if t.passes %}{{'{color="green"}'}}{% elif t.id == active_task %}{{'{color="blue"}'}}{% else %} {{'{color="yellow"}'}}{% endif %}
 {% endfor %}
 {% else %}
