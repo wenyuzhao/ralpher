@@ -54,7 +54,7 @@ class Hooks:
         assert tasks is not None
         task = tasks.get_task_by_id(task_id)
         assert task
-        label = f"**[Iteration {index+1} / {self.project.max_iterations}]** **{task.id}** - {task.title}"
+        label = f"**[Iteration {index + 1} / {self.project.max_iterations}]** **{task.id}** - {task.title}"
         self.status = Status(status="running", label=label, active_task=task_id)
         await self.update()
 
@@ -73,7 +73,7 @@ class Hooks:
         self.total_iterations = iterations
         if completed:
             if iterations == 0:
-                label = f"Project completed"
+                label = "Project completed"
             else:
                 label = f"Project completed in {iterations} iterations"
             status = "completed"

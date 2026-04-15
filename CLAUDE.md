@@ -24,6 +24,21 @@ uv run pytest tests/test_plan.py::TestGeneratePlan::test_returns_task_id_on_succ
 
 Requires Python 3.14+ and the `claude` CLI on PATH.
 
+## Linting & Formatting
+
+This project uses **ruff** for linting and formatting.
+
+```bash
+# Lint
+uvx ruff check .
+
+# Lint and auto-fix
+uvx ruff check --fix .
+
+# Format
+uvx ruff format .
+```
+
 ## Architecture
 
 - **CLI layer** (`ralpher/main.py`): Typer app with a `DefaultCommandGroup` that falls back to `run` when the first arg isn't a known command. Subcommands: `plan`, `refine`, `extract` (hidden), and `loop`. The default command accepts a prompt and runs the full pipeline: generate plan → extract JSON → run loop. Entry point registered as `ralpher` in pyproject.toml.

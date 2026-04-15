@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from ralpher.models import Project
 from ralpher.utils.project import init_project
 

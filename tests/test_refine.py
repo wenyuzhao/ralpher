@@ -1,5 +1,4 @@
-import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -17,7 +16,9 @@ class TestRefinePlan:
     async def test_raises_when_task_dir_missing(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         with pytest.raises(SystemExit):
-            await refine_plan(project=Project(id="nonexistent-task"), prompt="add auth", model=None)
+            await refine_plan(
+                project=Project(id="nonexistent-task"), prompt="add auth", model=None
+            )
 
     @pytest.mark.asyncio
     async def test_raises_when_plan_md_missing(self, tmp_path, monkeypatch):
@@ -30,7 +31,9 @@ class TestRefinePlan:
     @patch("ralpher.plan.refine.checkout_branch")
     @patch("ralpher.plan.refine.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_returns_task_id_on_success(self, mock_run, mock_checkout, tmp_path, monkeypatch):
+    async def test_returns_task_id_on_success(
+        self, mock_run, mock_checkout, tmp_path, monkeypatch
+    ):
         monkeypatch.chdir(tmp_path)
         task_id = "refine-task"
         project = Project(id=task_id)
@@ -66,7 +69,9 @@ class TestRefinePlan:
     @patch("ralpher.plan.refine.checkout_branch")
     @patch("ralpher.plan.refine.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_command_uses_refine_skill(self, mock_run, mock_checkout, tmp_path, monkeypatch):
+    async def test_command_uses_refine_skill(
+        self, mock_run, mock_checkout, tmp_path, monkeypatch
+    ):
         monkeypatch.chdir(tmp_path)
         task_id = "refine-skill"
         project = Project(id=task_id)

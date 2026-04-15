@@ -1,6 +1,5 @@
 import asyncio
 import json
-import os
 from pathlib import Path
 from datetime import datetime
 from typing import IO, Any
@@ -81,9 +80,7 @@ async def _ask_user_questions(questions: Questions) -> str:
         choice_options.append(
             (
                 "__other__",
-                HTML(
-                    "Other - <style color='ansibrightblack'>[please specify]</style>"
-                ),  # type: ignore
+                HTML("Other - <style color='ansibrightblack'>[please specify]</style>"),  # type: ignore
             )
         )
         result = await ChoiceInput(
@@ -115,7 +112,7 @@ def _get_session_id(log: Path) -> str | None:
             if "session_id" in data:
                 return data["session_id"]
         return None
-    except Exception as e:
+    except Exception:
         # print(f"Error occurred while fetching session ID: {e}")
         return None
 

@@ -13,7 +13,7 @@ async def __try_extract_tasks(project: Project):
             project_dir=project.project_dir,
             model="haiku",
         )
-    except ClaudeError as e:
+    except ClaudeError:
         return False
 
     if not (project.tasks_json).exists():
@@ -45,7 +45,7 @@ async def extract_tasks(project: Project, retries: int = 3) -> None:
             return
         else:
             rich.print(
-                f"[red]Failed to extract tasks.json. Retrying... ({i+1}/{retries})[/]"
+                f"[red]Failed to extract tasks.json. Retrying... ({i + 1}/{retries})[/]"
             )
 
     if not (project.tasks_json).exists():

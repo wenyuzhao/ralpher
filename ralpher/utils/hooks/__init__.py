@@ -1,1 +1,1 @@
-from .hooks import HooksManager
+from .hooks import HooksManager as HooksManager

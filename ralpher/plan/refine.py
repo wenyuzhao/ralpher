@@ -28,7 +28,7 @@ async def refine_plan(*, project: Project, prompt: str, model: str | None) -> st
     assert config is not None, "Project config should exist at this point."
     checkout_branch(config.target_branch, config.base_branch)
 
-    with tempfile.NamedTemporaryFile(prefix=f"ralpher-refine-", suffix=".md") as tmp:
+    with tempfile.NamedTemporaryFile(prefix="ralpher-refine-", suffix=".md") as tmp:
         tmp_path = Path(tmp.name)
         tmp_path.write_text(prompt)
 

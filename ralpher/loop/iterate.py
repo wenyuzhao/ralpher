@@ -59,7 +59,7 @@ async def iterate(project: Project, hooks: HooksManager) -> None:
     # Finish iteration
     project.remove_current_task()
     if modified_task.passes:
-        rich.print(f"  [green]✔ PASSED[/green]\n")
+        rich.print("  [green]✔ PASSED[/green]\n")
     else:
-        rich.print(f"  [red]✘ FAILED[/red]\n")
+        rich.print("  [red]✘ FAILED[/red]\n")
     await hooks.on_iteration_end(i, task.id)

@@ -1,5 +1,5 @@
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -196,7 +196,9 @@ class TestGeneratePlan:
             project.plan_md.write_text("# Plan")
 
         mock_run.side_effect = side_effect
-        result = await generate_plan(project=project, prompt="Build a chat app", model=None)
+        result = await generate_plan(
+            project=project, prompt="Build a chat app", model=None
+        )
         assert result == task_id
 
     @patch("ralpher.plan.plan.init_project")
@@ -210,7 +212,9 @@ class TestGeneratePlan:
         monkeypatch.chdir(tmp_path)
         mock_run.side_effect = ClaudeError(1)
         with pytest.raises(SystemExit):
-            await generate_plan(project=Project(id="task-fail"), prompt="test", model=None)
+            await generate_plan(
+                project=Project(id="task-fail"), prompt="test", model=None
+            )
 
     @patch("ralpher.plan.plan.init_project")
     @patch("ralpher.plan.plan.run_claude", new_callable=AsyncMock)
@@ -232,9 +236,7 @@ class TestGeneratePlan:
             project.plan_md.write_text("# Plan")
 
         mock_run.side_effect = run_side_effect
-        result = await generate_plan(
-            project=project, prompt="My feature request", model=None
-        )
+        await generate_plan(project=project, prompt="My feature request", model=None)
         assert project.project_dir.exists()
         assert project.prompt_md.read_text() == "My feature request"
 
@@ -268,7 +270,9 @@ class TestGeneratePlan:
         monkeypatch.chdir(tmp_path)
         mock_run.return_value = None
         with pytest.raises(SystemExit):
-            await generate_plan(project=Project(id="task-no-plan"), prompt="test", model=None)
+            await generate_plan(
+                project=Project(id="task-no-plan"), prompt="test", model=None
+            )
 
 
 class TestExtractTasks:

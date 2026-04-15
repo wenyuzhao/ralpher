@@ -20,7 +20,7 @@ async def prepare(project: Project, hooks: HooksManager) -> bool:
 
     # Extract tasks.json from PLAN.md if it doesn't exist
     if not project.tasks_json.exists():
-        rich.print(f"[bold blue]Extracting tasks.json from PLAN.md[/]\n")
+        rich.print("[bold blue]Extracting tasks.json from PLAN.md[/]\n")
         await hooks.on_extract_start()
         try:
             await extract_tasks(project)
