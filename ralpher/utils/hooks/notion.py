@@ -6,7 +6,7 @@ import rich
 from znotion import NotionClient
 from znotion.models import ChildPageBlock
 
-from ralpher.models import Project, ProjectPlan, Status
+from ralpher.models import Project, Status
 from ralpher.utils.hooks.hooks import Hooks
 
 
