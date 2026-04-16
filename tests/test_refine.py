@@ -28,7 +28,7 @@ class TestRefinePlan:
         with pytest.raises(SystemExit):
             await refine_plan(project=project, prompt="add auth", model=None)
 
-    @patch("ralpher.plan.refine.checkout_branch")
+    @patch("ralpher.plan.refine.checkout_existing_branch")
     @patch("ralpher.plan.refine.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_returns_task_id_on_success(
@@ -46,7 +46,7 @@ class TestRefinePlan:
         )
         assert result == task_id
 
-    @patch("ralpher.plan.refine.checkout_branch")
+    @patch("ralpher.plan.refine.checkout_existing_branch")
     @patch("ralpher.plan.refine.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_raises_when_plan_deleted_after_refine(
@@ -66,7 +66,7 @@ class TestRefinePlan:
         with pytest.raises(SystemExit):
             await refine_plan(project=project, prompt="break everything", model=None)
 
-    @patch("ralpher.plan.refine.checkout_branch")
+    @patch("ralpher.plan.refine.checkout_existing_branch")
     @patch("ralpher.plan.refine.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_command_uses_refine_skill(

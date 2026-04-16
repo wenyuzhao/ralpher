@@ -4,7 +4,7 @@ from ralpher.models import Project, ProjectConfig
 from ralpher.utils.error import fail
 from ralpher.utils.git import (
     branch_exists,
-    checkout_branch,
+    checkout_existing_branch,
     resolve_default_base_branch,
 )
 
@@ -58,7 +58,7 @@ def init_project(
 
     target_branch, base_branch = _resolve_branches(project, base_branch, target_branch)
 
-    checkout_branch(target_branch, base_branch)
+    checkout_existing_branch(base_branch)
 
     _init_project_config(project, base_branch, target_branch)
 

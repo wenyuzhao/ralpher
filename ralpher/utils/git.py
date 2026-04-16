@@ -60,8 +60,8 @@ def _init_repo() -> None:
     )
 
 
-def checkout_branch(target_branch: str, base_branch: str) -> None:
-    """Checkout the target branch, creating it from base_branch if provided."""
+def _ensure_repo() -> None:
+    """Ensure we're in a git repo with history and checkout is allowed."""
     if not _is_in_git_repo():
         _init_repo()
 
@@ -71,6 +71,25 @@ def checkout_branch(target_branch: str, base_branch: str) -> None:
         fail(
             "This repository does not allow automatic branch checkouts. Please remove the .no-checkout file and try again."
         )
+
+
+def checkout_existing_branch(branch: str) -> None:
+    """Checkout an existing branch."""
+    _ensure_repo()
+
+    if not branch_exists(branch):
+        fail(f"Branch '{branch}' does not exist.")
+
+    ret = subprocess.check_call(
+        ["git", "checkout", branch], stderr=DEVNULL, stdout=DEVNULL
+    )
+    if ret != 0:
+        fail(f"Failed to checkout branch '{branch}'.")
+
+
+def checkout_branch(target_branch: str, base_branch: str) -> None:
+    """Checkout the target branch, creating it from base_branch if provided."""
+    _ensure_repo()
 
     if not branch_exists(base_branch):
         fail(f"Base branch '{base_branch}' does not exist.")
