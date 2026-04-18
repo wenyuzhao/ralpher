@@ -78,8 +78,6 @@ class TestIterate:
     @patch("ralpher.loop.iterate.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_raises_on_claude_error(self, mock_run, tmp_path, monkeypatch):
-        from ralpher.utils.claude import ClaudeError
-
         monkeypatch.chdir(tmp_path)
         project = _make_project("iter-fail")
         project.project_dir.mkdir(parents=True)
@@ -89,7 +87,7 @@ class TestIterate:
         tasks_data = _make_tasks_data()
         project.tasks_json.write_text(json.dumps(tasks_data))
 
-        mock_run.side_effect = ClaudeError(1)
+        mock_run.side_effect = SystemExit("Claude process returned an error.")
 
         with pytest.raises(SystemExit):
             await iterate(project, HooksManager([]))

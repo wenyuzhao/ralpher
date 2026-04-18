@@ -1,6 +1,6 @@
 import rich
 from ..models import Project, Tasks
-from ..utils.claude import ClaudeError, run_claude
+from ..utils.claude import run_claude
 from ..utils.error import fail
 
 
@@ -20,7 +20,7 @@ async def __try_extract_tasks(project: Project):
         for t in tasks.tasks:
             t.passes = False
         project.save_tasks(tasks)
-    except ClaudeError:
+    except SystemExit:
         return False
 
     return True

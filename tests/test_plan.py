@@ -166,10 +166,8 @@ class TestGeneratePlan:
     async def test_raises_on_claude_error(
         self, mock_run, mock_init, tmp_path, monkeypatch
     ):
-        from ralpher.utils.claude import ClaudeError
-
         monkeypatch.chdir(tmp_path)
-        mock_run.side_effect = ClaudeError(1)
+        mock_run.side_effect = SystemExit("Claude process returned an error.")
         with pytest.raises(SystemExit):
             await generate_plan(
                 project=Project(id="task-fail"), prompt="test", model=None
@@ -266,14 +264,12 @@ class TestExtractTasks:
     @patch("ralpher.plan.extract.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_raises_on_all_retries_failed(self, mock_run, tmp_path, monkeypatch):
-        from ralpher.utils.claude import ClaudeError
-
         monkeypatch.chdir(tmp_path)
         project = Project(id="test-task")
         project.project_dir.mkdir(parents=True)
         project.plan_md.write_text("# My Plan")
 
-        mock_run.side_effect = ClaudeError(1)
+        mock_run.side_effect = SystemExit("Claude process returned an error.")
         with pytest.raises(SystemExit):
             await extract_tasks(project, retries=1)
 
@@ -282,14 +278,12 @@ class TestExtractTasks:
     async def test_raises_when_tasks_json_not_created(
         self, mock_run, tmp_path, monkeypatch
     ):
-        from ralpher.utils.claude import ClaudeError
-
         monkeypatch.chdir(tmp_path)
         project = Project(id="test-task")
         project.project_dir.mkdir(parents=True)
         project.plan_md.write_text("# My Plan")
 
-        mock_run.side_effect = ClaudeError(1)
+        mock_run.side_effect = SystemExit("Claude process returned an error.")
         with pytest.raises(SystemExit):
             await extract_tasks(project, retries=1)
 
@@ -311,8 +305,6 @@ class TestExtractTasks:
     @patch("ralpher.plan.extract.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_retries_on_invalid_tasks_json(self, mock_run, tmp_path, monkeypatch):
-        from ralpher.utils.claude import ClaudeError
-
         monkeypatch.chdir(tmp_path)
         project = Project(id="retry-task")
         project.project_dir.mkdir(parents=True)
@@ -324,7 +316,7 @@ class TestExtractTasks:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                raise ClaudeError(1)
+                raise SystemExit("Claude process returned an error.")
             return Tasks(tasks=[])
 
         mock_run.side_effect = side_effect
@@ -336,8 +328,6 @@ class TestExtractTasks:
     async def test_retries_on_claude_error_then_succeeds(
         self, mock_run, tmp_path, monkeypatch
     ):
-        from ralpher.utils.claude import ClaudeError
-
         monkeypatch.chdir(tmp_path)
         project = Project(id="retry-exit")
         project.project_dir.mkdir(parents=True)
@@ -349,7 +339,7 @@ class TestExtractTasks:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                raise ClaudeError(1)
+                raise SystemExit("Claude process returned an error.")
             return Tasks(tasks=[])
 
         mock_run.side_effect = side_effect

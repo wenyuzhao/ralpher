@@ -133,7 +133,9 @@ class Project(BaseModel):
         return Questions.model_validate(json.loads(self.questions_json.read_text()))
 
     def save_current_task(self, task: Task) -> None:
-        self.current_task_json.write_text(task.model_dump_json(indent=2, exclude={"passes"}))
+        self.current_task_json.write_text(
+            task.model_dump_json(indent=2, exclude={"passes"})
+        )
 
     def remove_current_task(self) -> None:
         if self.current_task_json.exists():

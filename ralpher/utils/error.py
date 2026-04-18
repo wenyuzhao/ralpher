@@ -5,4 +5,4 @@ import rich
 
 def fail(message: str) -> NoReturn:
     rich.print(f"[red][b]Error:[/] {message}[/]")
-    raise SystemExit(1)
+    raise SystemExit(message)

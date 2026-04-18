@@ -52,14 +52,6 @@ READONLY_TOOLS = [
 ]
 
 
-class ClaudeError(Exception):
-    """Raised when the claude SDK returns an error result."""
-
-    def __init__(self, returncode: int):
-        self.returncode = returncode
-        super().__init__(f"Claude process exited with code {returncode}")
-
-
 class Plan(BaseModel):
     markdown: str
 
@@ -113,7 +105,7 @@ async def _run_query(
         fail("No result received from Claude.")
 
     if result.is_error:
-        raise ClaudeError(1)
+        fail("Claude process returned an error.")
 
     return result
 
@@ -139,7 +131,9 @@ async def _ask_user_questions(questions: Questions) -> str:
             choice_options.append(
                 (
                     "__other__",
-                    HTML("Other - <style color='ansibrightblack'>[please specify]</style>"),  # type: ignore
+                    HTML(
+                        "Other - <style color='ansibrightblack'>[please specify]</style>"
+                    ),  # type: ignore
                 )
             )
             result = await ChoiceInput(

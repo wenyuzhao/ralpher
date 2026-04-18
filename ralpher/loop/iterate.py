@@ -2,8 +2,7 @@ import rich
 from pydantic import BaseModel, Field
 
 from ..models import Project
-from ..utils.claude import ClaudeError, run_claude
-from ..utils.error import fail
+from ..utils.claude import run_claude
 from ..utils.hooks import HooksManager
 
 
@@ -13,23 +12,15 @@ class Result(BaseModel):
     )
 
 
-async def implement_and_review(project: Project, hooks: HooksManager) -> Result:
+async def implement_and_review(project: Project) -> Result:
     assert project.current_iteration is not None
 
-    i = project.current_iteration
-
-    try:
-        result = await run_claude(
-            prompt=f"/ralpher:iterate {project.id}",
-            project=project,
-            model=project.model,
-            schema=Result,
-        )
-        return result
-    except ClaudeError as e:
-        await hooks.on_error(f"Iteration {i} failed with exit code {e.returncode}")
-        fail(f"Claude process exited with code {e.returncode}")
-        return Result(task_passed=False)
+    return await run_claude(
+        prompt=f"/ralpher:iterate {project.id}",
+        project=project,
+        model=project.model,
+        schema=Result,
+    )
 
 
 async def iterate(project: Project, hooks: HooksManager) -> None:
@@ -51,7 +42,7 @@ async def iterate(project: Project, hooks: HooksManager) -> None:
     project.save_current_task(task)
 
     # Implement the task using claude
-    result = await implement_and_review(project, hooks)
+    result = await implement_and_review(project)
 
     # Propagate changes to tasks.json if updated
     tasks = project.load_tasks()

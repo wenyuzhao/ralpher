@@ -15,7 +15,6 @@ from ..plan.extract import extract_tasks
 async def prepare(project: Project, hooks: HooksManager) -> bool:
     # Check if PLAN.md exists
     if not project.plan_md.exists():
-        await hooks.on_error("PLAN.md not found")
         fail(f"{project.plan_md} not found.")
 
     # Extract tasks.json from PLAN.md if it doesn't exist
@@ -25,10 +24,8 @@ async def prepare(project: Project, hooks: HooksManager) -> bool:
         try:
             await extract_tasks(project)
         except Exception as e:
-            await hooks.on_error(f"Failed to extract tasks.json: {str(e)}")
             fail(f"Failed to extract tasks.json: {str(e)}")
         if not project.tasks_json.exists():
-            await hooks.on_error("Failed to extract tasks.json")
             fail(f"{project.tasks_json} still not found after extraction.")
         await hooks.on_extract_end()
 
