@@ -157,10 +157,6 @@ async def _ask_user_questions(questions: Questions) -> str:
             answers.append(f"{q.question}: {answer}")
 
         print()
-        rich.print("[bold blue]Your answers:[/]")
-        for line in answers:
-            rich.print(f"  • {line}")
-        print()
 
         confirmed = await ChoiceInput(
             message=HTML("<b>Submit these answers?</b>"),
