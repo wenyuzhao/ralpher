@@ -153,7 +153,9 @@ async def _ask_user_questions(questions: Questions) -> str:
         print()
 
         confirmed = await ChoiceInput(
-            message=HTML("<b>Submit these answers?</b>"),
+            message=HTML(
+                "<style color='ansiblue'><b>Submit these answers?</b></style>"
+            ),
             options=[
                 ("yes", "Yes - submit these answers"),
                 ("no", "No - answer the questions again"),

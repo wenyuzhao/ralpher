@@ -27,7 +27,7 @@ Create a detailed Project Plan that is clear, actionable, and suitable for imple
 
 ## User Provided Feature Description
 
-@.ralpher/projects/$0/PROMPT.md
+@.claude/ralpher/projects/$0/PROMPT.md
 
 ---
 

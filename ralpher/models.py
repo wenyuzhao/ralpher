@@ -81,7 +81,7 @@ class Project(BaseModel):
 
     @property
     def project_dir(self) -> Path:
-        return Path.cwd() / ".ralpher" / "projects" / self.id
+        return Path.cwd() / ".claude/ralpher" / "projects" / self.id
 
     @property
     def config_json(self) -> Path:

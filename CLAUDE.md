@@ -38,7 +38,7 @@ uvx ruff format .         # format
 Typer app with a `DefaultCommandGroup` that routes unknown first args to a `run` default command. Subcommands: `plan`, `refine`, `extract` (hidden), `loop`. Entry point `ralpher` → `ralpher.main:main`. All handlers are sync Typer callbacks that bridge to async via `asyncio.run()`.
 
 ### Project state — [ralpher/models.py](ralpher/models.py)
-The `Project` Pydantic model is the central handle for a run. It owns all filesystem paths under `.ralpher/projects/{project_id}/` via properties (`plan_md`, `tasks_json`, `progress_md`, `prompt_md`, `questions_json`, `current_task_json`, `config_json`) and load/save helpers for `Tasks`, `Questions`, `ProjectConfig`, and `current_task`. `Task` has `id`, `title`, `description`, `acceptance_criteria`, and a `passes` boolean — the loop picks the first failing task each iteration. `ProjectConfig` stores `base_branch` and `target_branch` for the run.
+The `Project` Pydantic model is the central handle for a run. It owns all filesystem paths under `.claude/ralpher/projects/{project_id}/` via properties (`plan_md`, `tasks_json`, `progress_md`, `prompt_md`, `questions_json`, `current_task_json`, `config_json`) and load/save helpers for `Tasks`, `Questions`, `ProjectConfig`, and `current_task`. `Task` has `id`, `title`, `description`, `acceptance_criteria`, and a `passes` boolean — the loop picks the first failing task each iteration. `ProjectConfig` stores `base_branch` and `target_branch` for the run.
 
 ### Plan flow — [ralpher/plan/](ralpher/plan/)
 - [plan.py](ralpher/plan/plan.py) initializes the project directory + git branches, then invokes `claude` with `/ralpher:plan` via `run_claude_plan_mode` (Q&A loop — Claude can return either a finished plan or clarification questions, which are prompted to the user interactively).
@@ -58,7 +58,7 @@ The `Project` Pydantic model is the central handle for a run. It owns all filesy
 - `--dangerously-skip-permissions` unless `readonly=True` (in which case `READONLY_TOOLS` is used)
 - `--resume <session_id>` for Q&A continuation in plan mode
 
-All subprocess output is tee'd to `.ralpher/projects/{project_id}/logs/claude-{timestamp}.log`, and `session_id` is recovered by scanning that log.
+All subprocess output is tee'd to `.claude/ralpher/projects/{project_id}/logs/claude-{timestamp}.log`, and `session_id` is recovered by scanning that log.
 
 ### Plugin — [ralpher/plugin/](ralpher/plugin/)
 `skills/{plan,iterate,refine,extract-tasks}/SKILL.md` — Claude skill definitions loaded via `--plugin-dir`. These are the actual prompts that drive Claude; most behavior lives in markdown, not Python. Adapted from [snarktank/ralph](https://github.com/snarktank/ralph).
@@ -72,7 +72,7 @@ Each project runs on `ralph/{project_id}`, forked from a resolved base branch (`
 ## Key Patterns
 
 - **Structured output over text parsing.** Anywhere Claude needs to return data, pass a Pydantic model as `schema=` to `run_claude` — the framework serializes `model_json_schema()` into `--json-schema` and validates the returned `structured_output`. Avoid regex/markdown parsing of stdout.
-- **Project is the bag of paths.** Don't hardcode paths under `.ralpher/projects/...`; go through `Project` properties so layout changes stay local to [models.py](ralpher/models.py).
+- **Project is the bag of paths.** Don't hardcode paths under `.claude/ralpher/projects/...`; go through `Project` properties so layout changes stay local to [models.py](ralpher/models.py).
 - **Tests mock subprocess + filesystem.** No real `claude` invocations in [tests/](tests/). When adding loop/plan behavior, patch `run_claude` / `run_claude_plan_mode` and assert on the prompt + schema arguments.
 - **Async all the way down.** Every Claude-touching function is `async`; CLI handlers use `asyncio.run()` as the single bridge. Don't introduce blocking `subprocess.run` for Claude — only the thin git helpers are sync.
 - **Rich + yaspin for UX.** Progress is shown via `rich.print` and `Spinner` (wraps the subprocess with humorous status messages). Raw Claude stdout/stderr goes to the log file, not the terminal.

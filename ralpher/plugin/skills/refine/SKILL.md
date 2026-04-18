@@ -27,7 +27,7 @@ Refine the Project Plan based on user's input.
 
 ## The Original Project Plan
 
-@.ralpher/projects/$0/PLAN.md
+@.claude/ralpher/projects/$0/PLAN.md
 
 ---
 

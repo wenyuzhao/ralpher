@@ -93,19 +93,19 @@ def plan(
         )
     )
     rich.print(
-        f"[green]✔ Project plan generated at .ralpher/projects/{project.id}/PLAN.md[/]"
+        f"[green]✔ Project plan generated at .claude/ralpher/projects/{project.id}/PLAN.md[/]"
     )
 
 
 def _get_latest_project_id() -> str:
-    projects_dir = Path.cwd() / ".ralpher" / "projects"
+    projects_dir = Path.cwd() / ".claude/ralpher" / "projects"
     if not projects_dir.exists():
-        fail("No projects found in .ralpher/projects.")
+        fail("No projects found in .claude/ralpher/projects.")
     project_dirs = sorted(
         [f.name for f in projects_dir.iterdir() if f.is_dir()], reverse=True
     )
     if not project_dirs:
-        fail("No projects found in .ralpher/projects.")
+        fail("No projects found in .claude/ralpher/projects.")
     return project_dirs[0]
 
 
@@ -135,7 +135,7 @@ def refine(
     project = Project(id=project_id, model=model)
     asyncio.run(refine_plan(project=project, prompt=prompt, model=model))
     rich.print(
-        f"[green]✔ Project Plan refined at .ralpher/projects/{project_id}/PLAN.md[/]"
+        f"[green]✔ Project Plan refined at .claude/ralpher/projects/{project_id}/PLAN.md[/]"
     )
 
 
@@ -155,7 +155,9 @@ def extract(
     rich.print(f"[bold blue]Extracting tasks.json for project: [i]{project_id}[/][/]\n")
     project = Project(id=project_id)
     asyncio.run(extract_tasks(project=project))
-    rich.print(f"[green]✔ Extracted to .ralpher/projects/{project_id}/tasks.json[/]")
+    rich.print(
+        f"[green]✔ Extracted to .claude/ralpher/projects/{project_id}/tasks.json[/]"
+    )
 
 
 @app.command()

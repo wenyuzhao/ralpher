@@ -18,7 +18,7 @@ Take a Project Plan (markdown file or text) and convert it a list of tasks in th
 
 ## The Project Plan Input
 
-@.ralpher/projects/$0/PLAN.md
+@.claude/ralpher/projects/$0/PLAN.md
 
 ---
 
