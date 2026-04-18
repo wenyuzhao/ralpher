@@ -77,8 +77,10 @@ def _build_options(
         model=model,
         resume=session_id,
         output_format={"type": "json_schema", "schema": schema} if schema else None,
-        allowed_tools=tools or [],
-        tools=tools or [],
+        allowed_tools=tools if tools is not None else [],
+        tools=(
+            tools if tools is not None else {"type": "preset", "preset": "claude_code"}
+        ),
     )
     return options
 

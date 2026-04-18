@@ -113,3 +113,4 @@ The current task is completed and all acceptance criteria are met.
 - Commit frequently
 - Keep CI green
 - Read the Codebase Patterns section in the progress report before starting
+- Don't call StructuredOutput unless you are finished
