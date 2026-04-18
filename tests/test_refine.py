@@ -29,7 +29,7 @@ class TestRefinePlan:
             await refine_plan(project=project, prompt="add auth", model=None)
 
     @patch("ralpher.plan.refine.checkout_existing_branch")
-    @patch("ralpher.plan.refine.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.plan.refine.run_claude_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_returns_task_id_on_success(
         self, mock_run, mock_checkout, tmp_path, monkeypatch
@@ -47,7 +47,7 @@ class TestRefinePlan:
         assert result == task_id
 
     @patch("ralpher.plan.refine.checkout_existing_branch")
-    @patch("ralpher.plan.refine.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.plan.refine.run_claude_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_raises_when_plan_deleted_after_refine(
         self, mock_run, mock_checkout, tmp_path, monkeypatch
@@ -67,7 +67,7 @@ class TestRefinePlan:
             await refine_plan(project=project, prompt="break everything", model=None)
 
     @patch("ralpher.plan.refine.checkout_existing_branch")
-    @patch("ralpher.plan.refine.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.plan.refine.run_claude_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_command_uses_refine_skill(
         self, mock_run, mock_checkout, tmp_path, monkeypatch
@@ -83,4 +83,4 @@ class TestRefinePlan:
         call_kwargs = mock_run.call_args[1]
         assert "/ralpher:refine-plan" in call_kwargs["prompt"]
         assert task_id in call_kwargs["prompt"]
-        assert call_kwargs["interactive"] is True
+        assert call_kwargs["project"] is project

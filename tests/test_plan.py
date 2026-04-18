@@ -1,10 +1,9 @@
-import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from ralpher.utils.claude import _ask_user_questions
-from ralpher.models import Questions, Question, QuestionOption, Project
+from ralpher.models import Questions, Question, QuestionOption, Project, Tasks
 from ralpher.plan.plan import generate_plan
 from ralpher.plan.extract import extract_tasks
 
@@ -22,58 +21,6 @@ def _make_questions(raw: list[dict]) -> Questions:
             )
         )
     return Questions(questions=questions)
-
-
-class TestQuestionsLoad:
-    def test_returns_none_when_file_missing(self, tmp_path):
-        assert Questions.load(tmp_path) is None
-
-    def test_loads_valid_questions(self, tmp_path):
-        data = {
-            "questions": [
-                {
-                    "header": "Goal",
-                    "question": "What is the goal?",
-                    "options": [
-                        {"label": "A", "description": "Option A"},
-                        {"label": "B", "description": "Option B"},
-                    ],
-                }
-            ]
-        }
-        (tmp_path / "questions.json").write_text(json.dumps(data))
-        result = Questions.load(tmp_path)
-        assert result is not None
-        assert len(result.questions) == 1
-        assert result.questions[0].header == "Goal"
-
-    def test_loads_multiple_questions(self, tmp_path):
-        data = {
-            "questions": [
-                {
-                    "header": "Q1",
-                    "question": "First",
-                    "options": [{"label": "A", "description": "a"}],
-                },
-                {
-                    "header": "Q2",
-                    "question": "Second",
-                    "options": [{"label": "B", "description": "b"}],
-                },
-            ]
-        }
-        (tmp_path / "questions.json").write_text(json.dumps(data))
-        result = Questions.load(tmp_path)
-        assert result is not None
-        assert len(result.questions) == 2
-
-    def test_clear_removes_file(self, tmp_path):
-        (tmp_path / "questions.json").write_text("{}")
-        Questions.clear(tmp_path)
-        assert not (tmp_path / "questions.json").exists()
-
-    def test_clear_noop_when_missing(self, tmp_path):
-        Questions.clear(tmp_path)  # should not raise
 
 
 class TestAskUserQuestions:
@@ -182,7 +129,7 @@ class TestAskUserQuestions:
 
 class TestGeneratePlan:
     @patch("ralpher.plan.plan.init_project")
-    @patch("ralpher.plan.plan.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.plan.plan.run_claude_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_returns_task_id_on_success(
         self, mock_run, mock_init, tmp_path, monkeypatch
@@ -202,7 +149,7 @@ class TestGeneratePlan:
         assert result == task_id
 
     @patch("ralpher.plan.plan.init_project")
-    @patch("ralpher.plan.plan.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.plan.plan.run_claude_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_raises_on_claude_error(
         self, mock_run, mock_init, tmp_path, monkeypatch
@@ -217,7 +164,7 @@ class TestGeneratePlan:
             )
 
     @patch("ralpher.plan.plan.init_project")
-    @patch("ralpher.plan.plan.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.plan.plan.run_claude_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_creates_task_directory_and_prompt(
         self, mock_run, mock_init, tmp_path, monkeypatch
@@ -241,7 +188,7 @@ class TestGeneratePlan:
         assert project.prompt_md.read_text() == "My feature request"
 
     @patch("ralpher.plan.plan.init_project")
-    @patch("ralpher.plan.plan.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.plan.plan.run_claude_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_calls_run_claude_with_correct_args(
         self, mock_run, mock_init, tmp_path, monkeypatch
@@ -259,10 +206,10 @@ class TestGeneratePlan:
         call_kwargs = mock_run.call_args[1]
         assert task_id in call_kwargs["prompt"]
         assert "/ralpher:plan" in call_kwargs["prompt"]
-        assert call_kwargs["interactive"] is True
+        assert call_kwargs["project"] is project
 
     @patch("ralpher.plan.plan.init_project")
-    @patch("ralpher.plan.plan.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.plan.plan.run_claude_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_raises_when_plan_not_created(
         self, mock_run, mock_init, tmp_path, monkeypatch
@@ -298,19 +245,11 @@ class TestExtractTasks:
         project.project_dir.mkdir(parents=True)
         project.plan_md.write_text("# My Plan")
 
-        valid_tasks = json.dumps(
-            {
-                "tasks": [],
-            }
-        )
-
-        async def side_effect(**kwargs):
-            project.tasks_json.write_text(valid_tasks)
-
-        mock_run.side_effect = side_effect
+        mock_run.return_value = Tasks(tasks=[])
         await extract_tasks(project)
         call_kwargs = mock_run.call_args[1]
         assert call_kwargs["model"] == "haiku"
+        assert project.tasks_json.exists()
 
     @patch("ralpher.plan.extract.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
@@ -331,12 +270,14 @@ class TestExtractTasks:
     async def test_raises_when_tasks_json_not_created(
         self, mock_run, tmp_path, monkeypatch
     ):
+        from ralpher.utils.claude import ClaudeError
+
         monkeypatch.chdir(tmp_path)
         project = Project(id="test-task")
         project.project_dir.mkdir(parents=True)
         project.plan_md.write_text("# My Plan")
 
-        mock_run.return_value = None
+        mock_run.side_effect = ClaudeError(1)
         with pytest.raises(SystemExit):
             await extract_tasks(project, retries=1)
 
@@ -349,16 +290,7 @@ class TestExtractTasks:
         project.project_dir.mkdir(parents=True)
         project.plan_md.write_text("# Plan")
 
-        valid_tasks = json.dumps(
-            {
-                "tasks": [],
-            }
-        )
-
-        async def side_effect(**kwargs):
-            project.tasks_json.write_text(valid_tasks)
-
-        mock_run.side_effect = side_effect
+        mock_run.return_value = Tasks(tasks=[])
         await extract_tasks(project)
 
         call_kwargs = mock_run.call_args[1]
@@ -367,16 +299,12 @@ class TestExtractTasks:
     @patch("ralpher.plan.extract.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_retries_on_invalid_tasks_json(self, mock_run, tmp_path, monkeypatch):
+        from ralpher.utils.claude import ClaudeError
+
         monkeypatch.chdir(tmp_path)
         project = Project(id="retry-task")
         project.project_dir.mkdir(parents=True)
         project.plan_md.write_text("# Plan")
-
-        valid_tasks = json.dumps(
-            {
-                "tasks": [],
-            }
-        )
 
         call_count = 0
 
@@ -384,9 +312,8 @@ class TestExtractTasks:
             nonlocal call_count
             call_count += 1
             if call_count == 1:
-                project.tasks_json.write_text('{"invalid": true}')
-            else:
-                project.tasks_json.write_text(valid_tasks)
+                raise ClaudeError(1)
+            return Tasks(tasks=[])
 
         mock_run.side_effect = side_effect
         await extract_tasks(project, retries=3)
@@ -404,12 +331,6 @@ class TestExtractTasks:
         project.project_dir.mkdir(parents=True)
         project.plan_md.write_text("# Plan")
 
-        valid_tasks = json.dumps(
-            {
-                "tasks": [],
-            }
-        )
-
         call_count = 0
 
         async def side_effect(**kwargs):
@@ -417,8 +338,7 @@ class TestExtractTasks:
             call_count += 1
             if call_count == 1:
                 raise ClaudeError(1)
-            else:
-                project.tasks_json.write_text(valid_tasks)
+            return Tasks(tasks=[])
 
         mock_run.side_effect = side_effect
         await extract_tasks(project, retries=3)

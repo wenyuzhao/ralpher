@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from ralpher.loop.prepare import _init_progress
-from ralpher.loop.iterate import iterate
+from ralpher.loop.iterate import Result, iterate
 from ralpher.loop.loop import run_ralph_loop
 from ralpher.models import ProjectConfig, Tasks, Project
 from ralpher.utils.hooks import HooksManager
@@ -69,12 +69,7 @@ class TestIterate:
         tasks_data = _make_tasks_data()
         project.tasks_json.write_text(json.dumps(tasks_data))
 
-        async def side_effect(**kwargs):
-            project.current_task_json.write_text(
-                json.dumps({**_TASK_TEMPLATE, "passes": True})
-            )
-
-        mock_run.side_effect = side_effect
+        mock_run.return_value = Result(task_passed=True)
         await iterate(project, HooksManager([]))
 
         updated = Tasks.model_validate(json.loads(project.tasks_json.read_text()))
@@ -117,10 +112,7 @@ class TestIterate:
             nonlocal written_task
             # Read what iterate() wrote before claude runs
             written_task = json.loads(project.current_task_json.read_text())
-            # Simulate claude leaving the task file as-is
-            project.current_task_json.write_text(
-                json.dumps({**_TASK_TEMPLATE, "passes": False})
-            )
+            return Result(task_passed=False)
 
         mock_run.side_effect = side_effect
         await iterate(project, HooksManager([]))
@@ -140,17 +132,12 @@ class TestIterate:
         tasks_data = _make_tasks_data()
         project.tasks_json.write_text(json.dumps(tasks_data))
 
-        async def side_effect(**kwargs):
-            project.current_task_json.write_text(
-                json.dumps({**_TASK_TEMPLATE, "passes": False})
-            )
-
-        mock_run.side_effect = side_effect
+        mock_run.return_value = Result(task_passed=False)
         await iterate(project, HooksManager([]))
 
         call_kwargs = mock_run.call_args[1]
         assert f"/ralpher:iterate {task_id}" in call_kwargs["prompt"]
-        assert call_kwargs["project_dir"] == project.project_dir
+        assert call_kwargs["project"] is project
 
 
 class TestLoop:
@@ -181,12 +168,7 @@ class TestLoop:
         project.plan_md.write_text("# Plan")
         project.tasks_json.write_text(json.dumps(tasks_data))
 
-        async def side_effect(**kwargs):
-            project.current_task_json.write_text(
-                json.dumps({**_TASK_TEMPLATE, "passes": True})
-            )
-
-        mock_run.side_effect = side_effect
+        mock_run.return_value = Result(task_passed=True)
         await run_ralph_loop(project=project, hooks=HooksManager([]))
         assert mock_run.call_count == 1
 
@@ -206,12 +188,7 @@ class TestLoop:
         project.plan_md.write_text("# Plan")
         project.tasks_json.write_text(json.dumps(tasks_data))
 
-        async def side_effect(**kwargs):
-            project.current_task_json.write_text(
-                json.dumps({**_TASK_TEMPLATE, "passes": False})
-            )
-
-        mock_run.side_effect = side_effect
+        mock_run.return_value = Result(task_passed=False)
         import sys
 
         _loop_mod = sys.modules["ralpher.loop.loop"]
