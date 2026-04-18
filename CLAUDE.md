@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Ralpher is a Python CLI tool that orchestrates Claude AI for autonomous software development. It generates Project Plans from templates and runs iterative Claude development loops. The CLI delegates AI work to the `claude` subprocess.
+Ralpher is a Python CLI tool that orchestrates the `claude` CLI for autonomous software development. It generates a Project Plan from a user prompt, extracts it into structured tasks, then runs an iterative Ralph-loop where Claude implements one task at a time on a dedicated git branch. All AI work is delegated to the `claude` subprocess — there's no direct API integration.
 
 ## Build & Run
 
@@ -22,45 +22,57 @@ uv run pytest tests/ -v
 uv run pytest tests/test_plan.py::TestGeneratePlan::test_returns_task_id_on_success -v
 ```
 
-Requires Python 3.14+ and the `claude` CLI on PATH.
+Requires Python 3.14+ and the `claude` CLI on PATH (checked at startup by `_require_claude`).
 
 ## Linting & Formatting
 
-This project uses **ruff** for linting and formatting.
-
 ```bash
-# Lint
-uvx ruff check .
-
-# Lint and auto-fix
-uvx ruff check --fix .
-
-# Format
-uvx ruff format .
+uvx ruff check .          # lint
+uvx ruff check --fix .    # lint + autofix
+uvx ruff format .         # format
 ```
 
 ## Architecture
 
-- **CLI layer** (`ralpher/main.py`): Typer app with a `DefaultCommandGroup` that falls back to `run` when the first arg isn't a known command. Subcommands: `plan`, `refine`, `extract` (hidden), and `loop`. The default command accepts a prompt and runs the full pipeline: generate plan → extract JSON → run loop. Entry point registered as `ralpher` in pyproject.toml.
-- **Plan generation** (`ralpher/plan/plan.py`): Generates a Project Plan from a user prompt via the `claude` CLI subprocess. Stores output in `.ralpher/projects/{project_id}/PLAN.md`.
-- **Plan refinement** (`ralpher/plan/refine.py`): Refines an existing Project Plan via the `claude` CLI subprocess.
-- **Plan extraction** (`ralpher/plan/extract.py`): Extracts structured JSON from a generated Project Plan into a `ProjectPlan` Pydantic model. Retries up to 3 attempts.
-- **Models** (`ralpher/models.py`): Pydantic models — `Project` (id, model, max_iterations, and project directory/file accessors), `ProjectPlan` (project, description, tasks), `Task` (id, title, description, acceptance_criteria, priority, passes, notes), `Status`, and `Question`/`Questions`.
-- **Loop execution** (`ralpher/loop/`): Runs `claude` iteratively up to an optional max iteration count (unlimited by default). Tracks state per project under `.ralpher/projects/`. Manages git branches (`ralph/{project_id_suffix}`).
-- **Utils**:
-  - `utils/claude.py`: `run_claude()` — subprocess wrapper with Q&A loop and session resumption.
-  - `utils/project.py`: `init_project()` — initializes project directory structure and PROMPT.md.
-  - `utils/spinner.py`: Animated spinner with humorous messages during claude execution.
-  - `utils/error.py`: `fail()` utility for error messages.
-- **Hooks** (`ralpher/utils/hooks/`): Lifecycle callback system (`HooksManager`) for project events. Includes `NotionHooks` for syncing task status/progress to Notion via API (configured through `RALPHER_NOTION_TOKEN` and `RALPHER_NOTION_PARENT_PAGE_ID` env vars in `.env`).
-- **Skill installer** (`ralpher/init.py`): Downloads plan and Ralph skill files from GitHub (`snarktank/ralph`) into `.claude/skills/` of the target project.
-- **Plugin commands** (`ralpher/plugin/commands/`): Markdown skill files (`plan.md`, `iterate.md`, `refine-plan.md`, `extract-plan.md`) used as Claude skill definitions. Loaded via `--plugin-dir` flag.
+### CLI layer — [ralpher/main.py](ralpher/main.py)
+Typer app with a `DefaultCommandGroup` that routes unknown first args to a `run` default command. Subcommands: `plan`, `refine`, `extract` (hidden), `loop`. Entry point `ralpher` → `ralpher.main:main`. All handlers are sync Typer callbacks that bridge to async via `asyncio.run()`.
+
+### Project state — [ralpher/models.py](ralpher/models.py)
+The `Project` Pydantic model is the central handle for a run. It owns all filesystem paths under `.ralpher/projects/{project_id}/` via properties (`plan_md`, `tasks_json`, `progress_md`, `prompt_md`, `questions_json`, `current_task_json`, `config_json`) and load/save helpers for `Tasks`, `Questions`, `ProjectConfig`, and `current_task`. `Task` has `id`, `title`, `description`, `acceptance_criteria`, and a `passes` boolean — the loop picks the first failing task each iteration. `ProjectConfig` stores `base_branch` and `target_branch` for the run.
+
+### Plan flow — [ralpher/plan/](ralpher/plan/)
+- [plan.py](ralpher/plan/plan.py) initializes the project directory + git branches, then invokes `claude` with `/ralpher:plan` via `run_claude_plan_mode` (Q&A loop — Claude can return either a finished plan or clarification questions, which are prompted to the user interactively).
+- [refine.py](ralpher/plan/refine.py) runs `/ralpher:refine` against an existing plan.
+- [extract.py](ralpher/plan/extract.py) parses `PLAN.md` into structured `Tasks` JSON via Claude with a JSON schema; retries up to 3 attempts.
+
+### Loop execution — [ralpher/loop/](ralpher/loop/)
+- [loop.py](ralpher/loop/loop.py) `run_ralph_loop` is the main driver: calls `prepare`, then iterates until `max_iterations` (default 30) or all tasks pass. Each iteration picks the first failing task, invokes `iterate`, and reloads `tasks.json` to check progress.
+- [iterate.py](ralpher/loop/iterate.py) writes `current_task.json`, calls Claude with `/ralpher:iterate` and a `Result { task_passed }` schema, then updates `tasks.json`.
+- [prepare.py](ralpher/loop/prepare.py) handles first-run setup (extracting tasks, initializing progress).
+
+### Claude subprocess — [ralpher/utils/claude.py](ralpher/utils/claude.py)
+`run_claude` and `run_claude_plan_mode` are the only ways to invoke `claude`. Key flags passed:
+- `--permission-mode dontAsk`, `--output-format stream-json`, `--verbose`
+- `--plugin-dir <ralpher/plugin>` so the `/ralpher:*` slash commands resolve
+- `--json-schema <pydantic schema>` for structured output (Claude writes a `result` JSONL record with a `structured_output` field, which `_load_structured_output` parses from the log)
+- `--dangerously-skip-permissions` unless `readonly=True` (in which case `READONLY_TOOLS` is used)
+- `--resume <session_id>` for Q&A continuation in plan mode
+
+All subprocess output is tee'd to `.ralpher/projects/{project_id}/logs/claude-{timestamp}.log`, and `session_id` is recovered by scanning that log.
+
+### Plugin — [ralpher/plugin/](ralpher/plugin/)
+`skills/{plan,iterate,refine,extract-tasks}/SKILL.md` — Claude skill definitions loaded via `--plugin-dir`. These are the actual prompts that drive Claude; most behavior lives in markdown, not Python. Adapted from [snarktank/ralph](https://github.com/snarktank/ralph).
+
+### Git branch management — [ralpher/utils/git.py](ralpher/utils/git.py)
+Each project runs on `ralph/{project_id}`, forked from a resolved base branch (`--base-branch`, else `main`, else `master`). `checkout_branch` auto-inits the repo with an empty commit if none exists. A `.no-branch` sentinel file in the repo root disables automatic branch creation (useful for repos that should stay on a single branch).
+
+### Hooks — [ralpher/utils/hooks/](ralpher/utils/hooks/)
+`HooksManager` dispatches lifecycle callbacks (`on_loop_start`, `on_iteration_start/end`, `on_error`, `on_loop_end`) to registered hooks. `NotionHooks` syncs task status/progress to a Notion page — configured via `RALPHER_NOTION_TOKEN` and `RALPHER_NOTION_PARENT_PAGE_ID` in `.env` (loaded by `load_dotenv` in the `loop` command).
 
 ## Key Patterns
 
-- The `loop` command invokes `claude` with `--dangerously-skip-permissions --print` flags.
-- Rich library and yaspin are used for terminal output formatting (panels, rules, styled text, spinners).
-- Async subprocess calls throughout — CLI commands use `asyncio.run()` to bridge sync Typer handlers.
-- Project directory structure: `.ralpher/projects/{project_id}/` contains PLAN.md, tasks.json, PROMPT.md, progress.md, current_task.json, and logs/.
-- The `Project` model centralizes all file path properties (`project_dir`, `plan_md`, `plan_json`, `progress_md`, `prompt_md`, `questions_json`, `current_task_json`) and load/save methods.
-- Tests mock subprocess calls and file I/O; no real `claude` invocations in tests.
+- **Structured output over text parsing.** Anywhere Claude needs to return data, pass a Pydantic model as `schema=` to `run_claude` — the framework serializes `model_json_schema()` into `--json-schema` and validates the returned `structured_output`. Avoid regex/markdown parsing of stdout.
+- **Project is the bag of paths.** Don't hardcode paths under `.ralpher/projects/...`; go through `Project` properties so layout changes stay local to [models.py](ralpher/models.py).
+- **Tests mock subprocess + filesystem.** No real `claude` invocations in [tests/](tests/). When adding loop/plan behavior, patch `run_claude` / `run_claude_plan_mode` and assert on the prompt + schema arguments.
+- **Async all the way down.** Every Claude-touching function is `async`; CLI handlers use `asyncio.run()` as the single bridge. Don't introduce blocking `subprocess.run` for Claude — only the thin git helpers are sync.
+- **Rich + yaspin for UX.** Progress is shown via `rich.print` and `Spinner` (wraps the subprocess with humorous status messages). Raw Claude stdout/stderr goes to the log file, not the terminal.
