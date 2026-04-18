@@ -34,7 +34,7 @@ async def refine_plan(*, project: Project, prompt: str, model: str | None) -> st
 
         try:
             await run_claude_plan_mode(
-                prompt=f"/ralpher:refine-plan {project.id} {tmp_path}",
+                prompt=f"/ralpher:refine {project.id} {tmp_path}",
                 project=project,
                 model=model,
             )
