@@ -80,8 +80,12 @@ class Project(BaseModel):
     current_task_id: Optional[str] = None
 
     @property
+    def ralpher_dir(self) -> Path:
+        return Path.cwd() / ".claude/ralpher"
+
+    @property
     def project_dir(self) -> Path:
-        return Path.cwd() / ".claude/ralpher" / "projects" / self.id
+        return self.ralpher_dir / "projects" / self.id
 
     @property
     def config_json(self) -> Path:
