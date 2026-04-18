@@ -67,16 +67,9 @@ def _ensure_repo() -> None:
 
     _check_empty_git_history()
 
-    if (Path.cwd() / ".no-checkout").exists():
-        fail(
-            "This repository does not allow automatic branch checkouts. Please remove the .no-checkout file and try again."
-        )
-
 
 def checkout_existing_branch(branch: str) -> None:
     """Checkout an existing branch."""
-    _ensure_repo()
-
     if not branch_exists(branch):
         fail(f"Branch '{branch}' does not exist.")
 
@@ -100,6 +93,10 @@ def checkout_branch(target_branch: str, base_branch: str) -> None:
             ["git", "checkout", target_branch], stderr=DEVNULL, stdout=DEVNULL
         )
     else:
+        if (Path.cwd() / ".no-branch").exists():
+            fail(
+                "This repository does not allow automatic branch creation. Please remove the .no-branch file and try again."
+            )
         # Create new branch from base
         ret = subprocess.check_call(
             ["git", "checkout", "-b", target_branch, base_branch],

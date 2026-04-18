@@ -6,7 +6,7 @@ from rich.console import Console
 from ralpher.models import Project
 from ralpher.utils.git import checkout_existing_branch
 
-from ..utils.claude import ClaudeError, run_claude
+from ..utils.claude import ClaudeError, run_claude_plan_mode
 from ..utils.error import fail
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
@@ -33,10 +33,9 @@ async def refine_plan(*, project: Project, prompt: str, model: str | None) -> st
         tmp_path.write_text(prompt)
 
         try:
-            await run_claude(
+            await run_claude_plan_mode(
                 prompt=f"/ralpher:refine-plan {project.id} {tmp_path}",
-                project_dir=project.project_dir,
-                interactive=True,
+                project=project,
                 model=model,
             )
         except ClaudeError as e:

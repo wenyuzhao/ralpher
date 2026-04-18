@@ -1,4 +1,5 @@
 import rich
+from pydantic import BaseModel, Field
 
 from ..models import Project
 from ..utils.claude import ClaudeError, run_claude
@@ -6,20 +7,29 @@ from ..utils.error import fail
 from ..utils.hooks import HooksManager
 
 
-async def implement_and_review(project: Project, hooks: HooksManager):
+class Result(BaseModel):
+    task_passed: bool = Field(
+        description="Whether the task is fully implemented and passes all checks."
+    )
+
+
+async def implement_and_review(project: Project, hooks: HooksManager) -> Result:
     assert project.current_iteration is not None
 
     i = project.current_iteration
 
     try:
-        await run_claude(
+        result = await run_claude(
             prompt=f"/ralpher:iterate {project.id}",
-            project_dir=project.project_dir,
+            project=project,
             model=project.model,
+            schema=Result,
         )
+        return result
     except ClaudeError as e:
         await hooks.on_error(f"Iteration {i} failed with exit code {e.returncode}")
         fail(f"Claude process exited with code {e.returncode}")
+        return Result(task_passed=False)
 
 
 async def iterate(project: Project, hooks: HooksManager) -> None:
@@ -41,24 +51,22 @@ async def iterate(project: Project, hooks: HooksManager) -> None:
     project.save_current_task(task)
 
     # Implement the task using claude
-    await implement_and_review(project, hooks)
+    result = await implement_and_review(project, hooks)
 
     # Propagate changes to tasks.json if updated
-    modified_task = project.load_current_task()
-    assert modified_task is not None
     tasks = project.load_tasks()
     assert tasks is not None
-    if modified_task.passes:
+    if result.task_passed:
         # Update the corresponding task in tasks.json
         for t in tasks.tasks:
-            if t.id == modified_task.id:
+            if t.id == task.id:
                 t.passes = True
                 break
         project.save_tasks(tasks)
 
     # Finish iteration
     project.remove_current_task()
-    if modified_task.passes:
+    if result.task_passed:
         rich.print("  [green]✔ PASSED[/green]\n")
     else:
         rich.print("  [red]✘ FAILED[/red]\n")

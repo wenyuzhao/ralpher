@@ -148,14 +148,14 @@ def extract(
         ),
     ] = None,
 ) -> None:
-    """Extract plan.json for a given project ID."""
+    """Extract tasks.json for a given project ID."""
     _require_claude()
     if not project_id:
         project_id = _get_latest_project_id()
-    rich.print(f"[bold blue]Extracting plan.json for project: [i]{project_id}[/][/]\n")
+    rich.print(f"[bold blue]Extracting tasks.json for project: [i]{project_id}[/][/]\n")
     project = Project(id=project_id)
     asyncio.run(extract_tasks(project=project))
-    rich.print(f"[green]✔ Extracted to .ralpher/projects/{project_id}/plan.json[/]")
+    rich.print(f"[green]✔ Extracted to .ralpher/projects/{project_id}/tasks.json[/]")
 
 
 @app.command()

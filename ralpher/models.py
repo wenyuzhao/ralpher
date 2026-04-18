@@ -66,25 +66,6 @@ class Question(BaseModel):
 class Questions(BaseModel):
     questions: list[Question]
 
-    @staticmethod
-    def clear(project_dir: Path):
-        if project_dir.name == "questions.json":
-            questions_path = project_dir
-        else:
-            questions_path = project_dir / "questions.json"
-        if questions_path.exists():
-            questions_path.unlink()
-
-    @staticmethod
-    def load(project_dir: Path) -> Optional["Questions"]:
-        if project_dir.name == "questions.json":
-            questions_path = project_dir
-        else:
-            questions_path = project_dir / "questions.json"
-        if not questions_path.exists():
-            return None
-        return Questions.model_validate(json.loads(questions_path.read_text()))
-
 
 class ProjectConfig(BaseModel):
     base_branch: str
@@ -151,13 +132,8 @@ class Project(BaseModel):
             return None
         return Questions.model_validate(json.loads(self.questions_json.read_text()))
 
-    def load_current_task(self) -> Task | None:
-        if not self.current_task_json.exists():
-            return None
-        return Task.model_validate(json.loads(self.current_task_json.read_text()))
-
     def save_current_task(self, task: Task) -> None:
-        self.current_task_json.write_text(task.model_dump_json(indent=2))
+        self.current_task_json.write_text(task.model_dump_json(indent=2, exclude={"passes"}))
 
     def remove_current_task(self) -> None:
         if self.current_task_json.exists():

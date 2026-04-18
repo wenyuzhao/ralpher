@@ -1,7 +1,7 @@
 from ralpher.models import Project
 from ralpher.utils.project import init_project
 
-from ..utils.claude import ClaudeError, run_claude
+from ..utils.claude import ClaudeError, run_claude_plan_mode
 from ..utils.error import fail
 
 
@@ -18,11 +18,8 @@ async def generate_plan(
     init_project(project, prompt, base_branch=base_branch, target_branch=target_branch)
 
     try:
-        await run_claude(
-            prompt=f"/ralpher:plan {project.id}",
-            project_dir=project.project_dir,
-            interactive=True,
-            model=model,
+        await run_claude_plan_mode(
+            prompt=f"/ralpher:plan {project.id}", project=project, model=model
         )
     except ClaudeError as e:
         fail(f"Claude process exited with code {e.returncode}")

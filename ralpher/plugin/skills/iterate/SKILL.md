@@ -18,10 +18,11 @@ You are an autonomous coding agent working on a task of a software project.
 6. Update CLAUDE.md files if you discover reusable patterns (see below)
 7. If checks pass, commit ALL changes with message: `[Task ID] feat: [Task Title]`. e.g. `[T-001] feat: Add notifications table to database`.
    * The prefix "feat" can be any of: feat/fix/docs/style/refactor/test/chore/perf/ci/build/revert
-   * When the checks are not passed, DON'T commit or update current_task.json
-8. Update current_task.json to set `passes: true`
-   * Don't set `passes: true` if checks are not passed.
-9. Append your progress and additional notes to `progress.md`
+   * NEVER comment when any of the checks fail - fix the issues and only commit when all checks pass
+8. Append your progress and additional notes to `progress.md`
+9. After everything above is finished, use `StructuredOutput` tool to report status.
+
+---
 
 ## Progress Report Format
 
@@ -39,7 +40,7 @@ APPEND to .ralpher/projects/$0/progress.md (never replace, always append):
 
 The learnings section is critical - it helps future iterations avoid repeating mistakes and understand the codebase better.
 
-## Consolidate Patterns
+### Consolidate Patterns
 
 If you discover a **reusable pattern** that future iterations should know, add it to the `## Codebase Patterns` section at the TOP of progress.md (create it if it doesn't exist). This section should consolidate the most important learnings:
 
@@ -51,6 +52,8 @@ If you discover a **reusable pattern** that future iterations should know, add i
 ```
 
 Only add patterns that are **general and reusable**, not task-specific details.
+
+---
 
 ## Update CLAUDE.md Files
 
@@ -78,6 +81,8 @@ Before committing, check if any edited files have learnings worth preserving in 
 
 Only update CLAUDE.md if you have **genuinely reusable knowledge** that would help future work in that directory.
 
+---
+
 ## Quality Requirements
 
 - ALL commits must pass your project's quality checks (typecheck, lint, test)
@@ -85,7 +90,7 @@ Only update CLAUDE.md if you have **genuinely reusable knowledge** that would he
 - Keep changes focused and minimal
 - Follow existing code patterns
 
-## Browser Testing (If Available)
+### Browser Testing (If Available)
 
 For any task that changes UI, verify it works in the browser if you have browser testing tools configured (e.g., via MCP):
 
@@ -95,9 +100,11 @@ For any task that changes UI, verify it works in the browser if you have browser
 
 If no browser tools are available, note in your progress report that manual browser verification is needed.
 
+---
+
 ## Stop Condition
 
-The current task is completed.
+The current task is completed and all acceptance criteria are met.
 
 ## Important
 

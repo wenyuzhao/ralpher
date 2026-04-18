@@ -1,5 +1,5 @@
 import rich
-from ..models import Project
+from ..models import Project, Tasks
 from ..utils.claude import ClaudeError, run_claude
 from ..utils.error import fail
 
@@ -8,25 +8,21 @@ async def __try_extract_tasks(project: Project):
     """Run a Claude Code session to extract tasks.json."""
 
     try:
-        await run_claude(
+        tasks = await run_claude(
             prompt=f"/ralpher:extract-tasks {project.id}",
-            project_dir=project.project_dir,
+            project=project,
             model="haiku",
+            schema=Tasks,
+            readonly=True,
+            tools=["Read"],
         )
+        # set passes to false
+        for t in tasks.tasks:
+            t.passes = False
+        project.save_tasks(tasks)
     except ClaudeError:
         return False
 
-    if not (project.tasks_json).exists():
-        return False
-    try:
-        tasks = project.load_tasks()
-        assert tasks is not None
-        # set passes to false
-        for task in tasks.tasks:
-            task.passes = False
-        project.save_tasks(tasks)
-    except Exception:
-        return False
     return True
 
 

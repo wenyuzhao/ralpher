@@ -17,8 +17,9 @@ Refine the Project Plan based on user's input.
 3. (Optional) Ask 3-10 essential clarifying questions if the instruction is ambiguous
   * See the "Step 2: (Optional) Clarifying Questions" section below
   * Don't ask the user to provide more details. Just provide them with a list of concrate options.
-4. Update the Project Plan based on the user prompt and the answers
-5. Save to `.ralpher/projects/$0/PLAN.md`
+  * Use the `StructuredOutput` tool.
+4. Generate a new Project Plan based on the user prompt and the answers (don't modify the file, just output the markdown content follwing the structured output format)
+  * Use the `StructuredOutput` tool.
 
 **Important:** Do NOT start implementing. Just update the Project Plan.
 
@@ -48,36 +49,21 @@ The original Project Plan is provided above. Review it carefully, and understand
 
 Ask only critical questions where the user prompt is ambiguous.
 
-To ask user questions, output all the questions to `.ralpher/projects/$0/questions.json` in the following format, and finish your turn. The user will provide answers in the next turn.
+To ask user questions, use the `StructuredOutput` tool with all the questions and finish your turn. The user will provide answers in the next turn.
+All questions should have the following fields:
+* `header`: A short header in 1-2 words describing the question
+* `question`: The question to ask the user. It should be a multiple-choice single-answer question.
+* `options`: A list of 2-6 concrete options. Each option should have:
+  * `label`: A short label for the option
+  * `description`: A detailed description of the option to help the user choose
 
-```json
-{
-  "questions": [
-    {
-      "header": "...", // A short header in 1-2 words
-      "question": "The question?", // A mult-choice single-answer question
-      "options": [
-        // A list of 2-6 options
-        {
-          "label": "Label 1",
-          "description": "Description 1"
-        },
-        {
-          "label": "Label 2",
-          "description": "Description 2"
-        },
-      ]
-    },
-    // ... other questions
-  ]
-}
-```
+If any questions are depend on the answers to other questions, please ask the dependent questions in the next turn after receiving the user's answers.
 
 ---
 
 ## Step 3: Update Project Plan
 
-Update the Project Plan document.
+Generate the updated the Project Plan markdown document.
 
 Please refer to @${CLAUDE_SKILL_DIR}/../../docs/plan-structure.md for a list of required sections and an example.
 
@@ -85,17 +71,17 @@ Strictly follow the user's instructions, and don't change unrelated parts.
 
 You may need to add, update, or remove tasks to fit the new plan.
 
-You can do step-2 multiple times to ask more questions when making the plan.
+You can do step-2 multiple times to ask more questions before making the plan.
 
 ---
 
 ## Checklist
 
-Before saving the Project Plan:
+Before outputing the new Project Plan:
 
 - [ ] Reviewed the repo, the original Project Plan, and any other context
 - [ ] Incorporated the user's instructions
 - [ ] (Optional) Asked clarifying questions and incorporated user's answers
 - [ ] Did not change unrelated parts of the plan
 - [ ] The project plan follows the required structure and includes all required sections
-- [ ] Save to `.ralpher/projects/$0/PLAN.md`
+- [ ] Output: Use `StructuredOutput` tool to output the project plan markdown content or questions, WITHOUT WRITING TO ANY FILES.

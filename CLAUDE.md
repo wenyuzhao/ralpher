@@ -61,6 +61,6 @@ uvx ruff format .
 - The `loop` command invokes `claude` with `--dangerously-skip-permissions --print` flags.
 - Rich library and yaspin are used for terminal output formatting (panels, rules, styled text, spinners).
 - Async subprocess calls throughout — CLI commands use `asyncio.run()` to bridge sync Typer handlers.
-- Project directory structure: `.ralpher/projects/{project_id}/` contains PLAN.md, plan.json, PROMPT.md, progress.md, current_task.json, and logs/.
+- Project directory structure: `.ralpher/projects/{project_id}/` contains PLAN.md, tasks.json, PROMPT.md, progress.md, current_task.json, and logs/.
 - The `Project` model centralizes all file path properties (`project_dir`, `plan_md`, `plan_json`, `progress_md`, `prompt_md`, `questions_json`, `current_task_json`) and load/save methods.
 - Tests mock subprocess calls and file I/O; no real `claude` invocations in tests.
