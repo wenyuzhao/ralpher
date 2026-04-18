@@ -123,7 +123,7 @@ async def _ask_user_questions(questions: Questions) -> str:
     session = PromptSession()
 
     while True:
-        answers: list[str] = []
+        results: list[dict[str, str]] = []
 
         rich.print("[bold blue]Please answer the following clarification questions:[/]")
 
@@ -154,7 +154,7 @@ async def _ask_user_questions(questions: Questions) -> str:
                 )
             else:
                 answer = result if result else choice_options[0][0]
-            answers.append(f"{q.question}: {answer}")
+            results.append({"Q": q.question, "A": answer})
 
         print()
 
@@ -167,7 +167,7 @@ async def _ask_user_questions(questions: Questions) -> str:
         ).prompt_async()
         if confirmed == "yes":
             print()
-            return "\n".join(answers)
+            return json.dumps(results)
         print()
 
 
