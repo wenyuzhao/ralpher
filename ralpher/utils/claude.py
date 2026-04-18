@@ -110,41 +110,60 @@ async def _exec(cmd: list[str], logs: int | IO[Any]) -> int:
 async def _ask_user_questions(questions: Questions) -> str:
     """Prompt the user for answers to AskUserQuestion questions."""
     session = PromptSession()
-    answers: list[str] = []
 
-    rich.print("[bold blue]Please answer the following clarification questions:[/]")
+    while True:
+        answers: list[str] = []
 
-    for index, q in enumerate(questions.questions):
-        if not q.options:
-            continue
+        rich.print(
+            "[bold blue]Please answer the following clarification questions:[/]"
+        )
+
+        for index, q in enumerate(questions.questions):
+            if not q.options:
+                continue
+
+            print()
+            header = q.header
+            choice_options = [
+                (opt.label, f"{opt.label} - {opt.description}") for opt in q.options
+            ]
+            choice_options.append(
+                (
+                    "__other__",
+                    HTML("Other - <style color='ansibrightblack'>[please specify]</style>"),  # type: ignore
+                )
+            )
+            result = await ChoiceInput(
+                message=HTML(
+                    f"<style color='ansimagenta'><b>[Q{index + 1}] <i>{html.escape(header)}:</i></b> {html.escape(q.question)}</style>"
+                ),
+                options=choice_options,
+            ).prompt_async()
+            if result == "__other__":
+                answer = await session.prompt_async(
+                    HTML("<b><i>Enter your answer: </i></b>")
+                )
+            else:
+                answer = result if result else choice_options[0][0]
+            answers.append(f"{q.question}: {answer}")
 
         print()
-        header = q.header
-        choice_options = [
-            (opt.label, f"{opt.label} - {opt.description}") for opt in q.options
-        ]
-        choice_options.append(
-            (
-                "__other__",
-                HTML("Other - <style color='ansibrightblack'>[please specify]</style>"),  # type: ignore
-            )
-        )
-        result = await ChoiceInput(
-            message=HTML(
-                f"<style color='ansimagenta'><b>[Q{index + 1}] <i>{html.escape(header)}:</i></b> {html.escape(q.question)}</style>"
-            ),
-            options=choice_options,
-        ).prompt_async()
-        if result == "__other__":
-            answer = await session.prompt_async(
-                HTML("<b><i>Enter your answer: </i></b>")
-            )
-        else:
-            answer = result if result else choice_options[0][0]
-        answers.append(f"{q.question}: {answer}")
+        rich.print("[bold blue]Your answers:[/]")
+        for line in answers:
+            rich.print(f"  • {line}")
+        print()
 
-    print()
-    return "\n".join(answers)
+        confirmed = await ChoiceInput(
+            message=HTML("<b>Submit these answers?</b>"),
+            options=[
+                ("yes", "Yes - submit these answers"),
+                ("no", "No - answer the questions again"),
+            ],
+        ).prompt_async()
+        if confirmed == "yes":
+            print()
+            return "\n".join(answers)
+        print()
 
 
 def _get_session_id(log: Path) -> str | None:
