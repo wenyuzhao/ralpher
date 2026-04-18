@@ -1,8 +1,6 @@
-from asyncio.subprocess import Process
 import random
 import asyncio
 
-from prompt_toolkit.styles import Style
 from termcolor import colored
 
 LABELS: list[str] = [
@@ -68,37 +66,35 @@ LABELS: list[str] = [
     "The tests are passing and I don't know why",
 ]
 
-STYLE = Style.from_dict({"msg": "#4caf50 bold", "sub-msg": "#616161 italic"})
-
 
 class Spinner:
     def __init__(self):
         self.text = colored(random.choice(LABELS), "dark_grey")
         self._spinner = None
-        self._exit = False
+        self._task: asyncio.Task[None] | None = None
 
-    async def __animate(self):
-        while self._spinner and not self._exit:
+    async def _animate(self):
+        while True:
             await asyncio.sleep(3)
             self.text = colored(random.choice(LABELS), "dark_grey")
-            self._spinner.text = self.text
+            if self._spinner:
+                self._spinner.text = self.text
 
     async def __aenter__(self):
         from yaspin import yaspin
 
         self._spinner = yaspin(text=self.text, color="dark_grey")
         self._spinner.start()
+        self._task = asyncio.create_task(self._animate())
 
         return self
 
-    async def run(self, proc: Process):
-        async def wrapper():
-            await proc.wait()
-            self._exit = True
-
-        await asyncio.gather(wrapper(), self.__animate())
-
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        self._exit = True
+        if self._task:
+            self._task.cancel()
+            try:
+                await self._task
+            except asyncio.CancelledError:
+                pass
         if self._spinner:
             self._spinner.stop()

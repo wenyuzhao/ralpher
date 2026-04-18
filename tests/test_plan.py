@@ -27,7 +27,10 @@ class TestAskUserQuestions:
     @pytest.mark.asyncio
     @patch("ralpher.utils.claude.ChoiceInput")
     async def test_single_question_with_options(self, mock_choice_cls):
-        mock_choice_cls.return_value.prompt_async = AsyncMock(return_value="REST")
+        # First call: answer question; second call: confirm with "yes"
+        mock_choice_cls.return_value.prompt_async = AsyncMock(
+            side_effect=["REST", "yes"]
+        )
         questions = _make_questions(
             [
                 {
@@ -46,8 +49,9 @@ class TestAskUserQuestions:
     @pytest.mark.asyncio
     @patch("ralpher.utils.claude.ChoiceInput")
     async def test_multiple_questions_with_options(self, mock_choice_cls):
+        # Two question answers, then confirm
         mock_choice_cls.return_value.prompt_async = AsyncMock(
-            side_effect=["Yes", "Mobile"]
+            side_effect=["Yes", "Mobile", "yes"]
         )
         questions = _make_questions(
             [
@@ -76,7 +80,9 @@ class TestAskUserQuestions:
     @pytest.mark.asyncio
     @patch("ralpher.utils.claude.ChoiceInput")
     async def test_question_with_options(self, mock_choice_cls):
-        mock_choice_cls.return_value.prompt_async = AsyncMock(return_value="Monolith")
+        mock_choice_cls.return_value.prompt_async = AsyncMock(
+            side_effect=["Monolith", "yes"]
+        )
         questions = _make_questions(
             [
                 {
@@ -93,7 +99,10 @@ class TestAskUserQuestions:
         assert "Pick a pattern: Monolith" in result
 
     @pytest.mark.asyncio
-    async def test_skips_questions_without_options(self):
+    @patch("ralpher.utils.claude.ChoiceInput")
+    async def test_skips_questions_without_options(self, mock_choice_cls):
+        # Confirmation still happens even with no answerable questions
+        mock_choice_cls.return_value.prompt_async = AsyncMock(return_value="yes")
         questions = _make_questions(
             [
                 {"header": "X", "question": "No options here", "options": []},
@@ -108,7 +117,10 @@ class TestAskUserQuestions:
     async def test_other_option_prompts_freeform(
         self, mock_choice_cls, mock_session_cls
     ):
-        mock_choice_cls.return_value.prompt_async = AsyncMock(return_value="__other__")
+        # First call: select __other__; second call: confirm
+        mock_choice_cls.return_value.prompt_async = AsyncMock(
+            side_effect=["__other__", "yes"]
+        )
         mock_session_cls.return_value.prompt_async = AsyncMock(
             return_value="Custom answer"
         )
