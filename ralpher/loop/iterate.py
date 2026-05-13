@@ -82,8 +82,6 @@ async def verify(project: Project) -> Result:
         project=project,
         model=project.model,
         schema=Result,
-        readonly=False,
-        tools=READONLY_TOOLS + ["Bash"],
     )
 
 
