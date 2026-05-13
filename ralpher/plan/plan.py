@@ -18,7 +18,10 @@ async def generate_plan(
     init_project(project, prompt, base_branch=base_branch, target_branch=target_branch)
 
     await run_claude_plan_mode(
-        prompt=f"/ralpher:plan {project.id}", project=project, model=model
+        kind="plan",
+        prompt=f"/ralpher:plan {project.id}",
+        project=project,
+        model=model,
     )
 
     if not (project.plan_md).exists():

@@ -71,6 +71,7 @@ async def refine_plan(
         tmp_path.write_text(combined)
 
         await run_claude_plan_mode(
+            kind="refine",
             prompt=f"/ralpher:refine {project.id} {tmp_path}",
             project=project,
             model=model,

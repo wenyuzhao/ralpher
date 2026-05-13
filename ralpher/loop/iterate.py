@@ -65,6 +65,7 @@ async def implement(project: Project) -> None:
 
     with with_temp_file(project.progress_md) as temp_file:
         await run_claude(
+            kind="iterate",
             prompt=f"/ralpher:iterate {project.id} {temp_file}",
             project=project,
             model=project.model,
@@ -78,6 +79,7 @@ async def verify(project: Project) -> Result:
     assert project.current_iteration is not None
 
     return await run_claude(
+        kind="verify",
         prompt=f"/ralpher:verify {project.id}",
         project=project,
         model=project.model,

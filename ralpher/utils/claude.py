@@ -172,6 +172,7 @@ async def _ask_user_questions(questions: Questions) -> str:
 @overload
 async def run_claude(
     *,
+    kind: str,
     prompt: str,
     project: Project,
     model: str | None = None,
@@ -184,6 +185,7 @@ async def run_claude(
 @overload
 async def run_claude[T: BaseModel](
     *,
+    kind: str,
     prompt: str,
     project: Project,
     model: str | None = None,
@@ -195,6 +197,7 @@ async def run_claude[T: BaseModel](
 
 async def run_claude[T: BaseModel](
     *,
+    kind: str,
     prompt: str,
     project: Project,
     model: str | None = None,
@@ -206,7 +209,7 @@ async def run_claude[T: BaseModel](
     Run the claude SDK to execute a prompt.
     """
     timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
-    log_file = project.project_dir / "logs" / f"claude-{timestamp}.log"
+    log_file = project.project_dir / "logs" / f"{kind}-{timestamp}.log"
     log_file.parent.mkdir(parents=True, exist_ok=True)
 
     # Log initial prompt
@@ -228,12 +231,12 @@ async def run_claude[T: BaseModel](
 
 
 async def run_claude_plan_mode(
-    *, prompt: str, project: Project, model: str | None = None
+    *, kind: str, prompt: str, project: Project, model: str | None = None
 ):
     """Run claude SDK with Q&A loop for plan generation."""
 
     timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
-    log_file = project.project_dir / "logs" / f"claude-{timestamp}.log"
+    log_file = project.project_dir / "logs" / f"{kind}-{timestamp}.log"
     log_file.parent.mkdir(parents=True, exist_ok=True)
 
     # Log initial prompt

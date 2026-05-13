@@ -9,6 +9,7 @@ async def __try_extract_tasks(project: Project):
 
     try:
         tasks = await run_claude(
+            kind="extract-tasks",
             prompt=f"/ralpher:extract-tasks {project.id}",
             project=project,
             model="haiku",
