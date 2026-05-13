@@ -1,3 +1,4 @@
+import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -44,7 +45,7 @@ class TestAskUserQuestions:
             ]
         )
         result = await _ask_user_questions(questions)
-        assert "API style: REST" in result
+        assert json.loads(result) == [{"Q": "API style", "A": "REST"}]
 
     @pytest.mark.asyncio
     @patch("ralpher.utils.claude.ChoiceInput")
@@ -74,8 +75,10 @@ class TestAskUserQuestions:
             ]
         )
         result = await _ask_user_questions(questions)
-        assert "Auth needed?: Yes" in result
-        assert "Platform: Mobile" in result
+        assert json.loads(result) == [
+            {"Q": "Auth needed?", "A": "Yes"},
+            {"Q": "Platform", "A": "Mobile"},
+        ]
 
     @pytest.mark.asyncio
     @patch("ralpher.utils.claude.ChoiceInput")
@@ -96,7 +99,7 @@ class TestAskUserQuestions:
             ]
         )
         result = await _ask_user_questions(questions)
-        assert "Pick a pattern: Monolith" in result
+        assert json.loads(result) == [{"Q": "Pick a pattern", "A": "Monolith"}]
 
     @pytest.mark.asyncio
     @patch("ralpher.utils.claude.ChoiceInput")
@@ -109,7 +112,7 @@ class TestAskUserQuestions:
             ]
         )
         result = await _ask_user_questions(questions)
-        assert result == ""
+        assert json.loads(result) == []
 
     @pytest.mark.asyncio
     @patch("ralpher.utils.claude.PromptSession")
@@ -136,7 +139,7 @@ class TestAskUserQuestions:
             ]
         )
         result = await _ask_user_questions(questions)
-        assert "Pick style: Custom answer" in result
+        assert json.loads(result) == [{"Q": "Pick style", "A": "Custom answer"}]
 
 
 class TestGeneratePlan:

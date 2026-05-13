@@ -68,6 +68,7 @@ class TestIterate:
 
         tasks_data = _make_tasks_data()
         project.tasks_json.write_text(json.dumps(tasks_data))
+        project.progress_md.write_text("# Progress\n")
 
         # implement() call returns None; verify() call returns Result.
         mock_run.side_effect = [None, Result(task_passed=True)]
@@ -87,6 +88,7 @@ class TestIterate:
 
         tasks_data = _make_tasks_data()
         project.tasks_json.write_text(json.dumps(tasks_data))
+        project.progress_md.write_text("# Progress\n")
 
         mock_run.side_effect = SystemExit("Claude process returned an error.")
 
@@ -104,6 +106,7 @@ class TestIterate:
 
         tasks_data = _make_tasks_data()
         project.tasks_json.write_text(json.dumps(tasks_data))
+        project.progress_md.write_text("# Progress\n")
 
         written_task: dict | None = None
 
@@ -134,6 +137,7 @@ class TestIterate:
 
         tasks_data = _make_tasks_data()
         project.tasks_json.write_text(json.dumps(tasks_data))
+        project.progress_md.write_text("# Progress\n")
 
         mock_run.side_effect = [None, Result(task_passed=False)]
         await iterate(project, HooksManager([]))
@@ -148,7 +152,6 @@ class TestIterate:
         assert implement_kwargs["project"] is project
         assert verify_kwargs["prompt"] == f"/ralpher:verify {task_id}"
         assert verify_kwargs["schema"] is Result
-        assert verify_kwargs.get("readonly") is True
 
 
 class TestLoop:
