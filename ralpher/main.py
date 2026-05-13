@@ -12,12 +12,31 @@ from ralpher.loop import run_ralph_loop
 from ralpher.models import Project
 from ralpher.plan.plan import generate_plan
 from ralpher.plan.extract import extract_tasks
-from ralpher.plan.refine import refine_plan
+from ralpher.plan.refine import refine_plan, refine_plan_from_notion
 import asyncio
 from slugify import slugify
 from .utils.error import fail
 from .utils.hooks import HooksManager
+from .utils.hooks.notion import update_notion_page
 from dotenv import find_dotenv, load_dotenv
+
+
+def _sync_to_notion(project: Project) -> None:
+    """Push the project's current state to Notion and print the URL.
+
+    No-op (with a single info line) when Notion env vars are not configured.
+    """
+    import os
+
+    if "RALPHER_NOTION_TOKEN" not in os.environ:
+        return
+    url = asyncio.run(update_notion_page(project, status=None))
+    if url:
+        rich.print(f"[green]✔ Notion page synced: [i][u]{url}[/][/][/]")
+    else:
+        rich.print(
+            "[yellow]⚠ Notion env vars set but could not sync — check RALPHER_NOTION_PAGE_ID or RALPHER_NOTION_PARENT_PAGE_ID.[/]"
+        )
 
 
 def _require_claude() -> None:
@@ -77,6 +96,7 @@ def plan(
 ) -> None:
     """Generate a Project Plan."""
     _require_claude()
+    load_dotenv(find_dotenv(usecwd=True))
     if Path(prompt).is_file():
         prompt = Path(prompt).read_text()
     project_id = _gen_project_id(name)
@@ -95,6 +115,7 @@ def plan(
     rich.print(
         f"[green]✔ Project plan generated at .claude/ralpher/projects/{project.id}/PLAN.md[/]"
     )
+    _sync_to_notion(project)
 
 
 def _get_latest_project_id() -> str:
@@ -111,7 +132,10 @@ def _get_latest_project_id() -> str:
 
 @app.command()
 def refine(
-    prompt: Annotated[str, typer.Argument(help="The refinement prompt or file.")],
+    prompt: Annotated[
+        str | None,
+        typer.Argument(help="The refinement prompt or file. Omit when using --notion."),
+    ] = None,
     project_id: Annotated[
         str | None,
         typer.Option(
@@ -123,20 +147,37 @@ def refine(
     model: Annotated[
         str | None, typer.Option("--model", "-m", help="Claude model to use")
     ] = None,
+    notion: Annotated[
+        bool,
+        typer.Option(
+            "--notion",
+            help="Pull comments from the Project Plan section of the Notion page and use them as the refinement prompt. Resolves comments after.",
+        ),
+    ] = False,
 ) -> None:
     """Refine an existing Project Plan."""
     _require_claude()
-    if Path(prompt).is_file():
-        prompt = Path(prompt).read_text()
+    load_dotenv(find_dotenv(usecwd=True))
+    if notion and prompt:
+        fail("--notion takes the prompt from Notion comments; do not also pass a prompt argument.")
+    if not notion and not prompt:
+        fail("Provide a refinement prompt or pass --notion.")
     if not project_id:
         # Default to the latest project if no project_id is provided
         project_id = _get_latest_project_id()
     rich.print(f"[bold blue]Refining plan for project:[i]{project_id}[/][/]\n")
     project = Project(id=project_id, model=model)
-    asyncio.run(refine_plan(project=project, prompt=prompt, model=model))
+    if notion:
+        asyncio.run(refine_plan_from_notion(project=project, model=model))
+    else:
+        assert prompt is not None
+        if Path(prompt).is_file():
+            prompt = Path(prompt).read_text()
+        asyncio.run(refine_plan(project=project, prompt=prompt, model=model))
     rich.print(
         f"[green]✔ Project Plan refined at .claude/ralpher/projects/{project_id}/PLAN.md[/]"
     )
+    _sync_to_notion(project)
 
 
 @app.command(hidden=True)
