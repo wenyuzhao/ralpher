@@ -69,7 +69,8 @@ class TestIterate:
         tasks_data = _make_tasks_data()
         project.tasks_json.write_text(json.dumps(tasks_data))
 
-        mock_run.return_value = Result(task_passed=True)
+        # implement() call returns None; verify() call returns Result.
+        mock_run.side_effect = [None, Result(task_passed=True)]
         await iterate(project, HooksManager([]))
 
         updated = Tasks.model_validate(json.loads(project.tasks_json.read_text()))
@@ -108,8 +109,10 @@ class TestIterate:
 
         async def side_effect(**kwargs):
             nonlocal written_task
-            # Read what iterate() wrote before claude runs
-            written_task = json.loads(project.current_task_json.read_text())
+            if written_task is None:
+                # First call is the implement() session — capture the file then.
+                written_task = json.loads(project.current_task_json.read_text())
+                return None
             return Result(task_passed=False)
 
         mock_run.side_effect = side_effect
@@ -119,7 +122,9 @@ class TestIterate:
 
     @patch("ralpher.loop.iterate.run_claude", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_command_uses_iterate_skill(self, mock_run, tmp_path, monkeypatch):
+    async def test_command_uses_iterate_and_verify_skills(
+        self, mock_run, tmp_path, monkeypatch
+    ):
         monkeypatch.chdir(tmp_path)
         task_id = "iter-flags"
         project = _make_project(task_id)
@@ -130,12 +135,20 @@ class TestIterate:
         tasks_data = _make_tasks_data()
         project.tasks_json.write_text(json.dumps(tasks_data))
 
-        mock_run.return_value = Result(task_passed=False)
+        mock_run.side_effect = [None, Result(task_passed=False)]
         await iterate(project, HooksManager([]))
 
-        call_kwargs = mock_run.call_args[1]
-        assert f"/ralpher:iterate {task_id}" in call_kwargs["prompt"]
-        assert call_kwargs["project"] is project
+        assert mock_run.call_count == 2
+        implement_kwargs, verify_kwargs = (
+            mock_run.call_args_list[0][1],
+            mock_run.call_args_list[1][1],
+        )
+        assert f"/ralpher:iterate {task_id}" in implement_kwargs["prompt"]
+        assert implement_kwargs.get("schema") is None
+        assert implement_kwargs["project"] is project
+        assert verify_kwargs["prompt"] == f"/ralpher:verify {task_id}"
+        assert verify_kwargs["schema"] is Result
+        assert verify_kwargs.get("readonly") is True
 
 
 class TestLoop:
@@ -166,9 +179,10 @@ class TestLoop:
         project.plan_md.write_text("# Plan")
         project.tasks_json.write_text(json.dumps(tasks_data))
 
-        mock_run.return_value = Result(task_passed=True)
+        # Each iteration: implement() returns None, verify() returns Result.
+        mock_run.side_effect = [None, Result(task_passed=True)]
         await run_ralph_loop(project=project, hooks=HooksManager([]))
-        assert mock_run.call_count == 1
+        assert mock_run.call_count == 2
 
     @patch("ralpher.loop.prepare.checkout_branch")
     @patch("ralpher.loop.prepare.extract_tasks", new_callable=AsyncMock)
@@ -186,14 +200,20 @@ class TestLoop:
         project.plan_md.write_text("# Plan")
         project.tasks_json.write_text(json.dumps(tasks_data))
 
-        mock_run.return_value = Result(task_passed=False)
+        # Two iterations × (implement + verify) == 4 run_claude calls.
+        mock_run.side_effect = [
+            None,
+            Result(task_passed=False),
+            None,
+            Result(task_passed=False),
+        ]
         import sys
 
         _loop_mod = sys.modules["ralpher.loop.loop"]
         monkeypatch.setattr(_loop_mod.time, "sleep", lambda _: None)
         with pytest.raises(SystemExit):
             await run_ralph_loop(project=project, hooks=HooksManager([]))
-        assert mock_run.call_count == 2
+        assert mock_run.call_count == 4
 
     @patch("ralpher.loop.prepare.checkout_branch")
     @patch("ralpher.loop.prepare.extract_tasks", new_callable=AsyncMock)

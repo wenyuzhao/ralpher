@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 
 import rich
@@ -6,7 +7,7 @@ import tempfile
 import contextlib
 
 from ..models import Project
-from ..utils.claude import run_claude
+from ..utils.claude import READONLY_TOOLS, run_claude
 from ..utils.hooks import HooksManager
 
 
@@ -14,6 +15,30 @@ class Result(BaseModel):
     task_passed: bool = Field(
         description="Whether the task is fully implemented and passes all checks."
     )
+    notes: str | None = Field(
+        default=None,
+        description=(
+            "When task_passed is false, a markdown-formatted note describing "
+            "what is still incomplete, which acceptance criteria are unmet, "
+            "which checks failed and their error messages, and any hints for "
+            "the next attempt. Null or empty when task_passed is true."
+        ),
+    )
+
+
+def _append_verifier_notes(
+    progress_md: Path, task_id: str, task_passed: bool, notes: str | None
+) -> None:
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    status = "PASSED" if task_passed else "FAILED"
+    body = notes.strip() if notes and notes.strip() else "N/A"
+    section = (
+        f"\n### VERIFIER NOTES - {timestamp} - {task_id}\n\n"
+        f"- **Status:** {status}\n"
+        f"- **Notes:**\n\n{body}\n\n---\n"
+    )
+    with progress_md.open("a") as f:
+        f.write(section)
 
 
 @contextlib.contextmanager
@@ -35,16 +60,31 @@ def with_temp_file(original: Path):
         Path(file.name).unlink()
 
 
-async def implement_and_review(project: Project) -> Result:
+async def implement(project: Project) -> None:
     assert project.current_iteration is not None
 
     with with_temp_file(project.progress_md) as temp_file:
-        return await run_claude(
+        await run_claude(
             prompt=f"/ralpher:iterate {project.id} {temp_file}",
             project=project,
             model=project.model,
-            schema=Result,
         )
+
+
+async def verify(project: Project) -> Result:
+    """Run a fresh, non-persistent Claude session to independently verify the
+    current task. The verifier has no context from the implementation session,
+    so it cannot rubber-stamp its own work."""
+    assert project.current_iteration is not None
+
+    return await run_claude(
+        prompt=f"/ralpher:verify {project.id}",
+        project=project,
+        model=project.model,
+        schema=Result,
+        readonly=False,
+        tools=READONLY_TOOLS + ["Bash"],
+    )
 
 
 async def iterate(project: Project, hooks: HooksManager) -> None:
@@ -65,8 +105,16 @@ async def iterate(project: Project, hooks: HooksManager) -> None:
     # save to current_task.json for claude to read
     project.save_current_task(task)
 
-    # Implement the task using claude
-    result = await implement_and_review(project)
+    # Implement the task in one session, then verify in a fresh session so the
+    # verifier isn't biased by the implementer's context.
+    await implement(project)
+    result = await verify(project)
+
+    # Always persist the verifier verdict to the progress log so the next
+    # implementation iteration can see the previous status + any diagnosis.
+    _append_verifier_notes(
+        project.progress_md, task.id, result.task_passed, result.notes
+    )
 
     # Propagate changes to tasks.json if updated
     tasks = project.load_tasks()

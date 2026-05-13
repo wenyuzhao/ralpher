@@ -16,11 +16,13 @@ You are an autonomous coding agent working on a task of a software project.
 4. Implement that single task
 5. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
 6. Update CLAUDE.md files if you discover reusable patterns (see below)
-7. If checks pass, commit ALL changes with message: `[Task ID] feat: [Task Title]`. e.g. `[T-001] feat: Add notifications table to database`.
+7. **Always** commit ALL changes at the end of the iteration, regardless of whether the quality checks passed. Use the message format: `[Task ID] feat: [Task Title]`. e.g. `[T-001] feat: Add notifications table to database`.
    * The prefix "feat" can be any of: feat/fix/docs/style/refactor/test/chore/perf/ci/build/revert
-   * NEVER comment when any of the checks fail - fix the issues and only commit when all checks pass
-8. Append your progress and additional notes to the progress report.
-9. After everything above is finished, use `StructuredOutput` tool to report status.
+   * Try your best to fix any failing checks before committing, but if you cannot get them green, still commit so the verifier and the next iteration can see the current state.
+   * If checks fail, append `[WIP]` to the commit message subject (e.g. `[T-001] feat: Add notifications table to database [WIP]`) so the failing state is obvious in `git log`.
+8. Append your progress and additional notes to the progress report — including which checks (if any) still fail and the exact error output, so the next iteration can act on it.
+
+A separate verification agent will independently assess whether the task is complete after you finish — you do NOT need to report status yourself. Just do the work, run the checks, record the outcome in the progress log, and commit.
 
 ---
 
@@ -86,8 +88,8 @@ Only update CLAUDE.md if you have **genuinely reusable knowledge** that would he
 
 ## Quality Requirements
 
-- ALL commits must pass your project's quality checks (typecheck, lint, test)
-- Do NOT commit broken code
+- Try to make every commit pass the project's quality checks (typecheck, lint, test).
+- If you cannot get checks to pass within this iteration, still commit the current state, mark the commit subject with `[WIP]`, and clearly document the remaining failures in the progress report.
 - Keep changes focused and minimal
 - Follow existing code patterns
 
@@ -113,4 +115,3 @@ The current task is completed and all acceptance criteria are met.
 - Commit frequently
 - Keep CI green
 - Read the Codebase Patterns section in the progress report before starting
-- Don't call StructuredOutput unless you are finished
