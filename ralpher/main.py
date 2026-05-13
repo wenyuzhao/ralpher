@@ -12,7 +12,7 @@ from ralpher.loop import run_ralph_loop
 from ralpher.models import Project
 from ralpher.plan.plan import generate_plan
 from ralpher.plan.extract import extract_tasks
-from ralpher.plan.refine import refine_plan, refine_plan_from_notion
+from ralpher.plan.refine import refine_plan
 import asyncio
 from slugify import slugify
 from .utils.error import fail
@@ -134,7 +134,9 @@ def _get_latest_project_id() -> str:
 def refine(
     prompt: Annotated[
         str | None,
-        typer.Argument(help="The refinement prompt or file. Omit when using --notion."),
+        typer.Argument(
+            help="The refinement prompt or file. Optional when Notion is configured and has unresolved comments on the Project Plan section."
+        ),
     ] = None,
     project_id: Annotated[
         str | None,
@@ -147,33 +149,25 @@ def refine(
     model: Annotated[
         str | None, typer.Option("--model", "-m", help="Claude model to use")
     ] = None,
-    notion: Annotated[
-        bool,
-        typer.Option(
-            "--notion",
-            help="Pull comments from the Project Plan section of the Notion page and use them as the refinement prompt. Resolves comments after.",
-        ),
-    ] = False,
 ) -> None:
-    """Refine an existing Project Plan."""
+    """Refine an existing Project Plan.
+
+    When Notion env vars are configured, unresolved comments on the Project
+    Plan section are fetched automatically, combined with the prompt, and
+    resolved after refinement.
+    """
     _require_claude()
     load_dotenv(find_dotenv(usecwd=True))
-    if notion and prompt:
-        fail("--notion takes the prompt from Notion comments; do not also pass a prompt argument.")
-    if not notion and not prompt:
-        fail("Provide a refinement prompt or pass --notion.")
     if not project_id:
         # Default to the latest project if no project_id is provided
         project_id = _get_latest_project_id()
     rich.print(f"[bold blue]Refining plan for project:[i]{project_id}[/][/]\n")
     project = Project(id=project_id, model=model)
-    if notion:
-        asyncio.run(refine_plan_from_notion(project=project, model=model))
-    else:
-        assert prompt is not None
-        if Path(prompt).is_file():
-            prompt = Path(prompt).read_text()
-        asyncio.run(refine_plan(project=project, prompt=prompt, model=model))
+    if prompt and Path(prompt).is_file():
+        prompt = Path(prompt).read_text()
+    result = asyncio.run(refine_plan(project=project, prompt=prompt, model=model))
+    if result is None:
+        return
     rich.print(
         f"[green]✔ Project Plan refined at .claude/ralpher/projects/{project_id}/PLAN.md[/]"
     )

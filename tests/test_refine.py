@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from ralpher.models import Project, ProjectConfig
-from ralpher.plan.refine import refine_plan, refine_plan_from_notion
+from ralpher.plan.refine import refine_plan
 from ralpher.utils.notion_comments import NotionComment
 
 
@@ -87,21 +87,42 @@ class TestRefinePlan:
         assert call_kwargs["project"] is project
 
 
-class TestRefinePlanFromNotion:
+class TestRefinePlanWithNotion:
+    @patch("ralpher.plan.refine.checkout_existing_branch")
+    @patch("ralpher.plan.refine.run_claude_plan_mode", new_callable=AsyncMock)
+    @pytest.mark.asyncio
+    async def test_skips_when_no_prompt_and_notion_unconfigured(
+        self, mock_run, mock_checkout, tmp_path, monkeypatch
+    ):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.delenv("RALPHER_NOTION_TOKEN", raising=False)
+        project = Project(id="task")
+        project.project_dir.mkdir(parents=True)
+        project.plan_md.write_text("# Plan")
+        _write_config(project)
+        result = await refine_plan(project=project, prompt=None, model=None)
+        assert result is None
+        mock_run.assert_not_awaited()
+
+    @patch("ralpher.plan.refine.checkout_existing_branch")
+    @patch("ralpher.plan.refine.run_claude_plan_mode", new_callable=AsyncMock)
     @patch("ralpher.plan.refine.resolve_comments", new_callable=AsyncMock)
     @patch("ralpher.plan.refine.fetch_project_plan_comments", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_fails_when_no_comments(
-        self, mock_fetch, mock_resolve, tmp_path, monkeypatch
+    async def test_skips_when_notion_configured_but_no_comments_and_no_prompt(
+        self, mock_fetch, mock_resolve, mock_run, mock_checkout, tmp_path, monkeypatch
     ):
         monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("RALPHER_NOTION_TOKEN", "t")
+        monkeypatch.setenv("RALPHER_NOTION_PAGE_ID", "pid")
         mock_fetch.return_value = []
         project = Project(id="task")
         project.project_dir.mkdir(parents=True)
         project.plan_md.write_text("# Plan")
         _write_config(project)
-        with pytest.raises(SystemExit):
-            await refine_plan_from_notion(project=project, model=None)
+        result = await refine_plan(project=project, prompt=None, model=None)
+        assert result is None
+        mock_run.assert_not_awaited()
         mock_resolve.assert_not_awaited()
 
     @patch("ralpher.plan.refine.checkout_existing_branch")
@@ -109,16 +130,12 @@ class TestRefinePlanFromNotion:
     @patch("ralpher.plan.refine.resolve_comments", new_callable=AsyncMock)
     @patch("ralpher.plan.refine.fetch_project_plan_comments", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_runs_refine_and_resolves(
-        self,
-        mock_fetch,
-        mock_resolve,
-        mock_run,
-        mock_checkout,
-        tmp_path,
-        monkeypatch,
+    async def test_fetches_and_resolves_when_notion_configured(
+        self, mock_fetch, mock_resolve, mock_run, mock_checkout, tmp_path, monkeypatch
     ):
         monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("RALPHER_NOTION_TOKEN", "t")
+        monkeypatch.setenv("RALPHER_NOTION_PAGE_ID", "pid")
         comments = [
             NotionComment(
                 id="c1",
@@ -134,12 +151,31 @@ class TestRefinePlanFromNotion:
         project.plan_md.write_text("# Plan")
         _write_config(project)
 
-        result = await refine_plan_from_notion(project=project, model=None)
+        result = await refine_plan(project=project, prompt=None, model=None)
         assert result == "task-notion"
         mock_run.assert_awaited_once()
-        # The prompt passed to refine_plan should be derived from the comments.
-        # refine_plan writes it to a temp file then injects the path into the
-        # Claude prompt — so the Claude prompt won't contain the comment text
-        # directly. We just confirm the refine subprocess was invoked once
-        # and that comments were resolved afterward.
         mock_resolve.assert_awaited_once_with(comments)
+
+    @patch("ralpher.plan.refine.checkout_existing_branch")
+    @patch("ralpher.plan.refine.run_claude_plan_mode", new_callable=AsyncMock)
+    @patch("ralpher.plan.refine.resolve_comments", new_callable=AsyncMock)
+    @patch("ralpher.plan.refine.fetch_project_plan_comments", new_callable=AsyncMock)
+    @pytest.mark.asyncio
+    async def test_skips_resolve_when_no_comments_but_prompt_given(
+        self, mock_fetch, mock_resolve, mock_run, mock_checkout, tmp_path, monkeypatch
+    ):
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("RALPHER_NOTION_TOKEN", "t")
+        monkeypatch.setenv("RALPHER_NOTION_PAGE_ID", "pid")
+        mock_fetch.return_value = []
+        project = Project(id="task-no-comments")
+        project.project_dir.mkdir(parents=True)
+        project.plan_md.write_text("# Plan")
+        _write_config(project)
+
+        result = await refine_plan(
+            project=project, prompt="add feature X", model=None
+        )
+        assert result == "task-no-comments"
+        mock_run.assert_awaited_once()
+        mock_resolve.assert_not_awaited()
