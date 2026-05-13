@@ -7,7 +7,7 @@ import tempfile
 import contextlib
 
 from ..models import Project
-from ..utils.claude import READONLY_TOOLS, run_claude
+from ..utils.claude import run_claude
 from ..utils.hooks import HooksManager
 
 
