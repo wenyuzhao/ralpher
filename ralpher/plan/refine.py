@@ -28,9 +28,7 @@ def _notion_configured() -> bool:
     )
 
 
-async def refine_plan(
-    *, project: Project, prompt: str | None, model: str | None
-) -> str | None:
+async def refine_plan(*, project: Project, prompt: str | None) -> str | None:
     """Run a Claude Code session to refine a Project Plan.
 
     `prompt` is the user-supplied refinement instruction. If Notion is
@@ -74,7 +72,6 @@ async def refine_plan(
             kind="refine",
             prompt=f"/ralpher:refine {project.id} {tmp_path}",
             project=project,
-            model=model,
         )
 
     if not (project.plan_md).exists():

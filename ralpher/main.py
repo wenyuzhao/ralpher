@@ -76,9 +76,6 @@ def plan(
         str,
         typer.Option("--name", "-n", help="Name for the project, in kebab-case."),
     ],
-    model: Annotated[
-        str | None, typer.Option("--model", "-m", help="Claude model to use")
-    ] = None,
     base_branch: Annotated[
         str | None,
         typer.Option(
@@ -102,12 +99,11 @@ def plan(
     project_id = _gen_project_id(name)
 
     rich.print(f"[bold blue]Generating plan for new project: [i]{project_id}[/][/]\n")
-    project = Project(id=project_id, model=model)
+    project = Project(id=project_id)
     asyncio.run(
         generate_plan(
             project=project,
             prompt=prompt,
-            model=model,
             base_branch=base_branch,
             target_branch=target_branch,
         )
@@ -146,9 +142,6 @@ def refine(
             help="The project ID of the Project Plan to refine. Defaults to the latest project.",
         ),
     ] = None,
-    model: Annotated[
-        str | None, typer.Option("--model", "-m", help="Claude model to use")
-    ] = None,
 ) -> None:
     """Refine an existing Project Plan.
 
@@ -162,10 +155,10 @@ def refine(
         # Default to the latest project if no project_id is provided
         project_id = _get_latest_project_id()
     rich.print(f"[bold blue]Refining plan for project:[i]{project_id}[/][/]\n")
-    project = Project(id=project_id, model=model)
+    project = Project(id=project_id)
     if prompt and Path(prompt).is_file():
         prompt = Path(prompt).read_text()
-    result = asyncio.run(refine_plan(project=project, prompt=prompt, model=model))
+    result = asyncio.run(refine_plan(project=project, prompt=prompt))
     if result is None:
         return
     rich.print(
@@ -209,9 +202,6 @@ def loop(
         int,
         typer.Option("--max-iterations", "-n", help="Maximum number of iterations."),
     ] = DEFAULT_MAX_ITERATIONS,
-    model: Annotated[
-        str | None, typer.Option("--model", "-m", help="Claude model to use")
-    ] = None,
 ) -> None:
     """Run Claude in a loop until tasks are complete or max iterations reached."""
     _require_claude()
@@ -228,7 +218,6 @@ def loop(
         project = Project(
             id=project_id,
             max_iterations=max_iterations if max_iterations > 0 else None,
-            model=model,
         )
         await hooks.init(project)
         try:

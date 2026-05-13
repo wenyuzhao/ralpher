@@ -158,9 +158,7 @@ class TestGeneratePlan:
             project.plan_md.write_text("# Plan")
 
         mock_run.side_effect = side_effect
-        result = await generate_plan(
-            project=project, prompt="Build a chat app", model=None
-        )
+        result = await generate_plan(project=project, prompt="Build a chat app")
         assert result == task_id
 
     @patch("ralpher.plan.plan.init_project")
@@ -172,9 +170,7 @@ class TestGeneratePlan:
         monkeypatch.chdir(tmp_path)
         mock_run.side_effect = SystemExit("Claude process returned an error.")
         with pytest.raises(SystemExit):
-            await generate_plan(
-                project=Project(id="task-fail"), prompt="test", model=None
-            )
+            await generate_plan(project=Project(id="task-fail"), prompt="test")
 
     @patch("ralpher.plan.plan.init_project")
     @patch("ralpher.plan.plan.run_claude_plan_mode", new_callable=AsyncMock)
@@ -196,7 +192,7 @@ class TestGeneratePlan:
             project.plan_md.write_text("# Plan")
 
         mock_run.side_effect = run_side_effect
-        await generate_plan(project=project, prompt="My feature request", model=None)
+        await generate_plan(project=project, prompt="My feature request")
         assert project.project_dir.exists()
         assert project.prompt_md.read_text() == "My feature request"
 
@@ -215,7 +211,7 @@ class TestGeneratePlan:
             project.plan_md.write_text("# Plan")
 
         mock_run.side_effect = side_effect
-        await generate_plan(project=project, prompt="Implement SSO login", model=None)
+        await generate_plan(project=project, prompt="Implement SSO login")
         call_kwargs = mock_run.call_args[1]
         assert task_id in call_kwargs["prompt"]
         assert "/ralpher:plan" in call_kwargs["prompt"]
@@ -230,9 +226,7 @@ class TestGeneratePlan:
         monkeypatch.chdir(tmp_path)
         mock_run.return_value = None
         with pytest.raises(SystemExit):
-            await generate_plan(
-                project=Project(id="task-no-plan"), prompt="test", model=None
-            )
+            await generate_plan(project=Project(id="task-no-plan"), prompt="test")
 
 
 class TestExtractTasks:
@@ -261,7 +255,7 @@ class TestExtractTasks:
         mock_run.return_value = Tasks(tasks=[])
         await extract_tasks(project)
         call_kwargs = mock_run.call_args[1]
-        assert call_kwargs["model"] == "haiku"
+        assert call_kwargs["kind"] == "extract-tasks"
         assert project.tasks_json.exists()
 
     @patch("ralpher.plan.extract.run_claude", new_callable=AsyncMock)

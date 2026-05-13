@@ -9,7 +9,6 @@ async def generate_plan(
     *,
     project: Project,
     prompt: str,
-    model: str | None,
     base_branch: str | None = None,
     target_branch: str | None = None,
 ) -> str:
@@ -21,7 +20,6 @@ async def generate_plan(
         kind="plan",
         prompt=f"/ralpher:plan {project.id}",
         project=project,
-        model=model,
     )
 
     if not (project.plan_md).exists():

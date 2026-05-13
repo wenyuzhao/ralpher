@@ -12,7 +12,6 @@ async def __try_extract_tasks(project: Project):
             kind="extract-tasks",
             prompt=f"/ralpher:extract-tasks {project.id}",
             project=project,
-            model="haiku",
             schema=Tasks,
             readonly=True,
             tools=["Read"],

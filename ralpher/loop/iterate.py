@@ -65,10 +65,9 @@ async def implement(project: Project) -> None:
 
     with with_temp_file(project.progress_md) as temp_file:
         await run_claude(
-            kind="iterate",
+            kind="loop",
             prompt=f"/ralpher:iterate {project.id} {temp_file}",
             project=project,
-            model=project.model,
         )
 
 
@@ -82,7 +81,6 @@ async def verify(project: Project) -> Result:
         kind="verify",
         prompt=f"/ralpher:verify {project.id}",
         project=project,
-        model=project.model,
         schema=Result,
     )
 

@@ -5,6 +5,31 @@ from typing import Literal, Optional
 from pydantic import BaseModel
 
 
+DEFAULT_MODELS: dict[str, str] = {
+    "plan": "claude-opus-4-7[1m]",
+    "refine": "claude-opus-4-7[1m]",
+    "loop": "claude-opus-4-7[1m]",
+    "verify": "claude-sonnet-4-6[1m]",
+    "extract-tasks": "haiku",
+}
+
+
+class Settings(BaseModel):
+    models: dict[str, str] = {}
+
+    @classmethod
+    def load(cls) -> "Settings":
+        path = Path.cwd() / ".claude/ralpher/settings.json"
+        if not path.exists():
+            return cls()
+        return cls.model_validate(json.loads(path.read_text()))
+
+    def model_for(self, kind: str) -> str | None:
+        if kind in self.models:
+            return self.models[kind]
+        return DEFAULT_MODELS.get(kind)
+
+
 class Task(BaseModel):
     id: str
     title: str
@@ -74,7 +99,6 @@ class ProjectConfig(BaseModel):
 
 class Project(BaseModel):
     id: str
-    model: Optional[str] = None
     max_iterations: int | None = None
     current_iteration: int | None = None
     current_task_id: Optional[str] = None

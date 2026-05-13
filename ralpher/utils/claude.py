@@ -17,7 +17,7 @@ from claude_agent_sdk import (
     query,
 )
 
-from ralpher.models import Project, Questions
+from ralpher.models import Project, Questions, Settings
 from ralpher.utils.error import fail
 
 from .spinner import Spinner
@@ -217,6 +217,8 @@ async def run_claude[T: BaseModel](
         f.write(json.dumps({"initial_prompt": prompt}) + "\n\n")
 
     schema_dict = schema.model_json_schema() if schema else None
+    if model is None:
+        model = Settings.load().model_for(kind)
     options = _build_options(
         model=model, schema=schema_dict, readonly=readonly, tools=tools
     )
@@ -243,6 +245,8 @@ async def run_claude_plan_mode(
     with log_file.open("w") as f:
         f.write(json.dumps({"initial_prompt": prompt}) + "\n\n")
 
+    if model is None:
+        model = Settings.load().model_for(kind)
     session_id: str | None = None
     current_prompt = prompt
 

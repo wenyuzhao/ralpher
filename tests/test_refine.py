@@ -18,7 +18,7 @@ class TestRefinePlan:
         monkeypatch.chdir(tmp_path)
         with pytest.raises(SystemExit):
             await refine_plan(
-                project=Project(id="nonexistent-task"), prompt="add auth", model=None
+                project=Project(id="nonexistent-task"), prompt="add auth"
             )
 
     @pytest.mark.asyncio
@@ -27,7 +27,7 @@ class TestRefinePlan:
         project = Project(id="test-task")
         project.project_dir.mkdir(parents=True)
         with pytest.raises(SystemExit):
-            await refine_plan(project=project, prompt="add auth", model=None)
+            await refine_plan(project=project, prompt="add auth")
 
     @patch("ralpher.plan.refine.checkout_existing_branch")
     @patch("ralpher.plan.refine.run_claude_plan_mode", new_callable=AsyncMock)
@@ -42,9 +42,7 @@ class TestRefinePlan:
         project.plan_md.write_text("# Original Plan")
         _write_config(project)
 
-        result = await refine_plan(
-            project=project, prompt="add user authentication", model=None
-        )
+        result = await refine_plan(project=project, prompt="add user authentication")
         assert result == task_id
 
     @patch("ralpher.plan.refine.checkout_existing_branch")
@@ -65,7 +63,7 @@ class TestRefinePlan:
 
         mock_run.side_effect = side_effect
         with pytest.raises(SystemExit):
-            await refine_plan(project=project, prompt="break everything", model=None)
+            await refine_plan(project=project, prompt="break everything")
 
     @patch("ralpher.plan.refine.checkout_existing_branch")
     @patch("ralpher.plan.refine.run_claude_plan_mode", new_callable=AsyncMock)
@@ -80,7 +78,7 @@ class TestRefinePlan:
         project.plan_md.write_text("# Plan")
         _write_config(project)
 
-        await refine_plan(project=project, prompt="add feature X", model=None)
+        await refine_plan(project=project, prompt="add feature X")
         call_kwargs = mock_run.call_args[1]
         assert "/ralpher:refine" in call_kwargs["prompt"]
         assert task_id in call_kwargs["prompt"]
@@ -100,7 +98,7 @@ class TestRefinePlanWithNotion:
         project.project_dir.mkdir(parents=True)
         project.plan_md.write_text("# Plan")
         _write_config(project)
-        result = await refine_plan(project=project, prompt=None, model=None)
+        result = await refine_plan(project=project, prompt=None)
         assert result is None
         mock_run.assert_not_awaited()
 
@@ -120,7 +118,7 @@ class TestRefinePlanWithNotion:
         project.project_dir.mkdir(parents=True)
         project.plan_md.write_text("# Plan")
         _write_config(project)
-        result = await refine_plan(project=project, prompt=None, model=None)
+        result = await refine_plan(project=project, prompt=None)
         assert result is None
         mock_run.assert_not_awaited()
         mock_resolve.assert_not_awaited()
@@ -151,7 +149,7 @@ class TestRefinePlanWithNotion:
         project.plan_md.write_text("# Plan")
         _write_config(project)
 
-        result = await refine_plan(project=project, prompt=None, model=None)
+        result = await refine_plan(project=project, prompt=None)
         assert result == "task-notion"
         mock_run.assert_awaited_once()
         mock_resolve.assert_awaited_once_with(comments)
@@ -173,9 +171,7 @@ class TestRefinePlanWithNotion:
         project.plan_md.write_text("# Plan")
         _write_config(project)
 
-        result = await refine_plan(
-            project=project, prompt="add feature X", model=None
-        )
+        result = await refine_plan(project=project, prompt="add feature X")
         assert result == "task-no-comments"
         mock_run.assert_awaited_once()
         mock_resolve.assert_not_awaited()

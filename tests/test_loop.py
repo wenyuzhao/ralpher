@@ -32,10 +32,8 @@ _TASK_TEMPLATE = {
 }
 
 
-def _make_project(
-    task_id: str, max_iterations: int = 5, model: str | None = None
-) -> Project:
-    project = Project(id=task_id, max_iterations=max_iterations, model=model)
+def _make_project(task_id: str, max_iterations: int = 5) -> Project:
+    project = Project(id=task_id, max_iterations=max_iterations)
     return project
 
 
