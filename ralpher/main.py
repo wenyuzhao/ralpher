@@ -154,7 +154,7 @@ def refine(
     if not project_id:
         # Default to the latest project if no project_id is provided
         project_id = _get_latest_project_id()
-    rich.print(f"[bold blue]Refining plan for project:[i]{project_id}[/][/]\n")
+    rich.print(f"[bold blue]Refining plan for project: [i]{project_id}[/][/]\n")
     project = Project(id=project_id)
     if prompt and Path(prompt).is_file():
         prompt = Path(prompt).read_text()
