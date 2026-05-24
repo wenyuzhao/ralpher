@@ -9,7 +9,7 @@ DEFAULT_MODELS: dict[str, str] = {
     "plan": "claude-opus-4-7[1m]",
     "refine": "claude-opus-4-7[1m]",
     "loop": "claude-opus-4-7[1m]",
-    "verify": "claude-sonnet-4-6[1m]",
+    "verify": "claude-sonnet-4-6",
     "extract-tasks": "haiku",
 }
 
