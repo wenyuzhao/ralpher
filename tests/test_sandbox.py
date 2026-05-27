@@ -64,3 +64,13 @@ class TestBuildOptionsSandbox:
             assert any(
                 r.startswith("Write(//") and r.endswith("/.ralpher/**)") for r in deny
             )
+
+
+class TestBuildOptionsEffort:
+    def test_effort_passed_through(self):
+        # The :<level> suffix becomes Claude's --effort (EffortLevel).
+        assert _build_options(effort="xhigh").effort == "xhigh"
+
+    def test_effort_defaults_to_none(self):
+        # A bare model leaves effort unset, so the SDK uses its own default.
+        assert _build_options().effort is None

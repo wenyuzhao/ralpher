@@ -227,7 +227,7 @@ async def run_antigravity[T: BaseModel](
         model = settings.model_for(kind, backend="antigravity")
         thinking_level = settings.thinking_for(kind, backend="antigravity")
     else:
-        model, thinking_level = split_thinking_level(model)
+        model, thinking_level = split_thinking_level(model, backend="antigravity")
 
     config = _build_config(
         model=model,
@@ -269,7 +269,7 @@ async def run_antigravity_plan_mode(
         model = settings.model_for(kind, backend="antigravity")
         thinking_level = settings.thinking_for(kind, backend="antigravity")
     else:
-        model, thinking_level = split_thinking_level(model)
+        model, thinking_level = split_thinking_level(model, backend="antigravity")
 
     config = _build_config(
         model=model,

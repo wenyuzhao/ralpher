@@ -120,12 +120,27 @@ class TestModelForBackendAware:
         assert s.thinking_for("verify", backend="antigravity") == "high"
         assert s.thinking_for("extract-tasks", backend="antigravity") == "medium"
 
-    def test_thinking_for_claude_code_is_none(self):
+    def test_thinking_for_claude_code_bare_defaults_is_none(self):
+        # The claude-code defaults carry no :<level> suffix, so they run at the
+        # SDK's own default effort (no forced level).
         assert Settings().thinking_for("plan") is None
         assert Settings().thinking_for("plan", backend="claude-code") is None
 
+    def test_claude_code_pinned_model_can_carry_thinking_suffix(self):
+        # The effort suffix works for claude-code too, with claude's level set.
+        s = Settings(models={"plan": "claude-opus-4-7:xhigh"})
+        assert s.model_for("plan", backend="claude-code") == "claude-opus-4-7"
+        assert s.thinking_for("plan", backend="claude-code") == "xhigh"
+
+    def test_claude_code_suffix_after_bracketed_model(self):
+        # A "[1m]" context-window suffix is kept; only the :<level> is peeled.
+        s = Settings(models={"plan": "claude-opus-4-7[1m]:high"})
+        assert s.model_for("plan", backend="claude-code") == "claude-opus-4-7[1m]"
+        assert s.thinking_for("plan", backend="claude-code") == "high"
+
     def test_thinking_for_unknown_kind_is_none(self):
         assert Settings().thinking_for("nope", backend="antigravity") is None
+        assert Settings().thinking_for("nope", backend="claude-code") is None
 
     def test_pinned_bare_model_has_no_thinking_level(self):
         # A pinned name without a :<level> suffix runs at the SDK's default
@@ -161,6 +176,27 @@ class TestSplitThinkingLevel:
             "gemini-3.1-pro:preview",
             None,
         )
+
+    def test_claude_levels(self):
+        # claude-code accepts xhigh/max; "minimal" is not a claude level.
+        assert split_thinking_level("claude-opus-4-7:xhigh", "claude-code") == (
+            "claude-opus-4-7",
+            "xhigh",
+        )
+        assert split_thinking_level("claude-opus-4-7:max", "claude-code") == (
+            "claude-opus-4-7",
+            "max",
+        )
+        assert split_thinking_level("claude-opus-4-7:minimal", "claude-code") == (
+            "claude-opus-4-7:minimal",
+            None,
+        )
+
+    def test_levels_are_backend_specific(self):
+        # "xhigh" is a claude level only; "minimal" an antigravity level only.
+        assert split_thinking_level("m:xhigh", "antigravity") == ("m:xhigh", None)
+        assert split_thinking_level("m:minimal", "antigravity") == ("m", "minimal")
+        assert split_thinking_level("m:minimal", "claude-code") == ("m:minimal", None)
 
 
 class TestProjectBackend:

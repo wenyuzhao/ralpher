@@ -2,7 +2,7 @@ import dataclasses
 import json
 from pathlib import Path
 from datetime import datetime
-from typing import Any, overload
+from typing import Any, cast, overload
 
 from pydantic import BaseModel
 
@@ -11,8 +11,9 @@ from claude_agent_sdk import (
     ResultMessage,
     query,
 )
+from claude_agent_sdk.types import EffortLevel
 
-from ralpher.models import Project, Settings, ralpher_root
+from ralpher.models import Project, Settings, ralpher_root, split_thinking_level
 from ralpher.utils.error import fail
 from ralpher.utils.spinner import Spinner
 
@@ -66,6 +67,7 @@ def _readonly_ralpher_settings() -> str:
 def _build_options(
     *,
     model: str | None = None,
+    effort: str | None = None,
     session_id: str | None = None,
     schema: dict[str, Any] | None = None,
     readonly: bool = False,
@@ -78,6 +80,10 @@ def _build_options(
     options = ClaudeAgentOptions(
         permission_mode="dontAsk" if readonly else "bypassPermissions",
         model=model,
+        # Reasoning effort (Claude's --effort). Peeled off the model spec's
+        # ":<level>" suffix; None leaves the SDK's own default (high). The value
+        # is validated against EffortLevel by split_thinking_level upstream.
+        effort=cast("EffortLevel | None", effort),
         resume=session_id,
         output_format={"type": "json_schema", "schema": schema} if schema else None,
         allowed_tools=tools if tools is not None else [],
@@ -170,10 +176,15 @@ async def run_claude[T: BaseModel](
         f.write(json.dumps({"initial_prompt": prompt}) + "\n\n")
 
     schema_dict = schema.model_json_schema() if schema else None
+    settings = Settings.load()
     if model is None:
-        model = Settings.load().model_for(kind)
+        model = settings.model_for(kind)
+        effort = settings.thinking_for(kind)
+    else:
+        model, effort = split_thinking_level(model)
     options = _build_options(
         model=model,
+        effort=effort,
         schema=schema_dict,
         readonly=readonly,
         tools=tools,
@@ -201,8 +212,12 @@ async def run_claude_plan_mode(
     with log_file.open("w") as f:
         f.write(json.dumps({"initial_prompt": prompt}) + "\n\n")
 
+    settings = Settings.load()
     if model is None:
-        model = Settings.load().model_for(kind)
+        model = settings.model_for(kind)
+        effort = settings.thinking_for(kind)
+    else:
+        model, effort = split_thinking_level(model)
     session_id: str | None = None
     current_prompt = prompt
 
@@ -210,6 +225,7 @@ async def run_claude_plan_mode(
         schema = PlanOrQuestions.model_json_schema()
         options = _build_options(
             model=model,
+            effort=effort,
             session_id=session_id,
             schema=schema,
             readonly=True,

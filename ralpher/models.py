@@ -48,7 +48,10 @@ def normalize_backend(value: str) -> BackendKind:
     return _BACKEND_ALIASES[key]
 
 
-# Per-kind default models for the ``claude-code`` backend.
+# Per-kind default models for the ``claude-code`` backend. Like the antigravity
+# defaults below, a trailing ``:<level>`` suffix sets the reasoning effort
+# (Claude's ``--effort``); a bare name runs at the SDK's own default effort
+# (``high``), which is why these carry no suffix.
 CLAUDE_DEFAULT_MODELS: dict[str, str] = {
     "plan": "claude-opus-4-7[1m]",
     "refine": "claude-opus-4-7[1m]",
@@ -72,19 +75,28 @@ ANTIGRAVITY_DEFAULT_MODELS: dict[str, str] = {
     "extract-tasks": "gemini-3.5-flash:medium",
 }
 
-# Recognized thinking-level suffixes, mirroring the SDK ``ThinkingLevel`` enum
-# values (kept as plain strings so this module needs no antigravity import).
-_THINKING_LEVELS = ("minimal", "low", "medium", "high")
+# Recognized thinking-level suffixes per backend. A trailing ``:<level>`` on a
+# model spec sets the reasoning effort; the valid set differs by backend.
+# claude-code mirrors the SDK's ``EffortLevel`` (passed as ``--effort``);
+# antigravity mirrors its ``ThinkingLevel`` enum. Kept as plain strings so this
+# module needs no SDK import.
+_THINKING_LEVELS: dict[BackendKind, tuple[str, ...]] = {
+    "claude-code": ("low", "medium", "high", "xhigh", "max"),
+    "antigravity": ("minimal", "low", "medium", "high"),
+}
 
 
-def split_thinking_level(model: str) -> tuple[str, str | None]:
-    """Peel a trailing ``:<level>`` thinking suffix off an antigravity model.
+def split_thinking_level(
+    model: str, backend: BackendKind = DEFAULT_BACKEND
+) -> tuple[str, str | None]:
+    """Peel a trailing ``:<level>`` thinking suffix off a model spec.
 
-    ``"gemini-3.1-pro-preview:high"`` → ``("gemini-3.1-pro-preview", "high")``.
-    A string without a recognized suffix is returned unchanged, with ``None``.
+    ``"claude-opus-4-7:high"`` → ``("claude-opus-4-7", "high")``. The level must
+    be valid for ``backend`` (see ``_THINKING_LEVELS``); a string without a
+    recognized suffix is returned unchanged, with ``None``.
     """
     name, sep, level = model.rpartition(":")
-    if sep and name and level in _THINKING_LEVELS:
+    if sep and name and level in _THINKING_LEVELS[backend]:
         return name, level
     return model, None
 
@@ -115,29 +127,36 @@ class Settings(BaseModel):
             return cls()
         return cls.model_validate(json.loads(path.read_text()))
 
+    def _spec_for(self, kind: str, backend: BackendKind) -> str | None:
+        """Resolved model spec (name plus any ``:<level>`` suffix) for ``kind``.
+
+        A model pinned in settings.json wins over the backend's per-kind default.
+        """
+        defaults = (
+            CLAUDE_DEFAULT_MODELS
+            if backend == "claude-code"
+            else ANTIGRAVITY_DEFAULT_MODELS
+        )
+        return self.models.get(kind) or defaults.get(kind)
+
     def model_for(
         self, kind: str, backend: BackendKind = DEFAULT_BACKEND
     ) -> str | None:
-        if backend == "claude-code":
-            return self.models.get(kind) or CLAUDE_DEFAULT_MODELS.get(kind)
-        spec = self.models.get(kind) or ANTIGRAVITY_DEFAULT_MODELS.get(kind)
-        return split_thinking_level(spec)[0] if spec else None
+        spec = self._spec_for(kind, backend)
+        return split_thinking_level(spec, backend)[0] if spec else None
 
     def thinking_for(
         self, kind: str, backend: BackendKind = DEFAULT_BACKEND
     ) -> str | None:
         """Default thinking level (reasoning effort) for ``kind``.
 
-        Antigravity-only: the claude-code backend has no thinking-level knob,
-        so this is always ``None`` there. The level is the ``:<level>`` suffix
-        on the resolved model spec (pinned in settings.json, else the
-        ``ANTIGRAVITY_DEFAULT_MODELS`` default), so a bare pinned name yields
-        ``None`` — the SDK's own default effort.
+        The level is the ``:<level>`` suffix on the resolved model spec (pinned
+        in settings.json, else the backend's per-kind default), so a bare name
+        yields ``None`` — the SDK's own default effort. Valid levels differ by
+        backend (claude-code: ``--effort``; antigravity: ``ThinkingLevel``).
         """
-        if backend != "antigravity":
-            return None
-        spec = self.models.get(kind) or ANTIGRAVITY_DEFAULT_MODELS.get(kind)
-        return split_thinking_level(spec)[1] if spec else None
+        spec = self._spec_for(kind, backend)
+        return split_thinking_level(spec, backend)[1] if spec else None
 
 
 def resolve_backend(cli_backend: str | None) -> BackendKind:
