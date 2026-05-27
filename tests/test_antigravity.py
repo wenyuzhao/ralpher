@@ -5,7 +5,7 @@ import pytest
 from pydantic import BaseModel
 
 from google.antigravity.hooks.policy import Decision
-from google.antigravity.types import BuiltinTools, ToolCall
+from google.antigravity.types import BuiltinTools, ThinkingLevel, ToolCall
 
 from ralpher.models import Project
 from ralpher.backend import antigravity
@@ -87,9 +87,20 @@ class TestBuildConfig:
     def test_model_and_schema_passed_through(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         cfg = _build_config(model="gemini-3-pro", schema=Out)
+        # Without a thinking level the simple `model` shorthand carries the name.
         assert cfg.model == "gemini-3-pro"
         # The SDK normalizes a pydantic class into its JSON-schema string.
         assert json.loads(cfg.response_schema) == Out.model_json_schema()
+
+    def test_thinking_level_rides_on_gemini_config(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        cfg = _build_config(model="gemini-3.1-pro-preview", thinking_level="high")
+        # The shorthand is left unset; the model rides on gemini_config so the
+        # thinking level travels with it (the SDK forbids setting both).
+        assert cfg.model is None
+        entry = cfg.gemini_config.models.default
+        assert entry.name == "gemini-3.1-pro-preview"
+        assert entry.generation.thinking_level == ThinkingLevel.HIGH
 
     def test_workspace_is_cwd(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -189,6 +200,25 @@ class TestRunAntigravity:
             )
         logs = list((project.project_dir / "logs").glob("verify-*.log"))
         assert logs and "hello" in logs[0].read_text()
+
+    @pytest.mark.asyncio
+    async def test_applies_kind_default_model_and_thinking(self, tmp_path, monkeypatch):
+        # End to end: with no settings.json, the kind's defaults from
+        # ANTIGRAVITY_DEFAULT_MODELS reach the LocalAgentConfig the Agent sees.
+        project = _project(tmp_path, monkeypatch)
+        FakeAgent, record = _install_fake_agent(
+            [_FakeResponse(structured={"value": 1})]
+        )
+        with (
+            patch.object(antigravity, "Agent", FakeAgent),
+            patch.object(antigravity, "Spinner", _NoSpinner),
+        ):
+            await run_antigravity(
+                kind="verify", prompt="x", project=project, schema=Out
+            )
+        entry = record["configs"][0].gemini_config.models.default
+        assert entry.name == "gemini-3.5-flash"
+        assert entry.generation.thinking_level == ThinkingLevel.HIGH
 
 
 # --- dispatch: run_agent selects the backend by project.backend ----------- #

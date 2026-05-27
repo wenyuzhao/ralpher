@@ -9,6 +9,7 @@ from ralpher.models import (
     Settings,
     normalize_backend,
     resolve_backend,
+    split_thinking_level,
 )
 
 
@@ -102,15 +103,64 @@ class TestModelForBackendAware:
         assert s.model_for("plan") == "claude-opus-4-7[1m]"
         assert s.model_for("plan", backend="claude-code") == "claude-opus-4-7[1m]"
 
-    def test_antigravity_has_no_hardcoded_default(self):
-        # No Gemini model is forced — the SDK picks its own default.
-        assert Settings().model_for("plan", backend="antigravity") is None
-        assert Settings().model_for("verify", backend="antigravity") is None
+    def test_antigravity_uses_defaults(self):
+        s = Settings()
+        assert s.model_for("plan", backend="antigravity") == "gemini-3.1-pro-preview"
+        assert s.model_for("verify", backend="antigravity") == "gemini-3.5-flash"
+        assert s.model_for("extract-tasks", backend="antigravity") == "gemini-3.5-flash"
 
     def test_settings_override_applies_to_both_backends(self):
         s = Settings(models={"plan": "gemini-3-pro"})
         assert s.model_for("plan", backend="antigravity") == "gemini-3-pro"
         assert s.model_for("plan", backend="claude-code") == "gemini-3-pro"
+
+    def test_thinking_for_antigravity_uses_kind_defaults(self):
+        s = Settings()
+        assert s.thinking_for("plan", backend="antigravity") == "high"
+        assert s.thinking_for("verify", backend="antigravity") == "high"
+        assert s.thinking_for("extract-tasks", backend="antigravity") == "medium"
+
+    def test_thinking_for_claude_code_is_none(self):
+        assert Settings().thinking_for("plan") is None
+        assert Settings().thinking_for("plan", backend="claude-code") is None
+
+    def test_thinking_for_unknown_kind_is_none(self):
+        assert Settings().thinking_for("nope", backend="antigravity") is None
+
+    def test_pinned_bare_model_has_no_thinking_level(self):
+        # A pinned name without a -<level> suffix runs at the SDK's default
+        # effort; the model still applies, but no thinking level is forced.
+        s = Settings(models={"plan": "gemini-3-pro"})
+        assert s.model_for("plan", backend="antigravity") == "gemini-3-pro"
+        assert s.thinking_for("plan", backend="antigravity") is None
+
+    def test_pinned_model_can_carry_thinking_suffix(self):
+        # The thinking level travels on the model string, so a pin can set it.
+        s = Settings(models={"plan": "gemini-3-pro-low"})
+        assert s.model_for("plan", backend="antigravity") == "gemini-3-pro"
+        assert s.thinking_for("plan", backend="antigravity") == "low"
+
+
+class TestSplitThinkingLevel:
+    def test_peels_known_suffix(self):
+        assert split_thinking_level("gemini-3.5-flash-high") == (
+            "gemini-3.5-flash",
+            "high",
+        )
+        assert split_thinking_level("gemini-3.1-pro-preview-medium") == (
+            "gemini-3.1-pro-preview",
+            "medium",
+        )
+
+    def test_no_suffix_returns_model_unchanged(self):
+        assert split_thinking_level("gemini-3.5-flash") == ("gemini-3.5-flash", None)
+
+    def test_unknown_trailing_word_is_not_a_level(self):
+        # "preview" is part of the name, not a thinking level.
+        assert split_thinking_level("gemini-3.1-pro-preview") == (
+            "gemini-3.1-pro-preview",
+            None,
+        )
 
 
 class TestProjectBackend:

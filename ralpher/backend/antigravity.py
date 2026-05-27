@@ -27,7 +27,16 @@ from pydantic import BaseModel
 
 from google.antigravity import Agent, CapabilitiesConfig, LocalAgentConfig
 from google.antigravity.hooks import policy
-from google.antigravity.types import BuiltinTools, ToolCall
+from google.antigravity.types import (
+    DEFAULT_MODEL,
+    BuiltinTools,
+    GeminiConfig,
+    GenerationConfig,
+    ModelConfig,
+    ModelEntry,
+    ThinkingLevel,
+    ToolCall,
+)
 
 from ralpher.models import Project, Settings, ralpher_root
 from ralpher.utils.error import fail
@@ -69,11 +78,18 @@ def _ralpher_readonly_policies() -> list[policy.Policy]:
 def _build_config(
     *,
     model: str | None = None,
+    thinking_level: str | None = None,
     schema: type[BaseModel] | None = None,
     readonly: bool = False,
     tools: list[str] | None = None,
 ) -> LocalAgentConfig:
     """Build the ``LocalAgentConfig`` for one antigravity run.
+
+    ``thinking_level`` (one of the ``ThinkingLevel`` values) sets the model's
+    reasoning effort. It can only travel on the full ``gemini_config`` — the
+    ``model`` shorthand carries a name only, and the SDK rejects setting both —
+    so when a level is given we build the model entry ourselves and leave the
+    shorthand unset.
 
     ``tools`` is accepted for signature parity with ``run_claude`` but is not
     applied here — its sole caller pairs it with ``readonly=True``, and the
@@ -93,12 +109,28 @@ def _build_config(
     # When not read-only, no allow/deny_all is added: unmatched tools default
     # open (the SDK's behaviour), mirroring Claude Code's bypassPermissions.
 
+    if thinking_level is not None:
+        model_kwargs: dict[str, Any] = {
+            "gemini_config": GeminiConfig(
+                models=ModelConfig(
+                    default=ModelEntry(
+                        name=model or DEFAULT_MODEL,
+                        generation=GenerationConfig(
+                            thinking_level=ThinkingLevel(thinking_level)
+                        ),
+                    )
+                )
+            )
+        }
+    else:
+        model_kwargs = {"model": model}
+
     return LocalAgentConfig(
-        model=model,
         response_schema=schema,
         workspaces=[workspace],
         policies=policies,
         capabilities=CapabilitiesConfig(),
+        **model_kwargs,
     )
 
 
@@ -177,10 +209,18 @@ async def run_antigravity[T: BaseModel](
     with log_file.open("w") as f:
         f.write(json.dumps({"initial_prompt": prompt}) + "\n\n")
 
+    settings = Settings.load()
     if model is None:
-        model = Settings.load().model_for(kind, backend="antigravity")
+        model = settings.model_for(kind, backend="antigravity")
+    thinking_level = settings.thinking_for(kind, backend="antigravity")
 
-    config = _build_config(model=model, schema=schema, readonly=readonly, tools=tools)
+    config = _build_config(
+        model=model,
+        thinking_level=thinking_level,
+        schema=schema,
+        readonly=readonly,
+        tools=tools,
+    )
 
     structured = await _run_chat(
         prompt, config, log_file, expect_structured=schema is not None
@@ -209,10 +249,17 @@ async def run_antigravity_plan_mode(
     with log_file.open("w") as f:
         f.write(json.dumps({"initial_prompt": prompt}) + "\n\n")
 
+    settings = Settings.load()
     if model is None:
-        model = Settings.load().model_for(kind, backend="antigravity")
+        model = settings.model_for(kind, backend="antigravity")
+    thinking_level = settings.thinking_for(kind, backend="antigravity")
 
-    config = _build_config(model=model, schema=PlanOrQuestions, readonly=True)
+    config = _build_config(
+        model=model,
+        thinking_level=thinking_level,
+        schema=PlanOrQuestions,
+        readonly=True,
+    )
     current_prompt = prompt
 
     try:
