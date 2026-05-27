@@ -9,7 +9,7 @@ import typer
 from typer.core import TyperGroup
 
 from ralpher.loop import run_ralph_loop
-from ralpher.models import Project
+from ralpher.models import Project, ralpher_root
 from ralpher.plan.plan import generate_plan
 from ralpher.plan.extract import extract_tasks
 from ralpher.plan.refine import refine_plan
@@ -109,20 +109,20 @@ def plan(
         )
     )
     rich.print(
-        f"[green]✔ Project plan generated at .claude/ralpher/projects/{project.id}/PLAN.md[/]"
+        f"[green]✔ Project plan generated at .ralpher/projects/{project.id}/PLAN.md[/]"
     )
     _sync_to_notion(project)
 
 
 def _get_latest_project_id() -> str:
-    projects_dir = Path.cwd() / ".claude/ralpher" / "projects"
+    projects_dir = ralpher_root() / "projects"
     if not projects_dir.exists():
-        fail("No projects found in .claude/ralpher/projects.")
+        fail("No projects found in .ralpher/projects.")
     project_dirs = sorted(
         [f.name for f in projects_dir.iterdir() if f.is_dir()], reverse=True
     )
     if not project_dirs:
-        fail("No projects found in .claude/ralpher/projects.")
+        fail("No projects found in .ralpher/projects.")
     return project_dirs[0]
 
 
@@ -162,7 +162,7 @@ def refine(
     if result is None:
         return
     rich.print(
-        f"[green]✔ Project Plan refined at .claude/ralpher/projects/{project_id}/PLAN.md[/]"
+        f"[green]✔ Project Plan refined at .ralpher/projects/{project_id}/PLAN.md[/]"
     )
     _sync_to_notion(project)
 
@@ -184,7 +184,7 @@ def extract(
     project = Project(id=project_id)
     asyncio.run(extract_tasks(project=project))
     rich.print(
-        f"[green]✔ Extracted to .claude/ralpher/projects/{project_id}/tasks.json[/]"
+        f"[green]✔ Extracted to .ralpher/projects/{project_id}/tasks.json[/]"
     )
 
 

@@ -5,6 +5,16 @@ from typing import Literal, Optional
 from pydantic import BaseModel
 
 
+def ralpher_root() -> Path:
+    """Root directory holding all ralpher state, relative to the current cwd.
+
+    Single source of truth for the location: both the project file layout
+    (via ``Project.ralpher_dir``) and the read-only deny rules applied to the
+    ``claude`` subprocess derive from this, so they cannot drift apart.
+    """
+    return Path.cwd() / ".ralpher"
+
+
 DEFAULT_MODELS: dict[str, str] = {
     "plan": "claude-opus-4-7[1m]",
     "refine": "claude-opus-4-7[1m]",
@@ -19,7 +29,7 @@ class Settings(BaseModel):
 
     @classmethod
     def load(cls) -> "Settings":
-        path = Path.cwd() / ".claude/ralpher/settings.json"
+        path = ralpher_root() / "settings.json"
         if not path.exists():
             return cls()
         return cls.model_validate(json.loads(path.read_text()))
@@ -105,7 +115,7 @@ class Project(BaseModel):
 
     @property
     def ralpher_dir(self) -> Path:
-        return Path.cwd() / ".claude/ralpher"
+        return ralpher_root()
 
     @property
     def project_dir(self) -> Path:

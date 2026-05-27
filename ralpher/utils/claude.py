@@ -17,7 +17,7 @@ from claude_agent_sdk import (
     query,
 )
 
-from ralpher.models import Project, Questions, Settings
+from ralpher.models import Project, Questions, Settings, ralpher_root
 from ralpher.utils.error import fail
 
 from .spinner import Spinner
@@ -50,6 +50,23 @@ READONLY_TOOLS = [
 ]
 
 
+def _readonly_ralpher_settings() -> str:
+    """Settings JSON that makes the ``.ralpher`` state directory read-only.
+
+    Claude must be able to read its task/plan/progress files (which are passed
+    by absolute path) but never write into them — progress updates are mediated
+    through a temp file in the loop. ``deny`` rules are a hard block that is
+    enforced even under ``bypassPermissions``, so this holds for every call.
+
+    The absolute path uses the ``//`` prefix required by Claude Code's
+    gitignore-style permission patterns for filesystem-root paths.
+    """
+    root = ralpher_root().resolve()
+    pattern = f"//{str(root).lstrip('/')}/**"
+    deny = [f"Write({pattern})", f"Edit({pattern})", f"NotebookEdit({pattern})"]
+    return json.dumps({"permissions": {"deny": deny}})
+
+
 class Plan(BaseModel):
     markdown: str
 
@@ -78,6 +95,9 @@ def _build_options(
         tools=(
             tools if tools is not None else {"type": "preset", "preset": "claude_code"}
         ),
+        # Keep the .ralpher state directory read-only to Claude. deny rules are
+        # enforced even under bypassPermissions, so this holds in the loop too.
+        settings=_readonly_ralpher_settings(),
     )
     return options
 
