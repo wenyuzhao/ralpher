@@ -23,8 +23,6 @@ from ralpher.utils.error import fail
 from .spinner import Spinner
 
 
-PLUGIN_DIR = str(Path(__file__).resolve().parent.parent / "plugin")
-
 READONLY_TOOLS = [
     "Agent",
     "CronCreate",
@@ -73,7 +71,6 @@ def _build_options(
 
     options = ClaudeAgentOptions(
         permission_mode="dontAsk" if readonly else "bypassPermissions",
-        plugins=[{"type": "local", "path": PLUGIN_DIR}],
         model=model,
         resume=session_id,
         output_format={"type": "json_schema", "schema": schema} if schema else None,

@@ -41,27 +41,26 @@ Typer app with a `DefaultCommandGroup` that routes unknown first args to a `run`
 The `Project` Pydantic model is the central handle for a run. It owns all filesystem paths under `.claude/ralpher/projects/{project_id}/` via properties (`plan_md`, `tasks_json`, `progress_md`, `prompt_md`, `questions_json`, `current_task_json`, `config_json`) and load/save helpers for `Tasks`, `Questions`, `ProjectConfig`, and `current_task`. `Task` has `id`, `title`, `description`, `acceptance_criteria`, and a `passes` boolean — the loop picks the first failing task each iteration. `ProjectConfig` stores `base_branch` and `target_branch` for the run.
 
 ### Plan flow — [ralpher/plan/](ralpher/plan/)
-- [plan.py](ralpher/plan/plan.py) initializes the project directory + git branches, then invokes `claude` with `/ralpher:plan` via `run_claude_plan_mode` (Q&A loop — Claude can return either a finished plan or clarification questions, which are prompted to the user interactively).
-- [refine.py](ralpher/plan/refine.py) runs `/ralpher:refine` against an existing plan.
+- [plan.py](ralpher/plan/plan.py) initializes the project directory + git branches, then invokes `claude` with the rendered `plan` prompt via `run_claude_plan_mode` (Q&A loop — Claude can return either a finished plan or clarification questions, which are prompted to the user interactively).
+- [refine.py](ralpher/plan/refine.py) runs the rendered `refine` prompt against an existing plan.
 - [extract.py](ralpher/plan/extract.py) parses `PLAN.md` into structured `Tasks` JSON via Claude with a JSON schema; retries up to 3 attempts.
 
 ### Loop execution — [ralpher/loop/](ralpher/loop/)
 - [loop.py](ralpher/loop/loop.py) `run_ralph_loop` is the main driver: calls `prepare`, then iterates until `max_iterations` (default 30) or all tasks pass. Each iteration picks the first failing task, invokes `iterate`, and reloads `tasks.json` to check progress.
-- [iterate.py](ralpher/loop/iterate.py) writes `current_task.json`, calls Claude with `/ralpher:iterate` and a `Result { task_passed }` schema, then updates `tasks.json`.
+- [iterate.py](ralpher/loop/iterate.py) writes `current_task.json`, calls Claude with the rendered `iterate` prompt, then verifies with the rendered `verify` prompt and a `Result { task_passed }` schema, then updates `tasks.json`.
 - [prepare.py](ralpher/loop/prepare.py) handles first-run setup (extracting tasks, initializing progress).
+
+### Prompts — [ralpher/prompts/](ralpher/prompts/)
+`render_prompt(name, **vars)` renders a Jinja2 template in [ralpher/prompts/](ralpher/prompts/) (`plan.md`, `refine.md`, `extract-tasks.md`, `iterate.md`, `verify.md`) and returns the result, which callers pass to `run_claude` / `run_claude_plan_mode` as the **initial prompt**. The templates are the actual prompts that drive Claude — most behavior lives in markdown, not Python. They reference the project's files by absolute path (rendered from `Project` properties), and `plan.md`/`refine.md` point the agent at `plan-structure.md` (its absolute path is injected as the `plan_structure_path` Jinja global) to read. The Jinja env uses `StrictUndefined`, so a template variable that a caller forgets to pass raises at render time. Adapted from [snarktank/ralph](https://github.com/snarktank/ralph). (This replaces the former `--plugin-dir`-loaded `/ralpher:*` skills.)
 
 ### Claude subprocess — [ralpher/utils/claude.py](ralpher/utils/claude.py)
 `run_claude` and `run_claude_plan_mode` are the only ways to invoke `claude`. Key flags passed:
 - `--permission-mode dontAsk`, `--output-format stream-json`, `--verbose`
-- `--plugin-dir <ralpher/plugin>` so the `/ralpher:*` slash commands resolve
 - `--json-schema <pydantic schema>` for structured output (Claude writes a `result` JSONL record with a `structured_output` field, which `_load_structured_output` parses from the log)
 - `--dangerously-skip-permissions` unless `readonly=True` (in which case `READONLY_TOOLS` is used)
 - `--resume <session_id>` for Q&A continuation in plan mode
 
 All subprocess output is tee'd to `.claude/ralpher/projects/{project_id}/logs/claude-{timestamp}.log`, and `session_id` is recovered by scanning that log.
-
-### Plugin — [ralpher/plugin/](ralpher/plugin/)
-`skills/{plan,iterate,refine,extract-tasks}/SKILL.md` — Claude skill definitions loaded via `--plugin-dir`. These are the actual prompts that drive Claude; most behavior lives in markdown, not Python. Adapted from [snarktank/ralph](https://github.com/snarktank/ralph).
 
 ### Git branch management — [ralpher/utils/git.py](ralpher/utils/git.py)
 Each project runs on `ralph/{project_id}`, forked from a resolved base branch (`--base-branch`, else `main`, else `master`). `checkout_branch` auto-inits the repo with an empty commit if none exists. A `.no-branch` sentinel file in the repo root disables automatic branch creation (useful for repos that should stay on a single branch).

@@ -1,9 +1,3 @@
----
-name: extract-tasks
-description: Extract structured tasks from a project plan.
-disable-model-invocation: true
----
-
 # Extract Tasks from a Project Plan
 
 Extract all the tasks from an existing Project Plan to the tasks.json format that Ralph uses for autonomous execution.
@@ -18,7 +12,7 @@ Take a Project Plan (markdown file or text) and convert it a list of tasks in th
 
 ## The Project Plan Input
 
-@.claude/ralpher/projects/$0/PLAN.md
+The Project Plan to extract tasks from is in the file `{{ plan_path }}`. Read it.
 
 ---
 

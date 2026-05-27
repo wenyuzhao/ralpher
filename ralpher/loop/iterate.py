@@ -7,6 +7,7 @@ import tempfile
 import contextlib
 
 from ..models import Project
+from ..prompts import render_prompt
 from ..utils.claude import run_claude
 from ..utils.hooks import HooksManager
 
@@ -66,7 +67,12 @@ async def implement(project: Project) -> None:
     with with_temp_file(project.progress_md) as temp_file:
         await run_claude(
             kind="loop",
-            prompt=f"/ralpher:iterate {project.id} {temp_file}",
+            prompt=render_prompt(
+                "iterate",
+                current_task_path=str(project.current_task_json),
+                plan_path=str(project.plan_md),
+                progress_path=str(temp_file),
+            ),
             project=project,
         )
 
@@ -79,7 +85,11 @@ async def verify(project: Project) -> Result:
 
     return await run_claude(
         kind="verify",
-        prompt=f"/ralpher:verify {project.id}",
+        prompt=render_prompt(
+            "verify",
+            current_task_path=str(project.current_task_json),
+            plan_path=str(project.plan_md),
+        ),
         project=project,
         schema=Result,
     )

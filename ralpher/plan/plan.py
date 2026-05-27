@@ -1,4 +1,5 @@
 from ralpher.models import Project
+from ralpher.prompts import render_prompt
 from ralpher.utils.project import init_project
 
 from ..utils.claude import run_claude_plan_mode
@@ -18,7 +19,7 @@ async def generate_plan(
 
     await run_claude_plan_mode(
         kind="plan",
-        prompt=f"/ralpher:plan {project.id}",
+        prompt=render_prompt("plan", prompt_path=str(project.prompt_md)),
         project=project,
     )
 

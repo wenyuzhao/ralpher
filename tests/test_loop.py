@@ -145,10 +145,15 @@ class TestIterate:
             mock_run.call_args_list[0][1],
             mock_run.call_args_list[1][1],
         )
-        assert f"/ralpher:iterate {task_id}" in implement_kwargs["prompt"]
+        # Prompts are rendered from the prompt templates; they reference the
+        # project's files by path (which embed the project id) rather than a
+        # slash command.
+        assert "Coding Agent Instructions" in implement_kwargs["prompt"]
+        assert task_id in implement_kwargs["prompt"]
         assert implement_kwargs.get("schema") is None
         assert implement_kwargs["project"] is project
-        assert verify_kwargs["prompt"] == f"/ralpher:verify {task_id}"
+        assert "Verification Agent Instructions" in verify_kwargs["prompt"]
+        assert task_id in verify_kwargs["prompt"]
         assert verify_kwargs["schema"] is Result
 
 

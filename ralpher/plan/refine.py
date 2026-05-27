@@ -6,6 +6,7 @@ import rich
 from rich.console import Console
 
 from ralpher.models import Project
+from ralpher.prompts import render_prompt
 from ralpher.utils.git import checkout_existing_branch
 from ralpher.utils.notion_comments import (
     fetch_project_plan_comments,
@@ -15,8 +16,6 @@ from ralpher.utils.notion_comments import (
 
 from ..utils.claude import run_claude_plan_mode
 from ..utils.error import fail
-
-PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
 console = Console()
 
@@ -70,7 +69,11 @@ async def refine_plan(*, project: Project, prompt: str | None) -> str | None:
 
         await run_claude_plan_mode(
             kind="refine",
-            prompt=f"/ralpher:refine {project.id} {tmp_path}",
+            prompt=render_prompt(
+                "refine",
+                plan_path=str(project.plan_md),
+                input_path=str(tmp_path),
+            ),
             project=project,
         )
 

@@ -213,8 +213,10 @@ class TestGeneratePlan:
         mock_run.side_effect = side_effect
         await generate_plan(project=project, prompt="Implement SSO login")
         call_kwargs = mock_run.call_args[1]
+        # The rendered prompt references the project's PROMPT.md path, which
+        # embeds the project id, and carries the plan-skill instructions.
         assert task_id in call_kwargs["prompt"]
-        assert "/ralpher:plan" in call_kwargs["prompt"]
+        assert "Create Project Plan" in call_kwargs["prompt"]
         assert call_kwargs["project"] is project
 
     @patch("ralpher.plan.plan.init_project")

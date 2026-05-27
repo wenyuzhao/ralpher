@@ -1,9 +1,3 @@
----
-name: plan
-description: Generate a structured project plan.
-disable-model-invocation: true
----
-
 # Create Project Plan
 
 Create a detailed Project Plan that is clear, actionable, and suitable for implementation.
@@ -27,7 +21,7 @@ Create a detailed Project Plan that is clear, actionable, and suitable for imple
 
 ## User Provided Feature Description
 
-@.claude/ralpher/projects/$0/PROMPT.md
+Read the user-provided feature description from the file `{{ prompt_path }}` before doing anything else.
 
 ---
 
@@ -62,7 +56,7 @@ If any questions are depend on the answers to other questions, please ask the de
 
 Generate the Project Plan markdown document.
 
-Please refer to @${CLAUDE_SKILL_DIR}/../../docs/plan-structure.md for a list of required sections and an example.
+Read the file `{{ plan_structure_path }}` for the list of required sections and an example.
 
 You can do step-2 multiple times to ask more questions before making the plan.
 

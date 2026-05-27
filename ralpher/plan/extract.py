@@ -1,5 +1,6 @@
 import rich
 from ..models import Project, Tasks
+from ..prompts import render_prompt
 from ..utils.claude import run_claude
 from ..utils.error import fail
 
@@ -10,7 +11,7 @@ async def __try_extract_tasks(project: Project):
     try:
         tasks = await run_claude(
             kind="extract-tasks",
-            prompt=f"/ralpher:extract-tasks {project.id}",
+            prompt=render_prompt("extract-tasks", plan_path=str(project.plan_md)),
             project=project,
             schema=Tasks,
             readonly=True,

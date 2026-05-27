@@ -1,18 +1,12 @@
----
-name: iterate
-description: Iterate on the implementation based on the current task and the project plan.
-disable-model-invocation: true
----
-
 # Coding Agent Instructions
 
 You are an autonomous coding agent working on a task of a software project.
 
 ## Your Task
 
-1. Read and understand the current task: @.claude/ralpher/projects/$0/current_task.json`
-2. Read and understand the complete Project Plan: @.claude/ralpher/projects/$0/PLAN.md (NEVER modify it)
-3. Read the progress log at $1 (check Codebase Patterns section first)
+1. Read and understand the current task: `{{ current_task_path }}`
+2. Read and understand the complete Project Plan: `{{ plan_path }}` (NEVER modify it)
+3. Read the progress log at `{{ progress_path }}` (check Codebase Patterns section first)
 4. Implement that single task
 5. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
 6. Update CLAUDE.md files if you discover reusable patterns (see below)
@@ -28,7 +22,7 @@ A separate verification agent will independently assess whether the task is comp
 
 ## Progress Report File and Format
 
-File: @$1
+File: `{{ progress_path }}`
 
 APPEND to the file (never replace, always append):
 ```

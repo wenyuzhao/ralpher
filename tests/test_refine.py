@@ -80,7 +80,9 @@ class TestRefinePlan:
 
         await refine_plan(project=project, prompt="add feature X")
         call_kwargs = mock_run.call_args[1]
-        assert "/ralpher:refine" in call_kwargs["prompt"]
+        # The rendered prompt references the project's PLAN.md path (which
+        # embeds the project id) and carries the refine-skill instructions.
+        assert "Refine the Project Plan" in call_kwargs["prompt"]
         assert task_id in call_kwargs["prompt"]
         assert call_kwargs["project"] is project
 

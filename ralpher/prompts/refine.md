@@ -1,9 +1,3 @@
----
-name: refine
-description: Refine the Project Plan based on user's input.
-disable-model-invocation: true
----
-
 # Refine the Project Plan
 
 Refine the Project Plan based on user's input.
@@ -27,13 +21,13 @@ Refine the Project Plan based on user's input.
 
 ## The Original Project Plan
 
-@.claude/ralpher/projects/$0/PLAN.md
+The original Project Plan is in the file `{{ plan_path }}`. Read it before making any changes.
 
 ---
 
 ## User Provided Input
 
-@$1
+The user's refinement instruction is in the file `{{ input_path }}`. Read it.
 
 ---
 
@@ -65,7 +59,7 @@ If any questions are depend on the answers to other questions, please ask the de
 
 Generate the updated the Project Plan markdown document.
 
-Please refer to @${CLAUDE_SKILL_DIR}/../../docs/plan-structure.md for a list of required sections and an example.
+Read the file `{{ plan_structure_path }}` for the list of required sections and an example.
 
 Strictly follow the user's instructions, and don't change unrelated parts.
 
