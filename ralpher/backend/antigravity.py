@@ -100,6 +100,12 @@ def _build_config(
     # Specific .ralpher write denies apply in every mode (loop, verify, plan).
     policies: list[policy.Policy] = list(_ralpher_readonly_policies())
 
+    # ask_question is always denied: ralpher drives its own clarification UX
+    # (the plan-mode Q&A loop), and the loop/verify runs are unattended — the
+    # agent must never block waiting on an interactive answer. This is a
+    # specific deny (highest priority), so it holds in every mode.
+    policies.append(policy.deny(BuiltinTools.ASK_QUESTION.value, name="no_ask_question"))
+
     if readonly:
         # Deny everything, then re-allow only the read-only builtins. Specific
         # allow (priority 3) beats wildcard deny (priority 4); the .ralpher
