@@ -128,7 +128,7 @@ class TestModelForBackendAware:
         assert Settings().thinking_for("nope", backend="antigravity") is None
 
     def test_pinned_bare_model_has_no_thinking_level(self):
-        # A pinned name without a -<level> suffix runs at the SDK's default
+        # A pinned name without a :<level> suffix runs at the SDK's default
         # effort; the model still applies, but no thinking level is forced.
         s = Settings(models={"plan": "gemini-3-pro"})
         assert s.model_for("plan", backend="antigravity") == "gemini-3-pro"
@@ -136,18 +136,18 @@ class TestModelForBackendAware:
 
     def test_pinned_model_can_carry_thinking_suffix(self):
         # The thinking level travels on the model string, so a pin can set it.
-        s = Settings(models={"plan": "gemini-3-pro-low"})
+        s = Settings(models={"plan": "gemini-3-pro:low"})
         assert s.model_for("plan", backend="antigravity") == "gemini-3-pro"
         assert s.thinking_for("plan", backend="antigravity") == "low"
 
 
 class TestSplitThinkingLevel:
     def test_peels_known_suffix(self):
-        assert split_thinking_level("gemini-3.5-flash-high") == (
+        assert split_thinking_level("gemini-3.5-flash:high") == (
             "gemini-3.5-flash",
             "high",
         )
-        assert split_thinking_level("gemini-3.1-pro-preview-medium") == (
+        assert split_thinking_level("gemini-3.1-pro-preview:medium") == (
             "gemini-3.1-pro-preview",
             "medium",
         )
@@ -156,9 +156,9 @@ class TestSplitThinkingLevel:
         assert split_thinking_level("gemini-3.5-flash") == ("gemini-3.5-flash", None)
 
     def test_unknown_trailing_word_is_not_a_level(self):
-        # "preview" is part of the name, not a thinking level.
-        assert split_thinking_level("gemini-3.1-pro-preview") == (
-            "gemini-3.1-pro-preview",
+        # A ":" suffix that isn't a recognized level stays part of the name.
+        assert split_thinking_level("gemini-3.1-pro:preview") == (
+            "gemini-3.1-pro:preview",
             None,
         )
 

@@ -60,16 +60,16 @@ CLAUDE_DEFAULT_MODELS: dict[str, str] = {
 # Per-kind defaults for the ``antigravity`` backend, parallel to
 # ``CLAUDE_DEFAULT_MODELS``. antigravity separates the model from its reasoning
 # effort, but rather than carry a separate field the effort rides on the model
-# string as a trailing ``-<level>`` suffix that ``split_thinking_level`` peels
-# off — so "gemini-3.5-flash-high" means the flash model at high thinking. A
+# string as a trailing ``:<level>`` suffix that ``split_thinking_level`` peels
+# off — so "gemini-3.5-flash:high" means the flash model at high thinking. A
 # model pinned in settings.json may carry its own suffix; a bare name runs at
 # the SDK's own default effort.
 ANTIGRAVITY_DEFAULT_MODELS: dict[str, str] = {
-    "plan": "gemini-3.1-pro-preview-high",
-    "refine": "gemini-3.1-pro-preview-high",
-    "loop": "gemini-3.1-pro-preview-high",
-    "verify": "gemini-3.5-flash-high",
-    "extract-tasks": "gemini-3.5-flash-medium",
+    "plan": "gemini-3.1-pro-preview:high",
+    "refine": "gemini-3.1-pro-preview:high",
+    "loop": "gemini-3.1-pro-preview:high",
+    "verify": "gemini-3.5-flash:high",
+    "extract-tasks": "gemini-3.5-flash:medium",
 }
 
 # Recognized thinking-level suffixes, mirroring the SDK ``ThinkingLevel`` enum
@@ -78,15 +78,14 @@ _THINKING_LEVELS = ("minimal", "low", "medium", "high")
 
 
 def split_thinking_level(model: str) -> tuple[str, str | None]:
-    """Peel a trailing ``-<level>`` thinking suffix off an antigravity model.
+    """Peel a trailing ``:<level>`` thinking suffix off an antigravity model.
 
-    ``"gemini-3.1-pro-preview-high"`` → ``("gemini-3.1-pro-preview", "high")``.
+    ``"gemini-3.1-pro-preview:high"`` → ``("gemini-3.1-pro-preview", "high")``.
     A string without a recognized suffix is returned unchanged, with ``None``.
     """
-    for level in _THINKING_LEVELS:
-        suffix = f"-{level}"
-        if model.endswith(suffix) and len(model) > len(suffix):
-            return model[: -len(suffix)], level
+    name, sep, level = model.rpartition(":")
+    if sep and name and level in _THINKING_LEVELS:
+        return name, level
     return model, None
 
 
@@ -130,7 +129,7 @@ class Settings(BaseModel):
         """Default thinking level (reasoning effort) for ``kind``.
 
         Antigravity-only: the claude-code backend has no thinking-level knob,
-        so this is always ``None`` there. The level is the ``-<level>`` suffix
+        so this is always ``None`` there. The level is the ``:<level>`` suffix
         on the resolved model spec (pinned in settings.json, else the
         ``ANTIGRAVITY_DEFAULT_MODELS`` default), so a bare pinned name yields
         ``None`` — the SDK's own default effort.

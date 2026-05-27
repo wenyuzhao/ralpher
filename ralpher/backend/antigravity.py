@@ -41,7 +41,7 @@ from google.antigravity.types import (
     ToolCall,
 )
 
-from ralpher.models import Project, Settings, ralpher_root
+from ralpher.models import Project, Settings, ralpher_root, split_thinking_level
 from ralpher.utils.error import fail
 
 # The question prompt UX and the plan-mode output schema are backend-agnostic
@@ -225,7 +225,9 @@ async def run_antigravity[T: BaseModel](
     settings = Settings.load()
     if model is None:
         model = settings.model_for(kind, backend="antigravity")
-    thinking_level = settings.thinking_for(kind, backend="antigravity")
+        thinking_level = settings.thinking_for(kind, backend="antigravity")
+    else:
+        model, thinking_level = split_thinking_level(model)
 
     config = _build_config(
         model=model,
@@ -265,7 +267,9 @@ async def run_antigravity_plan_mode(
     settings = Settings.load()
     if model is None:
         model = settings.model_for(kind, backend="antigravity")
-    thinking_level = settings.thinking_for(kind, backend="antigravity")
+        thinking_level = settings.thinking_for(kind, backend="antigravity")
+    else:
+        model, thinking_level = split_thinking_level(model)
 
     config = _build_config(
         model=model,
