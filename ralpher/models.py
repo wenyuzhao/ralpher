@@ -26,6 +26,10 @@ DEFAULT_MODELS: dict[str, str] = {
 
 class Settings(BaseModel):
     models: dict[str, str] = {}
+    # Run Claude's Bash tool in an OS sandbox so the read-only .ralpher deny
+    # rule is enforced against shell writes too. Enabled by default; the loop's
+    # --sandbox/--no-sandbox flag overrides this per run.
+    sandbox: bool = True
 
     @classmethod
     def load(cls) -> "Settings":
@@ -112,6 +116,10 @@ class Project(BaseModel):
     max_iterations: int | None = None
     current_iteration: int | None = None
     current_task_id: Optional[str] = None
+    # Whether the claude subprocess runs with OS-level Bash sandboxing for this
+    # run. Resolved once by the loop command (CLI flag, else Settings.sandbox)
+    # and read by the claude helpers when building options.
+    sandbox: bool = False
 
     @property
     def ralpher_dir(self) -> Path:

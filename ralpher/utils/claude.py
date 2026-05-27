@@ -82,6 +82,7 @@ def _build_options(
     schema: dict[str, Any] | None = None,
     readonly: bool = False,
     tools: list[str] | None = None,
+    sandbox: bool = False,
 ) -> ClaudeAgentOptions:
     if readonly:
         tools = tools or READONLY_TOOLS
@@ -98,6 +99,12 @@ def _build_options(
         # Keep the .ralpher state directory read-only to Claude. deny rules are
         # enforced even under bypassPermissions, so this holds in the loop too.
         settings=_readonly_ralpher_settings(),
+        # Run Bash in an OS sandbox so the .ralpher deny rule is enforced against
+        # shell writes, not just the file tools.
+        sandbox={"enabled": True} if sandbox else None,
+        # Load the user's Claude Code settings rather than running hermetically,
+        # so e.g. a sandbox.network allowlist in .claude/settings.json applies.
+        setting_sources=["user", "project", "local"],
     )
     return options
 
@@ -237,7 +244,11 @@ async def run_claude[T: BaseModel](
     if model is None:
         model = Settings.load().model_for(kind)
     options = _build_options(
-        model=model, schema=schema_dict, readonly=readonly, tools=tools
+        model=model,
+        schema=schema_dict,
+        readonly=readonly,
+        tools=tools,
+        sandbox=project.sandbox,
     )
 
     result = await _run_query(prompt, options, log_file)
@@ -274,6 +285,7 @@ async def run_claude_plan_mode(
             session_id=session_id,
             schema=schema,
             readonly=True,
+            sandbox=project.sandbox,
         )
 
         result = await _run_query(current_prompt, options, log_file)

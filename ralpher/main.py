@@ -9,7 +9,7 @@ import typer
 from typer.core import TyperGroup
 
 from ralpher.loop import run_ralph_loop
-from ralpher.models import Project, ralpher_root
+from ralpher.models import Project, Settings, ralpher_root
 from ralpher.plan.plan import generate_plan
 from ralpher.plan.extract import extract_tasks
 from ralpher.plan.refine import refine_plan
@@ -202,6 +202,13 @@ def loop(
         int,
         typer.Option("--max-iterations", "-n", help="Maximum number of iterations."),
     ] = DEFAULT_MAX_ITERATIONS,
+    sandbox: Annotated[
+        bool | None,
+        typer.Option(
+            "--sandbox/--no-sandbox",
+            help="Run Claude's Bash tool in an OS sandbox.",
+        ),
+    ] = None,
 ) -> None:
     """Run Claude in a loop until tasks are complete or max iterations reached."""
     _require_claude()
@@ -211,6 +218,9 @@ def loop(
     if not project_id:
         project_id = _get_latest_project_id()
 
+    # CLI flag wins when given; otherwise honor .ralpher/settings.json (default on).
+    sandbox_enabled = sandbox if sandbox is not None else Settings.load().sandbox
+
     rich.print(f"[bold blue]Running project: [i]{project_id}[/][/]\n")
 
     async def run_loop_with_hooks():
@@ -218,6 +228,7 @@ def loop(
         project = Project(
             id=project_id,
             max_iterations=max_iterations if max_iterations > 0 else None,
+            sandbox=sandbox_enabled,
         )
         await hooks.init(project)
         try:
