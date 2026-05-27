@@ -59,7 +59,11 @@ If any questions are depend on the answers to other questions, please ask the de
 
 Generate the updated the Project Plan markdown document.
 
-Read the file `{{ plan_structure_path }}` for the list of required sections and an example.
+Follow the structure below for the list of required sections and an example:
+
+<plan-structure>
+{{ plan_structure }}
+</plan-structure>
 
 Strictly follow the user's instructions, and don't change unrelated parts.
 

@@ -19,9 +19,11 @@ _env = Environment(
     autoescape=False,
 )
 
-# Absolute path to the Project Plan structure reference doc. It ships inside
-# this package; templates reference it by path and ask the agent to read it.
-_env.globals["plan_structure_path"] = str(_PROMPTS_DIR / "plan-structure.md")
+# Content of the Project Plan structure reference doc. It ships inside this
+# package; its full text is embedded directly into the plan/refine prompts so
+# the agent never has to read a file outside the run's workspace (the
+# antigravity backend confines file access to that workspace).
+_env.globals["plan_structure"] = (_PROMPTS_DIR / "plan-structure.md").read_text()
 
 
 def render_prompt(name: str, /, **context: object) -> str:

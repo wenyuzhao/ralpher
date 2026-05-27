@@ -56,7 +56,11 @@ If any questions are depend on the answers to other questions, please ask the de
 
 Generate the Project Plan markdown document.
 
-Read the file `{{ plan_structure_path }}` for the list of required sections and an example.
+Follow the structure below for the list of required sections and an example:
+
+<plan-structure>
+{{ plan_structure }}
+</plan-structure>
 
 You can do step-2 multiple times to ask more questions before making the plan.
 
