@@ -133,23 +133,25 @@ class TestBuildConfig:
         assert deny.when(outside) is False
         assert deny.when(no_path) is False
 
-    def test_ask_question_always_denied(self, tmp_path, monkeypatch):
+    def test_ask_question_always_disabled(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        # Both unattended (loop/verify) and readonly (plan) runs must deny it.
-        for kwargs in ({}, {"readonly": True}):
-            cfg = _build_config(**kwargs)
-            deny = next(p for p in cfg.policies if p.name == "no_ask_question")
-            assert deny.tool == BuiltinTools.ASK_QUESTION.value
-            assert deny.decision == Decision.DENY
-            # Unconditional deny — it fires regardless of the tool-call args.
-            assert deny.when is None
+        # Unattended (loop/verify): ask_question is dropped from the tool set.
+        cfg = _build_config()
+        assert cfg.capabilities.disabled_tools == [BuiltinTools.ASK_QUESTION]
+        # Readonly (plan): the read-only whitelist excludes it anyway.
+        cfg = _build_config(readonly=True)
+        assert BuiltinTools.ASK_QUESTION not in cfg.capabilities.enabled_tools
 
-    def test_readonly_adds_deny_all_and_read_only_allows(self, tmp_path, monkeypatch):
+    def test_readonly_whitelists_read_only_tools_via_capabilities(
+        self, tmp_path, monkeypatch
+    ):
         monkeypatch.chdir(tmp_path)
         cfg = _build_config(readonly=True)
-        assert any(p.tool == "*" and p.decision == Decision.DENY for p in cfg.policies)
-        allowed = {p.tool for p in cfg.policies if p.decision == Decision.APPROVE}
-        assert allowed == {t.value for t in BuiltinTools.read_only()}
+        # Read-only mode exposes exactly the safe read builtins, as a whitelist.
+        assert cfg.capabilities.enabled_tools == BuiltinTools.read_only()
+        assert cfg.capabilities.disabled_tools is None
+        # No blanket deny_all policy anymore — capabilities gate the tool set.
+        assert not any(p.tool == "*" for p in cfg.policies)
         # The .ralpher write guard is still present alongside the read-only set.
         assert any(p.name == "ralpher_readonly" for p in cfg.policies)
 

@@ -12,6 +12,9 @@ Differences from the claude-code backend:
   validate against the pydantic ``schema`` ourselves).
 - The read-only ``.ralpher`` guarantee is enforced with deny *policies* on the
   file-writing builtins rather than Claude Code ``deny`` permission rules.
+  Whole-tool restrictions (disabling ``ask_question``, the read-only tool set)
+  instead go through ``CapabilitiesConfig``, which drops the tool from the
+  model's context entirely.
 - The OS Bash sandbox (``project.sandbox``) has no antigravity equivalent and
   is ignored; file writes are still confined to the workspace + the .ralpher
   deny policies.
@@ -93,27 +96,31 @@ def _build_config(
 
     ``tools`` is accepted for signature parity with ``run_claude`` but is not
     applied here — its sole caller pairs it with ``readonly=True``, and the
-    read-only allow-list below is exactly the safe read tool set.
+    read-only capability set below is exactly the safe read tool set.
+
+    Which builtins the model can even see is set via ``capabilities`` rather
+    than policies: capabilities drop a tool from the model's context entirely
+    (the SDK's recommended mechanism for an unconditional restriction), whereas
+    a deny policy still shows the tool and rejects calls at the hook layer. The
+    path-conditional ``.ralpher`` write guard can't be a capability (it gates a
+    tool only for certain paths), so it stays a policy.
     """
     workspace = str(Path.cwd().resolve())
 
-    # Specific .ralpher write denies apply in every mode (loop, verify, plan).
+    # The .ralpher write guard is path-conditional, so it must remain a policy.
+    # It also doubles as the safety policy the SDK requires whenever write
+    # tools are active (it raises otherwise), which is the non-readonly case.
     policies: list[policy.Policy] = list(_ralpher_readonly_policies())
 
-    # ask_question is always denied: ralpher drives its own clarification UX
-    # (the plan-mode Q&A loop), and the loop/verify runs are unattended — the
-    # agent must never block waiting on an interactive answer. This is a
-    # specific deny (highest priority), so it holds in every mode.
-    policies.append(policy.deny(BuiltinTools.ASK_QUESTION.value, name="no_ask_question"))
-
+    # ask_question is always disabled: the loop/verify turns run unattended and
+    # plan mode drives its own clarification UX, so an interactive question tool
+    # would only stall the run. Read-only mode narrows the set further to the
+    # safe read builtins (a whitelist, which already excludes ask_question);
+    # enabled_tools and disabled_tools are mutually exclusive, hence either/or.
     if readonly:
-        # Deny everything, then re-allow only the read-only builtins. Specific
-        # allow (priority 3) beats wildcard deny (priority 4); the .ralpher
-        # specific denies (priority 1) still win over those allows.
-        policies.append(policy.deny_all())
-        policies.extend(policy.allow(t.value) for t in BuiltinTools.read_only())
-    # When not read-only, no allow/deny_all is added: unmatched tools default
-    # open (the SDK's behaviour), mirroring Claude Code's bypassPermissions.
+        capabilities = CapabilitiesConfig(enabled_tools=BuiltinTools.read_only())
+    else:
+        capabilities = CapabilitiesConfig(disabled_tools=[BuiltinTools.ASK_QUESTION])
 
     if thinking_level is not None:
         model_kwargs: dict[str, Any] = {
@@ -135,7 +142,7 @@ def _build_config(
         response_schema=schema,
         workspaces=[workspace],
         policies=policies,
-        capabilities=CapabilitiesConfig(),
+        capabilities=capabilities,
         **model_kwargs,
     )
 
