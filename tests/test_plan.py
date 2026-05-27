@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from ralpher.utils.claude import _ask_user_questions
+from ralpher.backend.common import ask_user_questions
 from ralpher.models import Questions, Question, QuestionOption, Project, Tasks
 from ralpher.plan.plan import generate_plan
 from ralpher.plan.extract import extract_tasks
@@ -26,7 +26,7 @@ def _make_questions(raw: list[dict]) -> Questions:
 
 class TestAskUserQuestions:
     @pytest.mark.asyncio
-    @patch("ralpher.utils.claude.ChoiceInput")
+    @patch("ralpher.backend.common.ChoiceInput")
     async def test_single_question_with_options(self, mock_choice_cls):
         # First call: answer question; second call: confirm with "yes"
         mock_choice_cls.return_value.prompt_async = AsyncMock(
@@ -44,11 +44,11 @@ class TestAskUserQuestions:
                 }
             ]
         )
-        result = await _ask_user_questions(questions)
+        result = await ask_user_questions(questions)
         assert json.loads(result) == [{"Q": "API style", "A": "REST"}]
 
     @pytest.mark.asyncio
-    @patch("ralpher.utils.claude.ChoiceInput")
+    @patch("ralpher.backend.common.ChoiceInput")
     async def test_multiple_questions_with_options(self, mock_choice_cls):
         # Two question answers, then confirm
         mock_choice_cls.return_value.prompt_async = AsyncMock(
@@ -74,14 +74,14 @@ class TestAskUserQuestions:
                 },
             ]
         )
-        result = await _ask_user_questions(questions)
+        result = await ask_user_questions(questions)
         assert json.loads(result) == [
             {"Q": "Auth needed?", "A": "Yes"},
             {"Q": "Platform", "A": "Mobile"},
         ]
 
     @pytest.mark.asyncio
-    @patch("ralpher.utils.claude.ChoiceInput")
+    @patch("ralpher.backend.common.ChoiceInput")
     async def test_question_with_options(self, mock_choice_cls):
         mock_choice_cls.return_value.prompt_async = AsyncMock(
             side_effect=["Monolith", "yes"]
@@ -98,11 +98,11 @@ class TestAskUserQuestions:
                 }
             ]
         )
-        result = await _ask_user_questions(questions)
+        result = await ask_user_questions(questions)
         assert json.loads(result) == [{"Q": "Pick a pattern", "A": "Monolith"}]
 
     @pytest.mark.asyncio
-    @patch("ralpher.utils.claude.ChoiceInput")
+    @patch("ralpher.backend.common.ChoiceInput")
     async def test_skips_questions_without_options(self, mock_choice_cls):
         # Confirmation still happens even with no answerable questions
         mock_choice_cls.return_value.prompt_async = AsyncMock(return_value="yes")
@@ -111,12 +111,12 @@ class TestAskUserQuestions:
                 {"header": "X", "question": "No options here", "options": []},
             ]
         )
-        result = await _ask_user_questions(questions)
+        result = await ask_user_questions(questions)
         assert json.loads(result) == []
 
     @pytest.mark.asyncio
-    @patch("ralpher.utils.claude.PromptSession")
-    @patch("ralpher.utils.claude.ChoiceInput")
+    @patch("ralpher.backend.common.PromptSession")
+    @patch("ralpher.backend.common.ChoiceInput")
     async def test_other_option_prompts_freeform(
         self, mock_choice_cls, mock_session_cls
     ):
@@ -138,13 +138,13 @@ class TestAskUserQuestions:
                 }
             ]
         )
-        result = await _ask_user_questions(questions)
+        result = await ask_user_questions(questions)
         assert json.loads(result) == [{"Q": "Pick style", "A": "Custom answer"}]
 
 
 class TestGeneratePlan:
     @patch("ralpher.plan.plan.init_project")
-    @patch("ralpher.plan.plan.run_claude_plan_mode", new_callable=AsyncMock)
+    @patch("ralpher.plan.plan.run_agent_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_returns_task_id_on_success(
         self, mock_run, mock_init, tmp_path, monkeypatch
@@ -162,7 +162,7 @@ class TestGeneratePlan:
         assert result == task_id
 
     @patch("ralpher.plan.plan.init_project")
-    @patch("ralpher.plan.plan.run_claude_plan_mode", new_callable=AsyncMock)
+    @patch("ralpher.plan.plan.run_agent_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_raises_on_claude_error(
         self, mock_run, mock_init, tmp_path, monkeypatch
@@ -173,7 +173,7 @@ class TestGeneratePlan:
             await generate_plan(project=Project(id="task-fail"), prompt="test")
 
     @patch("ralpher.plan.plan.init_project")
-    @patch("ralpher.plan.plan.run_claude_plan_mode", new_callable=AsyncMock)
+    @patch("ralpher.plan.plan.run_agent_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_creates_task_directory_and_prompt(
         self, mock_run, mock_init, tmp_path, monkeypatch
@@ -197,7 +197,7 @@ class TestGeneratePlan:
         assert project.prompt_md.read_text() == "My feature request"
 
     @patch("ralpher.plan.plan.init_project")
-    @patch("ralpher.plan.plan.run_claude_plan_mode", new_callable=AsyncMock)
+    @patch("ralpher.plan.plan.run_agent_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_calls_run_claude_with_correct_args(
         self, mock_run, mock_init, tmp_path, monkeypatch
@@ -220,7 +220,7 @@ class TestGeneratePlan:
         assert call_kwargs["project"] is project
 
     @patch("ralpher.plan.plan.init_project")
-    @patch("ralpher.plan.plan.run_claude_plan_mode", new_callable=AsyncMock)
+    @patch("ralpher.plan.plan.run_agent_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_raises_when_plan_not_created(
         self, mock_run, mock_init, tmp_path, monkeypatch
@@ -246,7 +246,7 @@ class TestExtractTasks:
         with pytest.raises(SystemExit):
             await extract_tasks(project)
 
-    @patch("ralpher.plan.extract.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.plan.extract.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_returns_on_success(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -260,7 +260,7 @@ class TestExtractTasks:
         assert call_kwargs["kind"] == "extract-tasks"
         assert project.tasks_json.exists()
 
-    @patch("ralpher.plan.extract.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.plan.extract.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_raises_on_all_retries_failed(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -272,7 +272,7 @@ class TestExtractTasks:
         with pytest.raises(SystemExit):
             await extract_tasks(project, retries=1)
 
-    @patch("ralpher.plan.extract.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.plan.extract.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_raises_when_tasks_json_not_created(
         self, mock_run, tmp_path, monkeypatch
@@ -286,7 +286,7 @@ class TestExtractTasks:
         with pytest.raises(SystemExit):
             await extract_tasks(project, retries=1)
 
-    @patch("ralpher.plan.extract.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.plan.extract.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_prompt_includes_task_id(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -301,7 +301,7 @@ class TestExtractTasks:
         call_kwargs = mock_run.call_args[1]
         assert "my-task-123" in call_kwargs["prompt"]
 
-    @patch("ralpher.plan.extract.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.plan.extract.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_retries_on_invalid_tasks_json(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -322,7 +322,7 @@ class TestExtractTasks:
         await extract_tasks(project, retries=3)
         assert mock_run.call_count == 2
 
-    @patch("ralpher.plan.extract.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.plan.extract.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_retries_on_claude_error_then_succeeds(
         self, mock_run, tmp_path, monkeypatch

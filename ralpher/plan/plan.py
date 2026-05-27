@@ -2,7 +2,7 @@ from ralpher.models import Project
 from ralpher.prompts import render_prompt
 from ralpher.utils.project import init_project
 
-from ..utils.claude import run_claude_plan_mode
+from ..backend import run_agent_plan_mode
 from ..utils.error import fail
 
 
@@ -17,7 +17,7 @@ async def generate_plan(
 
     init_project(project, prompt, base_branch=base_branch, target_branch=target_branch)
 
-    await run_claude_plan_mode(
+    await run_agent_plan_mode(
         kind="plan",
         prompt=render_prompt("plan", prompt_path=str(project.prompt_md)),
         project=project,

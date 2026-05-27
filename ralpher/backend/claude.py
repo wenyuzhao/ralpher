@@ -3,12 +3,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 from typing import Any, overload
-import html
 
-from prompt_toolkit import PromptSession
-from prompt_toolkit.formatted_text import HTML
-from prompt_toolkit.shortcuts.choice_input import ChoiceInput
-import rich
 from pydantic import BaseModel
 
 from claude_agent_sdk import (
@@ -17,10 +12,11 @@ from claude_agent_sdk import (
     query,
 )
 
-from ralpher.models import Project, Questions, Settings, ralpher_root
+from ralpher.models import Project, Settings, ralpher_root
 from ralpher.utils.error import fail
+from ralpher.utils.spinner import Spinner
 
-from .spinner import Spinner
+from .common import Plan, PlanOrQuestions, ask_user_questions
 
 
 READONLY_TOOLS = [
@@ -65,14 +61,6 @@ def _readonly_ralpher_settings() -> str:
     pattern = f"//{str(root).lstrip('/')}/**"
     deny = [f"Write({pattern})", f"Edit({pattern})", f"NotebookEdit({pattern})"]
     return json.dumps({"permissions": {"deny": deny}})
-
-
-class Plan(BaseModel):
-    markdown: str
-
-
-class PlanOrQuestions(BaseModel):
-    plan_or_questions: Questions | Plan
 
 
 def _build_options(
@@ -136,63 +124,6 @@ async def _run_query(
     return result
 
 
-async def _ask_user_questions(questions: Questions) -> str:
-    """Prompt the user for answers to AskUserQuestion questions."""
-    session = PromptSession()
-
-    while True:
-        results: list[dict[str, str]] = []
-
-        rich.print("[bold blue]Please answer the following clarification questions:[/]")
-
-        for index, q in enumerate(questions.questions):
-            if not q.options:
-                continue
-
-            print()
-            header = q.header
-            choice_options = [
-                (opt.label, f"{opt.label} - {opt.description}") for opt in q.options
-            ]
-            choice_options.append(
-                (
-                    "__other__",
-                    HTML(
-                        "Other - <style color='ansibrightblack'>[please specify]</style>"
-                    ),  # type: ignore
-                )
-            )
-            result = await ChoiceInput(
-                message=HTML(
-                    f"<style color='ansimagenta'><b>[Q{index + 1}] <i>{html.escape(header)}:</i></b> {html.escape(q.question)}</style>"
-                ),
-                options=choice_options,
-            ).prompt_async()
-            if result == "__other__":
-                answer = await session.prompt_async(
-                    HTML("<b><i>Enter your answer: </i></b>")
-                )
-            else:
-                answer = result if result else choice_options[0][0]
-            results.append({"Q": q.question, "A": answer})
-
-        print()
-
-        confirmed = await ChoiceInput(
-            message=HTML(
-                "<style color='ansiblue'><b>Submit these answers?</b></style>"
-            ),
-            options=[
-                ("yes", "Yes - submit these answers"),
-                ("no", "No - answer the questions again"),
-            ],
-        ).prompt_async()
-        if confirmed == "yes":
-            print()
-            return json.dumps(results)
-        print()
-
-
 @overload
 async def run_claude(
     *,
@@ -229,9 +160,7 @@ async def run_claude[T: BaseModel](
     readonly: bool = False,
     tools: list[str] | None = None,
 ) -> T | None:
-    """
-    Run the claude SDK to execute a prompt.
-    """
+    """Run the Claude Agent SDK to execute a prompt."""
     timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
     log_file = project.project_dir / "logs" / f"{kind}-{timestamp}.log"
     log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -263,8 +192,7 @@ async def run_claude[T: BaseModel](
 async def run_claude_plan_mode(
     *, kind: str, prompt: str, project: Project, model: str | None = None
 ):
-    """Run claude SDK with Q&A loop for plan generation."""
-
+    """Run the Claude Agent SDK with a Q&A loop for plan generation."""
     timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
     log_file = project.project_dir / "logs" / f"{kind}-{timestamp}.log"
     log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -304,7 +232,7 @@ async def run_claude_plan_mode(
             project.plan_md.write_text(output.plan_or_questions.markdown)
             return
         else:
-            current_prompt = await _ask_user_questions(output.plan_or_questions)
+            current_prompt = await ask_user_questions(output.plan_or_questions)
             with log_file.open("a") as f:
                 f.write("\n" + json.dumps({"answers": current_prompt}) + "\n\n")
             continue

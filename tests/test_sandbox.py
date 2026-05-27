@@ -1,7 +1,7 @@
 import json
 
 from ralpher.models import Project, Settings
-from ralpher.utils.claude import _build_options
+from ralpher.backend.claude import _build_options
 
 
 class TestSandboxDefaults:

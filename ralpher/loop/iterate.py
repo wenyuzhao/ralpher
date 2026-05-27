@@ -8,7 +8,7 @@ import contextlib
 
 from ..models import Project
 from ..prompts import render_prompt
-from ..utils.claude import run_claude
+from ..backend import run_agent
 from ..utils.hooks import HooksManager
 
 
@@ -65,7 +65,7 @@ async def implement(project: Project) -> None:
     assert project.current_iteration is not None
 
     with with_temp_file(project.progress_md) as temp_file:
-        await run_claude(
+        await run_agent(
             kind="loop",
             prompt=render_prompt(
                 "iterate",
@@ -83,7 +83,7 @@ async def verify(project: Project) -> Result:
     so it cannot rubber-stamp its own work."""
     assert project.current_iteration is not None
 
-    return await run_claude(
+    return await run_agent(
         kind="verify",
         prompt=render_prompt(
             "verify",

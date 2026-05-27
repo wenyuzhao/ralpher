@@ -30,7 +30,7 @@ class TestRefinePlan:
             await refine_plan(project=project, prompt="add auth")
 
     @patch("ralpher.plan.refine.checkout_existing_branch")
-    @patch("ralpher.plan.refine.run_claude_plan_mode", new_callable=AsyncMock)
+    @patch("ralpher.plan.refine.run_agent_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_returns_task_id_on_success(
         self, mock_run, mock_checkout, tmp_path, monkeypatch
@@ -46,7 +46,7 @@ class TestRefinePlan:
         assert result == task_id
 
     @patch("ralpher.plan.refine.checkout_existing_branch")
-    @patch("ralpher.plan.refine.run_claude_plan_mode", new_callable=AsyncMock)
+    @patch("ralpher.plan.refine.run_agent_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_raises_when_plan_deleted_after_refine(
         self, mock_run, mock_checkout, tmp_path, monkeypatch
@@ -66,7 +66,7 @@ class TestRefinePlan:
             await refine_plan(project=project, prompt="break everything")
 
     @patch("ralpher.plan.refine.checkout_existing_branch")
-    @patch("ralpher.plan.refine.run_claude_plan_mode", new_callable=AsyncMock)
+    @patch("ralpher.plan.refine.run_agent_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_command_uses_refine_skill(
         self, mock_run, mock_checkout, tmp_path, monkeypatch
@@ -89,7 +89,7 @@ class TestRefinePlan:
 
 class TestRefinePlanWithNotion:
     @patch("ralpher.plan.refine.checkout_existing_branch")
-    @patch("ralpher.plan.refine.run_claude_plan_mode", new_callable=AsyncMock)
+    @patch("ralpher.plan.refine.run_agent_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_skips_when_no_prompt_and_notion_unconfigured(
         self, mock_run, mock_checkout, tmp_path, monkeypatch
@@ -105,7 +105,7 @@ class TestRefinePlanWithNotion:
         mock_run.assert_not_awaited()
 
     @patch("ralpher.plan.refine.checkout_existing_branch")
-    @patch("ralpher.plan.refine.run_claude_plan_mode", new_callable=AsyncMock)
+    @patch("ralpher.plan.refine.run_agent_plan_mode", new_callable=AsyncMock)
     @patch("ralpher.plan.refine.resolve_comments", new_callable=AsyncMock)
     @patch("ralpher.plan.refine.fetch_project_plan_comments", new_callable=AsyncMock)
     @pytest.mark.asyncio
@@ -126,7 +126,7 @@ class TestRefinePlanWithNotion:
         mock_resolve.assert_not_awaited()
 
     @patch("ralpher.plan.refine.checkout_existing_branch")
-    @patch("ralpher.plan.refine.run_claude_plan_mode", new_callable=AsyncMock)
+    @patch("ralpher.plan.refine.run_agent_plan_mode", new_callable=AsyncMock)
     @patch("ralpher.plan.refine.resolve_comments", new_callable=AsyncMock)
     @patch("ralpher.plan.refine.fetch_project_plan_comments", new_callable=AsyncMock)
     @pytest.mark.asyncio
@@ -157,7 +157,7 @@ class TestRefinePlanWithNotion:
         mock_resolve.assert_awaited_once_with(comments)
 
     @patch("ralpher.plan.refine.checkout_existing_branch")
-    @patch("ralpher.plan.refine.run_claude_plan_mode", new_callable=AsyncMock)
+    @patch("ralpher.plan.refine.run_agent_plan_mode", new_callable=AsyncMock)
     @patch("ralpher.plan.refine.resolve_comments", new_callable=AsyncMock)
     @patch("ralpher.plan.refine.fetch_project_plan_comments", new_callable=AsyncMock)
     @pytest.mark.asyncio

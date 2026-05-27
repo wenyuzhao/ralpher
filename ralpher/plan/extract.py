@@ -1,7 +1,7 @@
 import rich
 from ..models import Project, Tasks
 from ..prompts import render_prompt
-from ..utils.claude import run_claude
+from ..backend import run_agent
 from ..utils.error import fail
 
 
@@ -9,7 +9,7 @@ async def __try_extract_tasks(project: Project):
     """Run a Claude Code session to extract tasks.json."""
 
     try:
-        tasks = await run_claude(
+        tasks = await run_agent(
             kind="extract-tasks",
             prompt=render_prompt("extract-tasks", plan_path=str(project.plan_md)),
             project=project,

@@ -9,7 +9,7 @@ import typer
 from typer.core import TyperGroup
 
 from ralpher.loop import run_ralph_loop
-from ralpher.models import Project, Settings, ralpher_root
+from ralpher.models import BackendKind, Project, Settings, ralpher_root, resolve_backend
 from ralpher.plan.plan import generate_plan
 from ralpher.plan.extract import extract_tasks
 from ralpher.plan.refine import refine_plan
@@ -39,12 +39,43 @@ def _sync_to_notion(project: Project) -> None:
         )
 
 
-def _require_claude() -> None:
-    """Exit with an error if the claude CLI is not on PATH."""
+def _require_backend(backend: BackendKind) -> None:
+    """Exit with an error if the selected backend's prerequisites are missing."""
+    if backend == "antigravity":
+        import os
+
+        if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")):
+            fail(
+                "GEMINI_API_KEY not set. The antigravity backend needs a Gemini API key — "
+                "get one at https://aistudio.google.com/app/api-keys and set GEMINI_API_KEY "
+                "(e.g. in .env)."
+            )
+        return
     if not shutil.which("claude"):
         fail(
             "'claude' CLI not found on PATH. Install it first: https://docs.anthropic.com/en/docs/claude-code"
         )
+
+
+def _resolve_backend_or_fail(cli_backend: str | None) -> BackendKind:
+    """Resolve the backend (CLI flag, else settings.json), failing on bad input."""
+    try:
+        return resolve_backend(cli_backend)
+    except ValueError as e:
+        fail(str(e))
+
+
+BackendOption = Annotated[
+    str | None,
+    typer.Option(
+        "--backend",
+        "-b",
+        help=(
+            "Coding agent backend: claude-code (cc) or antigravity (agy). "
+            "Defaults to the 'backend' key in .ralpher/settings.json, else claude-code."
+        ),
+    ),
+]
 
 
 class DefaultCommandGroup(TyperGroup):
@@ -90,16 +121,18 @@ def plan(
             help="Target branch to work on. Created from base-branch if it doesn't exist.",
         ),
     ] = None,
+    backend: BackendOption = None,
 ) -> None:
     """Generate a Project Plan."""
-    _require_claude()
     load_dotenv(find_dotenv(usecwd=True))
+    backend_kind = _resolve_backend_or_fail(backend)
+    _require_backend(backend_kind)
     if Path(prompt).is_file():
         prompt = Path(prompt).read_text()
     project_id = _gen_project_id(name)
 
     rich.print(f"[bold blue]Generating plan for new project: [i]{project_id}[/][/]\n")
-    project = Project(id=project_id)
+    project = Project(id=project_id, backend=backend_kind)
     asyncio.run(
         generate_plan(
             project=project,
@@ -142,6 +175,7 @@ def refine(
             help="The project ID of the Project Plan to refine. Defaults to the latest project.",
         ),
     ] = None,
+    backend: BackendOption = None,
 ) -> None:
     """Refine an existing Project Plan.
 
@@ -149,13 +183,14 @@ def refine(
     Plan section are fetched automatically, combined with the prompt, and
     resolved after refinement.
     """
-    _require_claude()
     load_dotenv(find_dotenv(usecwd=True))
+    backend_kind = _resolve_backend_or_fail(backend)
+    _require_backend(backend_kind)
     if not project_id:
         # Default to the latest project if no project_id is provided
         project_id = _get_latest_project_id()
     rich.print(f"[bold blue]Refining plan for project: [i]{project_id}[/][/]\n")
-    project = Project(id=project_id)
+    project = Project(id=project_id, backend=backend_kind)
     if prompt and Path(prompt).is_file():
         prompt = Path(prompt).read_text()
     result = asyncio.run(refine_plan(project=project, prompt=prompt))
@@ -175,17 +210,18 @@ def extract(
             help="The project ID to extract JSON from. Defaults to the latest project.",
         ),
     ] = None,
+    backend: BackendOption = None,
 ) -> None:
     """Extract tasks.json for a given project ID."""
-    _require_claude()
+    load_dotenv(find_dotenv(usecwd=True))
+    backend_kind = _resolve_backend_or_fail(backend)
+    _require_backend(backend_kind)
     if not project_id:
         project_id = _get_latest_project_id()
     rich.print(f"[bold blue]Extracting tasks.json for project: [i]{project_id}[/][/]\n")
-    project = Project(id=project_id)
+    project = Project(id=project_id, backend=backend_kind)
     asyncio.run(extract_tasks(project=project))
-    rich.print(
-        f"[green]✔ Extracted to .ralpher/projects/{project_id}/tasks.json[/]"
-    )
+    rich.print(f"[green]✔ Extracted to .ralpher/projects/{project_id}/tasks.json[/]")
 
 
 @app.command()
@@ -206,14 +242,16 @@ def loop(
         bool | None,
         typer.Option(
             "--sandbox/--no-sandbox",
-            help="Run Claude's Bash tool in an OS sandbox.",
+            help="Run Claude's Bash tool in an OS sandbox (claude-code agent only).",
         ),
     ] = None,
+    backend: BackendOption = None,
 ) -> None:
-    """Run Claude in a loop until tasks are complete or max iterations reached."""
-    _require_claude()
-
+    """Run the coding agent in a loop until tasks are complete or max iterations reached."""
     load_dotenv(find_dotenv(usecwd=True))
+
+    backend_kind = _resolve_backend_or_fail(backend)
+    _require_backend(backend_kind)
 
     if not project_id:
         project_id = _get_latest_project_id()
@@ -227,6 +265,7 @@ def loop(
         hooks = HooksManager()
         project = Project(
             id=project_id,
+            backend=backend_kind,
             max_iterations=max_iterations if max_iterations > 0 else None,
             sandbox=sandbox_enabled,
         )

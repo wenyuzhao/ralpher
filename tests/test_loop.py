@@ -53,7 +53,7 @@ class TestInitProgress:
 
 
 class TestIterate:
-    @patch("ralpher.loop.iterate.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.loop.iterate.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_marks_task_passed_when_current_task_passes(
         self, mock_run, tmp_path, monkeypatch
@@ -75,7 +75,7 @@ class TestIterate:
         updated = Tasks.model_validate(json.loads(project.tasks_json.read_text()))
         assert updated.tasks[0].passes is True
 
-    @patch("ralpher.loop.iterate.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.loop.iterate.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_raises_on_claude_error(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -93,7 +93,7 @@ class TestIterate:
         with pytest.raises(SystemExit):
             await iterate(project, HooksManager([]))
 
-    @patch("ralpher.loop.iterate.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.loop.iterate.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_writes_current_task(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -121,7 +121,7 @@ class TestIterate:
 
         assert written_task["id"] == "T-001"  # type: ignore
 
-    @patch("ralpher.loop.iterate.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.loop.iterate.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_command_uses_iterate_and_verify_skills(
         self, mock_run, tmp_path, monkeypatch
@@ -171,7 +171,7 @@ class TestLoop:
 
     @patch("ralpher.loop.prepare.checkout_branch")
     @patch("ralpher.loop.prepare.extract_tasks", new_callable=AsyncMock)
-    @patch("ralpher.loop.iterate.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.loop.iterate.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_completes_when_all_tasks_pass(
         self, mock_run, mock_extract, mock_checkout, tmp_path, monkeypatch
@@ -192,7 +192,7 @@ class TestLoop:
 
     @patch("ralpher.loop.prepare.checkout_branch")
     @patch("ralpher.loop.prepare.extract_tasks", new_callable=AsyncMock)
-    @patch("ralpher.loop.iterate.run_claude", new_callable=AsyncMock)
+    @patch("ralpher.loop.iterate.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_exits_with_error_when_max_iterations_reached(
         self, mock_run, mock_extract, mock_checkout, tmp_path, monkeypatch
@@ -206,7 +206,7 @@ class TestLoop:
         project.plan_md.write_text("# Plan")
         project.tasks_json.write_text(json.dumps(tasks_data))
 
-        # Two iterations × (implement + verify) == 4 run_claude calls.
+        # Two iterations × (implement + verify) == 4 run_agent calls.
         mock_run.side_effect = [
             None,
             Result(task_passed=False),

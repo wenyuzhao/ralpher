@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 def ralpher_root() -> Path:
@@ -10,11 +10,48 @@ def ralpher_root() -> Path:
 
     Single source of truth for the location: both the project file layout
     (via ``Project.ralpher_dir``) and the read-only deny rules applied to the
-    ``claude`` subprocess derive from this, so they cannot drift apart.
+    coding-agent subprocess derive from this, so they cannot drift apart.
     """
     return Path.cwd() / ".ralpher"
 
 
+# Which coding-agent backend drives a run. ``claude-code`` shells out to the
+# ``claude`` CLI via the Claude Agent SDK; ``antigravity`` uses the Google
+# Antigravity SDK (Gemini) instead. Both are driven through the same
+# ``run_agent`` / ``run_agent_plan_mode`` dispatcher, which selects on the
+# resolved backend (see ``ralpher.backend``).
+BackendKind = Literal["claude-code", "antigravity"]
+
+# CLI / settings aliases accepted for each backend. ``--backend`` and the
+# ``backend`` key in settings.json both flow through ``normalize_backend``.
+_BACKEND_ALIASES: dict[str, BackendKind] = {
+    "claude-code": "claude-code",
+    "claude": "claude-code",
+    "cc": "claude-code",
+    "antigravity": "antigravity",
+    "agy": "antigravity",
+}
+
+DEFAULT_BACKEND: BackendKind = "claude-code"
+
+
+def normalize_backend(value: str) -> BackendKind:
+    """Resolve a user-supplied backend name/alias to its canonical ``BackendKind``.
+
+    Raises ``ValueError`` (surfaced by pydantic when validating settings, and
+    caught by the CLI for ``--backend``) on an unknown value.
+    """
+    key = value.strip().lower()
+    if key not in _BACKEND_ALIASES:
+        valid = ", ".join(sorted(set(_BACKEND_ALIASES)))
+        raise ValueError(f"Unknown backend '{value}'. Valid values: {valid}.")
+    return _BACKEND_ALIASES[key]
+
+
+# Per-kind default models, used only for the ``claude-code`` backend. The
+# antigravity backend deliberately has no hardcoded defaults — its SDK picks a
+# sensible Gemini model unless the user pins one in settings.json — so a model
+# is only sent when explicitly configured.
 DEFAULT_MODELS: dict[str, str] = {
     "plan": "claude-opus-4-7[1m]",
     "refine": "claude-opus-4-7[1m]",
@@ -26,10 +63,22 @@ DEFAULT_MODELS: dict[str, str] = {
 
 class Settings(BaseModel):
     models: dict[str, str] = {}
+    # Default coding-agent backend for this checkout. Overridden per run by the
+    # ``--backend`` CLI flag. Accepts aliases (e.g. "cc", "agy") via the
+    # validator below, which stores the canonical BackendKind.
+    backend: BackendKind = DEFAULT_BACKEND
     # Run Claude's Bash tool in an OS sandbox so the read-only .ralpher deny
     # rule is enforced against shell writes too. Enabled by default; the loop's
-    # --sandbox/--no-sandbox flag overrides this per run.
+    # --sandbox/--no-sandbox flag overrides this per run. Only applies to the
+    # claude-code backend.
     sandbox: bool = True
+
+    @field_validator("backend", mode="before")
+    @classmethod
+    def _normalize_backend(cls, value: object) -> object:
+        if isinstance(value, str):
+            return normalize_backend(value)
+        return value
 
     @classmethod
     def load(cls) -> "Settings":
@@ -38,10 +87,25 @@ class Settings(BaseModel):
             return cls()
         return cls.model_validate(json.loads(path.read_text()))
 
-    def model_for(self, kind: str) -> str | None:
+    def model_for(
+        self, kind: str, backend: BackendKind = DEFAULT_BACKEND
+    ) -> str | None:
         if kind in self.models:
             return self.models[kind]
-        return DEFAULT_MODELS.get(kind)
+        if backend == "claude-code":
+            return DEFAULT_MODELS.get(kind)
+        # antigravity: rely on the SDK's own default unless pinned in settings.
+        return None
+
+
+def resolve_backend(cli_backend: str | None) -> BackendKind:
+    """Resolve the backend for a run: the ``--backend`` flag wins, else settings.json.
+
+    Mirrors how ``--sandbox`` falls back to ``Settings.sandbox``.
+    """
+    if cli_backend is not None:
+        return normalize_backend(cli_backend)
+    return Settings.load().backend
 
 
 class Task(BaseModel):
@@ -116,9 +180,14 @@ class Project(BaseModel):
     max_iterations: int | None = None
     current_iteration: int | None = None
     current_task_id: Optional[str] = None
+    # Coding-agent backend for this run. Resolved once by each command (CLI
+    # --backend flag, else Settings.backend) and read by run_agent /
+    # run_agent_plan_mode to dispatch to the right SDK.
+    backend: BackendKind = DEFAULT_BACKEND
     # Whether the claude subprocess runs with OS-level Bash sandboxing for this
     # run. Resolved once by the loop command (CLI flag, else Settings.sandbox)
-    # and read by the claude helpers when building options.
+    # and read by the claude helpers when building options. Only meaningful for
+    # the claude-code backend.
     sandbox: bool = False
 
     @property

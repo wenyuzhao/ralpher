@@ -14,7 +14,7 @@ from ralpher.utils.notion_comments import (
     resolve_comments,
 )
 
-from ..utils.claude import run_claude_plan_mode
+from ..backend import run_agent_plan_mode
 from ..utils.error import fail
 
 console = Console()
@@ -67,7 +67,7 @@ async def refine_plan(*, project: Project, prompt: str | None) -> str | None:
         tmp_path = Path(tmp.name)
         tmp_path.write_text(combined)
 
-        await run_claude_plan_mode(
+        await run_agent_plan_mode(
             kind="refine",
             prompt=render_prompt(
                 "refine",
