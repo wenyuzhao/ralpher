@@ -193,8 +193,16 @@ class TestSplitThinkingLevel:
         )
 
     def test_levels_are_backend_specific(self):
-        # "xhigh" is a claude level only; "minimal" an antigravity level only.
+        # "xhigh" is a claude level only; "minimal"/"extra_high" antigravity ones.
         assert split_thinking_level("m:xhigh", "antigravity") == ("m:xhigh", None)
+        assert split_thinking_level("m:extra_high", "antigravity") == (
+            "m",
+            "extra_high",
+        )
+        assert split_thinking_level("m:extra_high", "claude-code") == (
+            "m:extra_high",
+            None,
+        )
         assert split_thinking_level("m:minimal", "antigravity") == ("m", "minimal")
         assert split_thinking_level("m:minimal", "claude-code") == ("m:minimal", None)
 

@@ -30,13 +30,12 @@ from pydantic import BaseModel
 
 from google.antigravity import Agent, CapabilitiesConfig, LocalAgentConfig
 from google.antigravity.hooks import policy
+from google.antigravity.models import DEFAULT_MODEL
 from google.antigravity.types import (
-    DEFAULT_MODEL,
     BuiltinTools,
-    GeminiConfig,
-    GenerationConfig,
-    ModelConfig,
-    ModelEntry,
+    GeminiAPIEndpoint,
+    GeminiModelOptions,
+    ModelTarget,
     ThinkingLevel,
     ToolCall,
 )
@@ -89,10 +88,11 @@ def _build_config(
     """Build the ``LocalAgentConfig`` for one antigravity run.
 
     ``thinking_level`` (one of the ``ThinkingLevel`` values) sets the model's
-    reasoning effort. It can only travel on the full ``gemini_config`` — the
-    ``model`` shorthand carries a name only, and the SDK rejects setting both —
-    so when a level is given we build the model entry ourselves and leave the
-    shorthand unset.
+    reasoning effort. It lives in the *endpoint*'s ``GeminiModelOptions``, so a
+    bare model name can't carry it: when a level is given we hand ``model`` a
+    full ``ModelTarget`` with an explicit ``GeminiAPIEndpoint`` instead of the
+    plain string. That pins the run to the Gemini Developer API, which is the
+    only auth path this backend advertises (``GEMINI_API_KEY``) anyway.
 
     ``tools`` is accepted for signature parity with ``run_claude`` but is not
     applied here — its sole caller pairs it with ``readonly=True``, and the
@@ -122,28 +122,21 @@ def _build_config(
     else:
         capabilities = CapabilitiesConfig(disabled_tools=[BuiltinTools.ASK_QUESTION])
 
+    model_arg: str | ModelTarget | None = model
     if thinking_level is not None:
-        model_kwargs: dict[str, Any] = {
-            "gemini_config": GeminiConfig(
-                models=ModelConfig(
-                    default=ModelEntry(
-                        name=model or DEFAULT_MODEL,
-                        generation=GenerationConfig(
-                            thinking_level=ThinkingLevel(thinking_level)
-                        ),
-                    )
-                )
-            )
-        }
-    else:
-        model_kwargs = {"model": model}
+        model_arg = ModelTarget(
+            name=model or DEFAULT_MODEL,
+            endpoint=GeminiAPIEndpoint(
+                options=GeminiModelOptions(thinking_level=ThinkingLevel(thinking_level))
+            ),
+        )
 
     return LocalAgentConfig(
         response_schema=schema,
         workspaces=[workspace],
         policies=policies,
         capabilities=capabilities,
-        **model_kwargs,
+        model=model_arg,
     )
 
 

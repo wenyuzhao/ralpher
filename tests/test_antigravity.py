@@ -92,15 +92,13 @@ class TestBuildConfig:
         # The SDK normalizes a pydantic class into its JSON-schema string.
         assert json.loads(cfg.response_schema) == Out.model_json_schema()
 
-    def test_thinking_level_rides_on_gemini_config(self, tmp_path, monkeypatch):
+    def test_thinking_level_rides_on_model_target(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         cfg = _build_config(model="gemini-3.1-pro-preview", thinking_level="high")
-        # The shorthand is left unset; the model rides on gemini_config so the
-        # thinking level travels with it (the SDK forbids setting both).
-        assert cfg.model is None
-        entry = cfg.gemini_config.models.default
-        assert entry.name == "gemini-3.1-pro-preview"
-        assert entry.generation.thinking_level == ThinkingLevel.HIGH
+        # A bare name can't carry a thinking level (it lives in the endpoint's
+        # options), so the shorthand becomes a full ModelTarget.
+        assert cfg.model.name == "gemini-3.1-pro-preview"
+        assert cfg.model.endpoint.options.thinking_level == ThinkingLevel.HIGH
 
     def test_workspace_is_cwd(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -229,9 +227,9 @@ class TestRunAntigravity:
             await run_antigravity(
                 kind="verify", prompt="x", project=project, schema=Out
             )
-        entry = record["configs"][0].gemini_config.models.default
-        assert entry.name == "gemini-3.5-flash"
-        assert entry.generation.thinking_level == ThinkingLevel.HIGH
+        target = record["configs"][0].model
+        assert target.name == "gemini-3.5-flash"
+        assert target.endpoint.options.thinking_level == ThinkingLevel.HIGH
 
 
 # --- dispatch: run_agent selects the backend by project.backend ----------- #

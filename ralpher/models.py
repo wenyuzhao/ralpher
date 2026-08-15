@@ -82,7 +82,7 @@ ANTIGRAVITY_DEFAULT_MODELS: dict[str, str] = {
 # module needs no SDK import.
 _THINKING_LEVELS: dict[BackendKind, tuple[str, ...]] = {
     "claude-code": ("low", "medium", "high", "xhigh", "max"),
-    "antigravity": ("minimal", "low", "medium", "high"),
+    "antigravity": ("minimal", "low", "medium", "high", "extra_high"),
 }
 
 
