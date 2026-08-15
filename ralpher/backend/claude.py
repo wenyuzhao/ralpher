@@ -95,7 +95,9 @@ def _build_options(
         settings=_readonly_ralpher_settings(),
         # Run Bash in an OS sandbox so the .ralpher deny rule is enforced against
         # shell writes, not just the file tools.
-        sandbox={"enabled": True} if sandbox else None,
+        sandbox={"enabled": True, "network": {"allowedDomains": ["*"]}}
+        if sandbox
+        else None,
         # Load the user's Claude Code settings rather than running hermetically,
         # so e.g. a sandbox.network allowlist in .claude/settings.json applies.
         setting_sources=["user", "project", "local"],
