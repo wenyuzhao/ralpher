@@ -100,8 +100,8 @@ class TestResolveBackend:
 class TestModelForBackendAware:
     def test_claude_code_uses_defaults(self):
         s = Settings()
-        assert s.model_for("plan") == "claude-opus-4-7[1m]"
-        assert s.model_for("plan", backend="claude-code") == "claude-opus-4-7[1m]"
+        assert s.model_for("plan") == "claude-opus-5[1m]"
+        assert s.model_for("plan", backend="claude-code") == "claude-opus-5[1m]"
 
     def test_antigravity_uses_defaults(self):
         s = Settings()
@@ -128,14 +128,14 @@ class TestModelForBackendAware:
 
     def test_claude_code_pinned_model_can_carry_thinking_suffix(self):
         # The effort suffix works for claude-code too, with claude's level set.
-        s = Settings(models={"plan": "claude-opus-4-7:xhigh"})
-        assert s.model_for("plan", backend="claude-code") == "claude-opus-4-7"
+        s = Settings(models={"plan": "claude-opus-5:xhigh"})
+        assert s.model_for("plan", backend="claude-code") == "claude-opus-5"
         assert s.thinking_for("plan", backend="claude-code") == "xhigh"
 
     def test_claude_code_suffix_after_bracketed_model(self):
         # A "[1m]" context-window suffix is kept; only the :<level> is peeled.
-        s = Settings(models={"plan": "claude-opus-4-7[1m]:high"})
-        assert s.model_for("plan", backend="claude-code") == "claude-opus-4-7[1m]"
+        s = Settings(models={"plan": "claude-opus-5[1m]:high"})
+        assert s.model_for("plan", backend="claude-code") == "claude-opus-5[1m]"
         assert s.thinking_for("plan", backend="claude-code") == "high"
 
     def test_thinking_for_unknown_kind_is_none(self):
@@ -179,16 +179,16 @@ class TestSplitThinkingLevel:
 
     def test_claude_levels(self):
         # claude-code accepts xhigh/max; "minimal" is not a claude level.
-        assert split_thinking_level("claude-opus-4-7:xhigh", "claude-code") == (
-            "claude-opus-4-7",
+        assert split_thinking_level("claude-opus-5:xhigh", "claude-code") == (
+            "claude-opus-5",
             "xhigh",
         )
-        assert split_thinking_level("claude-opus-4-7:max", "claude-code") == (
-            "claude-opus-4-7",
+        assert split_thinking_level("claude-opus-5:max", "claude-code") == (
+            "claude-opus-5",
             "max",
         )
-        assert split_thinking_level("claude-opus-4-7:minimal", "claude-code") == (
-            "claude-opus-4-7:minimal",
+        assert split_thinking_level("claude-opus-5:minimal", "claude-code") == (
+            "claude-opus-5:minimal",
             None,
         )
 

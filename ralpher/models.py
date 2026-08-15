@@ -53,10 +53,10 @@ def normalize_backend(value: str) -> BackendKind:
 # (Claude's ``--effort``); a bare name runs at the SDK's own default effort
 # (``high``), which is why these carry no suffix.
 CLAUDE_DEFAULT_MODELS: dict[str, str] = {
-    "plan": "claude-opus-4-7[1m]",
-    "refine": "claude-opus-4-7[1m]",
-    "loop": "claude-opus-4-7[1m]",
-    "verify": "claude-sonnet-4-6",
+    "plan": "claude-opus-5[1m]",
+    "refine": "claude-opus-5[1m]",
+    "loop": "claude-opus-5[1m]",
+    "verify": "claude-sonnet-5",
     "extract-tasks": "haiku",
 }
 
@@ -91,7 +91,7 @@ def split_thinking_level(
 ) -> tuple[str, str | None]:
     """Peel a trailing ``:<level>`` thinking suffix off a model spec.
 
-    ``"claude-opus-4-7:high"`` → ``("claude-opus-4-7", "high")``. The level must
+    ``"claude-opus-5:high"`` → ``("claude-opus-5", "high")``. The level must
     be valid for ``backend`` (see ``_THINKING_LEVELS``); a string without a
     recognized suffix is returned unchanged, with ``None``.
     """
