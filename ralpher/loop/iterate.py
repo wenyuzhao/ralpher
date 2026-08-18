@@ -1,5 +1,3 @@
-import contextlib
-import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -10,6 +8,25 @@ from ..backend import run_agent
 from ..models import Project
 from ..prompts import render_prompt
 from ..utils.hooks import HooksManager
+
+
+class ProgressReport(BaseModel):
+    """What the implementation session reports back about its iteration.
+
+    The agent never writes the progress log itself — `.ralpher` is read-only to
+    it — so it returns the entry it wants recorded and ralpher appends it.
+    """
+
+    notes: str = Field(
+        description=(
+            "Markdown body of this iteration's progress log entry: what was "
+            "implemented, which files changed, which quality checks were run "
+            "and their outcome (with the exact error output of any that still "
+            "fail), and learnings for future iterations. Do not include a "
+            "date/task heading or a trailing '---' separator — those are added "
+            "for you."
+        )
+    )
 
 
 class Result(BaseModel):
@@ -27,6 +44,14 @@ class Result(BaseModel):
     )
 
 
+def _append_progress(progress_md: Path, task_id: str, notes: str) -> None:
+    """Append the implementation session's reported entry to the progress log."""
+    timestamp = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S")
+    body = notes.strip() if notes.strip() else "N/A"
+    with progress_md.open("a") as f:
+        f.write(f"\n## {timestamp} - {task_id}\n\n{body}\n\n---\n")
+
+
 def _append_verifier_notes(
     progress_md: Path, task_id: str, task_passed: bool, notes: str | None
 ) -> None:
@@ -42,39 +67,25 @@ def _append_verifier_notes(
         f.write(section)
 
 
-@contextlib.contextmanager
-def with_temp_file(original: Path):
-    with tempfile.NamedTemporaryFile(
-        prefix="progress-", suffix=".md", delete=False
-    ) as file:
-        # Copy original content to temp file
-        assert original.exists()
-        Path(file.name).write_text(original.read_text())
-    try:
-        yield file.name
-    finally:
-        # Copy content back to original file
-        content = Path(file.name).read_text()
-        if content:
-            original.write_text(content)
-        # Remove temp file
-        Path(file.name).unlink()
+async def implement(project: Project) -> ProgressReport:
+    """Implement the current task, returning the progress entry to record.
 
-
-async def implement(project: Project) -> None:
+    The session reads the progress log but never writes it: it hands its entry
+    back as structured output, which the caller appends.
+    """
     assert project.current_iteration is not None
 
-    with with_temp_file(project.progress_md) as temp_file:
-        await run_agent(
-            kind="loop",
-            prompt=render_prompt(
-                "iterate",
-                current_task_path=str(project.current_task_json),
-                plan_path=str(project.plan_md),
-                progress_path=str(temp_file),
-            ),
-            project=project,
-        )
+    return await run_agent(
+        kind="loop",
+        prompt=render_prompt(
+            "iterate",
+            current_task_path=str(project.current_task_json),
+            plan_path=str(project.plan_md),
+            progress_path=str(project.progress_md),
+        ),
+        project=project,
+        schema=ProgressReport,
+    )
 
 
 async def verify(project: Project) -> Result:
@@ -115,7 +126,9 @@ async def iterate(project: Project, hooks: HooksManager) -> None:
 
     # Implement the task in one session, then verify in a fresh session so the
     # verifier isn't biased by the implementer's context.
-    await implement(project)
+    report = await implement(project)
+    _append_progress(project.progress_md, task.id, report.notes)
+
     result = await verify(project)
 
     # Always persist the verifier verdict to the progress log so the next

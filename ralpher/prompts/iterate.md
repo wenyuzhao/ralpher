@@ -6,7 +6,7 @@ You are an autonomous coding agent working on a task of a software project.
 
 1. Read and understand the current task: `{{ current_task_path }}`
 2. Read and understand the complete Project Plan: `{{ plan_path }}` (NEVER modify it)
-3. Read the progress log at `{{ progress_path }}` (check Codebase Patterns section first)
+3. Read the progress log at `{{ progress_path }}` (start with the learnings earlier iterations recorded). It is **read-only** — never edit it.
 4. Implement that single task
 5. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
 6. Update CLAUDE.md files if you discover reusable patterns (see below)
@@ -15,15 +15,15 @@ You are an autonomous coding agent working on a task of a software project.
    * Do NOT prepend the task ID (or any `[T-XXX]` marker) to the commit message.
    * Try your best to fix any failing checks before committing, but if you cannot get them green, still commit so the verifier and the next iteration can see the current state.
    * If checks fail, append `[WIP]` to the commit message subject (e.g. `feat: Add notifications table to database [WIP]`) so the failing state is obvious in `git log`.
-8. Append your progress and additional notes to the progress report — including which checks (if any) still fail and the exact error output, so the next iteration can act on it.
+8. Return your progress notes as structured output (see below) — including which checks (if any) still fail and the exact error output, so the next iteration can act on it.
 
-A separate verification agent will independently assess whether the task is complete after you finish — you do NOT need to report status yourself. Just do the work, run the checks, record the outcome in the progress log, and commit.
+A separate verification agent will independently assess whether the task is complete after you finish — you do NOT need to report status yourself. Just do the work, run the checks, report the outcome in your structured output, and commit.
 
 ---
 
 ## Never Reference Tasks Outside the Progress Report
 
-The task list is scaffolding for this run only — it will NOT exist for anyone reading the project later. The **only** place a task ID or task reference may appear is the progress report at `{{ progress_path }}`.
+The task list is scaffolding for this run only — it will NOT exist for anyone reading the project later. The **only** place a task ID or task reference may appear is the progress notes you return as structured output.
 
 Everywhere else — source code, comments, docstrings, tests, README and other docs, CLAUDE.md files, config files, commit messages, and any file you create or edit in the project — write as if the task list never existed:
 
@@ -35,36 +35,23 @@ Describe what the code does and why, in terms that make sense to a reader who on
 
 ---
 
-## Progress Report File and Format
+## Progress Report Output
 
-File: `{{ progress_path }}`
+Do **NOT** write to `{{ progress_path }}` — it is read-only to you. Instead, return your entry as structured output, and it will be appended to the log for you.
 
-APPEND to the file (never replace, always append):
+`notes` — the markdown body of this iteration's entry. Do not add a date/task heading or a trailing `---`; those are added for you.
+
 ```
-## [Date/Time] - [Task ID]
 - What was implemented
 - Files changed
 - **Learnings for future iterations:**
   - Patterns discovered (e.g., "this codebase uses X for Y")
   - Gotchas encountered (e.g., "don't forget to update Z when changing W")
   - Useful context (e.g., "the evaluation panel is in component X")
----
+  - Which quality checks still fail, with their exact error output
 ```
 
-The learnings section is critical - it helps future iterations avoid repeating mistakes and understand the codebase better.
-
-### Consolidate Patterns
-
-If you discover a **reusable pattern** that future iterations should know, add it to the `## Codebase Patterns` section at the TOP of the progress report (create it if it doesn't exist). This section should consolidate the most important learnings:
-
-```
-## Codebase Patterns
-- Example: Use `sql<number>` template for aggregations
-- Example: Always use `IF NOT EXISTS` for migrations
-- Example: Export types from actions.ts for UI components
-```
-
-Only add patterns that are **general and reusable**, not task-specific details.
+The learnings section is critical - it helps future iterations avoid repeating mistakes and understand the codebase better. Call out **general, reusable** patterns explicitly (e.g. "Use `sql<number>` template for aggregations", "Always use `IF NOT EXISTS` for migrations") so later iterations can pick them up from the log — not just task-specific details.
 
 ---
 
@@ -99,7 +86,7 @@ Only update CLAUDE.md if you have **genuinely reusable knowledge** that would he
 ## Quality Requirements
 
 - Try to make every commit pass the project's quality checks (typecheck, lint, test).
-- If you cannot get checks to pass within this iteration, still commit the current state, mark the commit subject with `[WIP]`, and clearly document the remaining failures in the progress report.
+- If you cannot get checks to pass within this iteration, still commit the current state, mark the commit subject with `[WIP]`, and clearly document the remaining failures in your progress notes.
 - Keep changes focused and minimal
 - Follow existing code patterns
 
@@ -111,7 +98,7 @@ For any task that changes UI, verify it works in the browser if you have browser
 2. Verify the UI changes work as expected
 3. Take a screenshot if helpful for the progress log
 
-If no browser tools are available, note in your progress report that manual browser verification is needed.
+If no browser tools are available, note in your progress notes that manual browser verification is needed.
 
 ---
 
@@ -124,5 +111,6 @@ The current task is completed and all acceptance criteria are met.
 - Work on ONE task per iteration
 - Commit frequently
 - Keep CI green
-- Never mention task IDs or tasks in anything except the progress report
-- Read the Codebase Patterns section in the progress report before starting
+- Never mention task IDs or tasks in anything except your progress notes
+- Read the progress log before starting, especially the recorded learnings
+- Never write to the progress log yourself — return your entry as structured output

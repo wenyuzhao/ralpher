@@ -74,7 +74,7 @@ The `Project` Pydantic model is the central handle for a run. It owns all filesy
 
 ### Loop execution — [ralpher/loop/](ralpher/loop/)
 - [loop.py](ralpher/loop/loop.py) `run_ralph_loop` is the main driver: calls `prepare`, then iterates until `max_iterations` (default 30) or all tasks pass. Each iteration picks the first failing task, invokes `iterate`, and reloads `tasks.json` to check progress.
-- [iterate.py](ralpher/loop/iterate.py) writes `current_task.json`, calls the agent with the rendered `iterate` prompt, then verifies with the rendered `verify` prompt and a `Result { task_passed }` schema, then updates `tasks.json`.
+- [iterate.py](ralpher/loop/iterate.py) writes `current_task.json`, calls the agent with the rendered `iterate` prompt and a `ProgressReport { notes }` schema, then verifies with the rendered `verify` prompt and a `Result { task_passed }` schema, then updates `tasks.json`. **The agent never writes `progress.md`** — it reads it and hands its entry back as structured output; ralpher appends `notes` under a timestamped `## <time> - <task id>` heading via `_append_progress`. The verifier's verdict is appended the same way by `_append_verifier_notes`.
 - [prepare.py](ralpher/loop/prepare.py) handles first-run setup (extracting tasks, initializing progress).
 
 ### Prompts — [ralpher/prompts/](ralpher/prompts/)

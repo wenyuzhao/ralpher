@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from ralpher.loop.iterate import Result, iterate
+from ralpher.loop.iterate import ProgressReport, Result, _append_progress, iterate
 from ralpher.loop.loop import run_ralph_loop
 from ralpher.loop.prepare import _init_progress
 from ralpher.models import Project, ProjectConfig, Tasks
@@ -52,6 +52,34 @@ class TestInitProgress:
         assert "Started:" in content
 
 
+class TestProgressLog:
+    def test_append_progress_wraps_notes_in_a_task_heading(self, tmp_path):
+        progress = tmp_path / "progress.md"
+        _init_progress(progress)
+        _append_progress(progress, "T-001", "- Added login\n")
+
+        content = progress.read_text()
+        assert "- T-001\n" in content
+        assert "- Added login" in content
+        assert content.rstrip().endswith("---")
+
+    def test_append_progress_keeps_earlier_entries(self, tmp_path):
+        progress = tmp_path / "progress.md"
+        _init_progress(progress)
+        _append_progress(progress, "T-001", "- Added login")
+        _append_progress(progress, "T-002", "- Added logout")
+
+        content = progress.read_text()
+        assert content.index("- Added login") < content.index("- Added logout")
+
+    def test_append_progress_records_empty_notes_as_na(self, tmp_path):
+        progress = tmp_path / "progress.md"
+        _init_progress(progress)
+        _append_progress(progress, "T-001", "   ")
+
+        assert "N/A" in progress.read_text()
+
+
 class TestIterate:
     @patch("ralpher.loop.iterate.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
@@ -68,12 +96,18 @@ class TestIterate:
         project.tasks_json.write_text(json.dumps(tasks_data))
         project.progress_md.write_text("# Progress\n")
 
-        # implement() call returns None; verify() call returns Result.
-        mock_run.side_effect = [None, Result(task_passed=True)]
+        # implement() returns a ProgressReport; verify() returns a Result.
+        mock_run.side_effect = [
+            ProgressReport(notes="did the thing"),
+            Result(task_passed=True),
+        ]
         await iterate(project, HooksManager([]))
 
         updated = Tasks.model_validate(json.loads(project.tasks_json.read_text()))
         assert updated.tasks[0].passes is True
+
+        # The implementer never touches progress.md; ralpher records its report.
+        assert "did the thing" in project.progress_md.read_text()
 
     @patch("ralpher.loop.iterate.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
@@ -113,7 +147,7 @@ class TestIterate:
             if written_task is None:
                 # First call is the implement() session — capture the file then.
                 written_task = json.loads(project.current_task_json.read_text())
-                return None
+                return ProgressReport(notes="did the thing")
             return Result(task_passed=False)
 
         mock_run.side_effect = side_effect
@@ -137,7 +171,10 @@ class TestIterate:
         project.tasks_json.write_text(json.dumps(tasks_data))
         project.progress_md.write_text("# Progress\n")
 
-        mock_run.side_effect = [None, Result(task_passed=False)]
+        mock_run.side_effect = [
+            ProgressReport(notes="did the thing"),
+            Result(task_passed=False),
+        ]
         await iterate(project, HooksManager([]))
 
         assert mock_run.call_count == 2
@@ -150,7 +187,7 @@ class TestIterate:
         # slash command.
         assert "Coding Agent Instructions" in implement_kwargs["prompt"]
         assert task_id in implement_kwargs["prompt"]
-        assert implement_kwargs.get("schema") is None
+        assert implement_kwargs["schema"] is ProgressReport
         assert implement_kwargs["project"] is project
         assert "Verification Agent Instructions" in verify_kwargs["prompt"]
         assert task_id in verify_kwargs["prompt"]
@@ -185,8 +222,11 @@ class TestLoop:
         project.plan_md.write_text("# Plan")
         project.tasks_json.write_text(json.dumps(tasks_data))
 
-        # Each iteration: implement() returns None, verify() returns Result.
-        mock_run.side_effect = [None, Result(task_passed=True)]
+        # Each iteration: implement() returns a ProgressReport, verify() a Result.
+        mock_run.side_effect = [
+            ProgressReport(notes="did the thing"),
+            Result(task_passed=True),
+        ]
         await run_ralph_loop(project=project, hooks=HooksManager([]))
         assert mock_run.call_count == 2
 
@@ -208,9 +248,9 @@ class TestLoop:
 
         # Two iterations × (implement + verify) == 4 run_agent calls.
         mock_run.side_effect = [
-            None,
+            ProgressReport(notes="attempt 1"),
             Result(task_passed=False),
-            None,
+            ProgressReport(notes="attempt 2"),
             Result(task_passed=False),
         ]
         import sys
