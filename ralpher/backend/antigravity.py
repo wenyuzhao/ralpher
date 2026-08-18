@@ -26,8 +26,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, overload
 
-from pydantic import BaseModel
-
 from google.antigravity import Agent, CapabilitiesConfig, LocalAgentConfig
 from google.antigravity.hooks import policy
 from google.antigravity.models import DEFAULT_MODEL
@@ -39,6 +37,7 @@ from google.antigravity.types import (
     ThinkingLevel,
     ToolCall,
 )
+from pydantic import BaseModel
 
 from ralpher.models import Project, Settings, ralpher_root, split_thinking_level
 from ralpher.utils.error import fail
@@ -149,7 +148,7 @@ def _log_chunk(log_file: Path, chunk: Any) -> None:
             payload = {"type": type(chunk).__name__, "repr": repr(chunk)}
         with log_file.open("a") as f:
             f.write(json.dumps(payload, default=str) + "\n")
-    except Exception:
+    except Exception:  # noqa: S110, BLE001 - chunk logging is best-effort; never break a run
         pass
 
 
@@ -166,7 +165,7 @@ async def _run_chat(
                     _log_chunk(log_file, chunk)
                 if expect_structured:
                     structured = await response.structured_output()
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - any SDK failure is funnelled to fail()
             fail(f"Antigravity agent returned an error: {e}")
     return structured
 
@@ -208,7 +207,7 @@ async def run_antigravity[T: BaseModel](
     tools: list[str] | None = None,
 ) -> T | None:
     """Run the antigravity SDK to execute a prompt (counterpart of run_claude)."""
-    timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    timestamp = datetime.now().astimezone().strftime("%Y-%m-%d-%H%M%S")
     log_file = project.project_dir / "logs" / f"{kind}-{timestamp}.log"
     log_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -250,7 +249,7 @@ async def run_antigravity_plan_mode(
     carries the context forward — the antigravity equivalent of Claude Code's
     ``--resume <session_id>`` continuation.
     """
-    timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    timestamp = datetime.now().astimezone().strftime("%Y-%m-%d-%H%M%S")
     log_file = project.project_dir / "logs" / f"{kind}-{timestamp}.log"
     log_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -296,5 +295,5 @@ async def run_antigravity_plan_mode(
                     f.write("\n" + json.dumps({"answers": current_prompt}) + "\n\n")
     except SystemExit:
         raise
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - any SDK failure is funnelled to fail()
         fail(f"Antigravity agent returned an error: {e}")

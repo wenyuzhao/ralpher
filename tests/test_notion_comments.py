@@ -92,9 +92,7 @@ class TestFetchProjectPlanComments:
         monkeypatch.delenv("RALPHER_NOTION_PARENT_PAGE_ID", raising=False)
 
         client = _make_client(top_blocks=[], comments_by_block={})
-        with patch(
-            "ralpher.utils.notion_comments.NotionClient", return_value=client
-        ):
+        with patch("ralpher.utils.notion_comments.NotionClient", return_value=client):
             result = await fetch_project_plan_comments(Project(id="proj"))
         assert result == []
 
@@ -134,9 +132,7 @@ class TestFetchProjectPlanComments:
                 "b-after": [_comment("c2", "d2", "also ignored")],
             },
         )
-        with patch(
-            "ralpher.utils.notion_comments.NotionClient", return_value=client
-        ):
+        with patch("ralpher.utils.notion_comments.NotionClient", return_value=client):
             result = await fetch_project_plan_comments(Project(id="proj"))
 
         assert len(result) == 1
@@ -175,9 +171,7 @@ class TestFetchProjectPlanComments:
             },
             child_blocks={"b-parent": [child]},
         )
-        with patch(
-            "ralpher.utils.notion_comments.NotionClient", return_value=client
-        ):
+        with patch("ralpher.utils.notion_comments.NotionClient", return_value=client):
             result = await fetch_project_plan_comments(Project(id="proj"))
 
         assert len(result) == 1
@@ -194,11 +188,13 @@ class TestResolveComments:
     async def test_uses_patch_when_supported(self, monkeypatch):
         monkeypatch.setenv("RALPHER_NOTION_TOKEN", "t")
         client = _make_client(top_blocks=[], comments_by_block={})
-        with patch(
-            "ralpher.utils.notion_comments.NotionClient", return_value=client
-        ):
+        with patch("ralpher.utils.notion_comments.NotionClient", return_value=client):
             await resolve_comments(
-                [NotionComment(id="c1", discussion_id="d1", text="x", context="y", author=None)]
+                [
+                    NotionComment(
+                        id="c1", discussion_id="d1", text="x", context="y", author=None
+                    )
+                ]
             )
         client._transport.patch.assert_awaited_once()
         client.comments.create.assert_not_awaited()
@@ -208,11 +204,13 @@ class TestResolveComments:
         monkeypatch.setenv("RALPHER_NOTION_TOKEN", "t")
         client = _make_client(top_blocks=[], comments_by_block={})
         client._transport.patch = AsyncMock(side_effect=Exception("404"))
-        with patch(
-            "ralpher.utils.notion_comments.NotionClient", return_value=client
-        ):
+        with patch("ralpher.utils.notion_comments.NotionClient", return_value=client):
             await resolve_comments(
-                [NotionComment(id="c1", discussion_id="d1", text="x", context="y", author=None)]
+                [
+                    NotionComment(
+                        id="c1", discussion_id="d1", text="x", context="y", author=None
+                    )
+                ]
             )
         client.comments.create.assert_awaited_once()
         kwargs = client.comments.create.call_args.kwargs

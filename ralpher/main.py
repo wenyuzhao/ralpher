@@ -1,24 +1,25 @@
+import asyncio
 import datetime
 import shutil
 from pathlib import Path
 from typing import Annotated
 
-import click
 import rich
 import typer
+from dotenv import find_dotenv, load_dotenv
+from slugify import slugify
+from typer._click.core import Context as TyperContext
 from typer.core import TyperGroup
 
 from ralpher.loop import run_ralph_loop
 from ralpher.models import BackendKind, Project, Settings, ralpher_root, resolve_backend
-from ralpher.plan.plan import generate_plan
 from ralpher.plan.extract import extract_tasks
+from ralpher.plan.plan import generate_plan
 from ralpher.plan.refine import refine_plan
-import asyncio
-from slugify import slugify
+
 from .utils.error import fail
 from .utils.hooks import HooksManager
 from .utils.hooks.notion import update_notion_page
-from dotenv import find_dotenv, load_dotenv
 
 
 def _sync_to_notion(project: Project) -> None:
@@ -83,7 +84,7 @@ class DefaultCommandGroup(TyperGroup):
 
     default_cmd_name = "run"
 
-    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+    def parse_args(self, ctx: TyperContext, args: list[str]) -> list[str]:
         if args and args[0] not in self.commands and not args[0].startswith("-"):
             args = [self.default_cmd_name] + args
         return super().parse_args(ctx, args)
@@ -95,7 +96,7 @@ DEFAULT_MAX_ITERATIONS = 30
 
 
 def _gen_project_id(name: str) -> str:
-    project_id = datetime.datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    project_id = datetime.datetime.now().astimezone().strftime("%Y-%m-%d-%H%M%S")
     project_id += f"-{slugify(name)}"
     return project_id
 
@@ -274,7 +275,7 @@ def loop(
             await run_ralph_loop(project=project, hooks=hooks)
         except BaseException as e:
             await hooks.on_error(str(e))
-            raise e
+            raise
 
     asyncio.run(run_loop_with_hooks())
 

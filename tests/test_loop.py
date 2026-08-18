@@ -3,10 +3,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from ralpher.loop.prepare import _init_progress
 from ralpher.loop.iterate import Result, iterate
 from ralpher.loop.loop import run_ralph_loop
-from ralpher.models import ProjectConfig, Tasks, Project
+from ralpher.loop.prepare import _init_progress
+from ralpher.models import Project, ProjectConfig, Tasks
 from ralpher.utils.hooks import HooksManager
 
 
@@ -216,7 +216,7 @@ class TestLoop:
         import sys
 
         _loop_mod = sys.modules["ralpher.loop.loop"]
-        monkeypatch.setattr(_loop_mod.time, "sleep", lambda _: None)
+        monkeypatch.setattr(_loop_mod.asyncio, "sleep", AsyncMock())
         with pytest.raises(SystemExit):
             await run_ralph_loop(project=project, hooks=HooksManager([]))
         assert mock_run.call_count == 4

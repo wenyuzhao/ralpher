@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, field_validator
 
@@ -121,7 +121,7 @@ class Settings(BaseModel):
         return value
 
     @classmethod
-    def load(cls) -> "Settings":
+    def load(cls) -> Settings:
         path = ralpher_root() / "settings.json"
         if not path.exists():
             return cls()
@@ -183,7 +183,7 @@ class Tasks(BaseModel):
     def failed_tasks(self) -> list[Task]:
         return [t for t in self.tasks if not t.passes]
 
-    def get_task_by_id(self, task_id: str) -> Optional[Task]:
+    def get_task_by_id(self, task_id: str) -> Task | None:
         for t in self.tasks:
             if t.id == task_id:
                 return t
@@ -240,7 +240,7 @@ class Project(BaseModel):
     id: str
     max_iterations: int | None = None
     current_iteration: int | None = None
-    current_task_id: Optional[str] = None
+    current_task_id: str | None = None
     # Coding-agent backend for this run. Resolved once by each command (CLI
     # --backend flag, else Settings.backend) and read by run_agent /
     # run_agent_plan_mode to dispatch to the right SDK.

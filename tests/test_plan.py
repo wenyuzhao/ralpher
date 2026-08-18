@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from ralpher.backend.common import ask_user_questions
-from ralpher.models import Questions, Question, QuestionOption, Project, Tasks
-from ralpher.plan.plan import generate_plan
+from ralpher.models import Project, Question, QuestionOption, Questions, Tasks
 from ralpher.plan.extract import extract_tasks
+from ralpher.plan.plan import generate_plan
 
 
 def _make_questions(raw: list[dict]) -> Questions:

@@ -1,5 +1,6 @@
 import rich
 from rich.prompt import Confirm
+
 from ralpher.models import Project, ProjectConfig
 from ralpher.utils.error import fail
 from ralpher.utils.git import (

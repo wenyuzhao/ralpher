@@ -1,7 +1,8 @@
 import rich
+
+from ..backend import run_agent
 from ..models import Project, Tasks
 from ..prompts import render_prompt
-from ..backend import run_agent
 from ..utils.error import fail
 
 

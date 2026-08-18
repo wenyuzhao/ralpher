@@ -33,7 +33,7 @@ async def _find_child_page(
                 and block.child_page.get("title") == title
             ):
                 return block.id
-    except Exception:
+    except Exception:  # noqa: BLE001 - Notion sync is optional; degrade to no page
         return None
     return None
 
@@ -167,7 +167,7 @@ async def _resolve_one(client: NotionClient, comment: NotionComment) -> None:
             f"/comments/{comment.id}", json={"resolved": True}
         )
         return
-    except Exception:
+    except Exception:  # noqa: S110, BLE001 - resolving a comment is best-effort
         pass
     try:
         await client.comments.create(
@@ -179,7 +179,7 @@ async def _resolve_one(client: NotionClient, comment: NotionComment) -> None:
                 }
             ],
         )
-    except Exception:
+    except Exception:  # noqa: S110, BLE001 - the fallback ack is best-effort
         pass
 
 

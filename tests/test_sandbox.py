@@ -1,7 +1,7 @@
 import json
 
-from ralpher.models import Project, Settings
 from ralpher.backend.claude import _build_options
+from ralpher.models import Project, Settings
 
 
 class TestSandboxDefaults:
@@ -39,7 +39,7 @@ class TestSettingsSandboxFromFile:
 class TestBuildOptionsSandbox:
     def test_sandbox_enabled_sets_sandbox(self):
         opts = _build_options(sandbox=True)
-        assert opts.sandbox == {"enabled": True}
+        assert opts.sandbox == {"enabled": True, "network": {"allowedDomains": ["*"]}}
 
     def test_sandbox_disabled_leaves_sandbox_unset(self):
         opts = _build_options(sandbox=False)

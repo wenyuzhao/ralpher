@@ -1,4 +1,4 @@
-from ralpher.models import Tasks, Task
+from ralpher.models import Task, Tasks
 
 
 class TestTask:

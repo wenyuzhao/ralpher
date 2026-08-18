@@ -1,5 +1,5 @@
-from pathlib import Path
 import os
+from pathlib import Path
 
 import jinja2
 import rich
@@ -19,7 +19,7 @@ async def __create_page(
             properties={"title": {"title": [{"text": {"content": title}}]}},
         )
         return page.id
-    except Exception:
+    except Exception:  # noqa: BLE001 - Notion sync is optional; degrade to no page
         return None
 
 
@@ -33,7 +33,7 @@ async def __find_child_page(
                 and block.child_page.get("title") == title
             ):
                 return block.id
-    except Exception:
+    except Exception:  # noqa: BLE001 - Notion sync is optional; degrade to no page
         return None
     return None
 
@@ -83,7 +83,7 @@ async def __update_page(title: str, content: str) -> tuple[bool, str | None]:
             # Add dash to page_id
             page_id = page_id.replace("-", "")
             return True, f"https://notion.so/{page_id}"
-    except Exception:
+    except Exception:  # noqa: BLE001 - Notion sync is optional; degrade to no page
         return False, None
 
 
@@ -122,7 +122,7 @@ async def update_notion_page(project: Project, status: Status | None) -> str | N
         status=status,
         branch=branch,
     )
-    success, page_id = await __update_page(project_dir.name, rendered)
+    _success, page_id = await __update_page(project_dir.name, rendered)
     return page_id
 
 

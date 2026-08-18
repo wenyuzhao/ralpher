@@ -1,10 +1,8 @@
 import dataclasses
 import json
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 from typing import Any, cast, overload
-
-from pydantic import BaseModel
 
 from claude_agent_sdk import (
     ClaudeAgentOptions,
@@ -12,13 +10,13 @@ from claude_agent_sdk import (
     query,
 )
 from claude_agent_sdk.types import EffortLevel
+from pydantic import BaseModel
 
 from ralpher.models import Project, Settings, ralpher_root, split_thinking_level
 from ralpher.utils.error import fail
 from ralpher.utils.spinner import Spinner
 
 from .common import Plan, PlanOrQuestions, ask_user_questions
-
 
 READONLY_TOOLS = [
     "Agent",
@@ -117,7 +115,7 @@ async def _run_query(
             with log_file.open("a") as f:
                 try:
                     f.write(json.dumps(dataclasses.asdict(message)) + "\n")
-                except Exception:
+                except Exception:  # noqa: S110, BLE001 - message logging is best-effort; never break a run
                     pass
 
             if isinstance(message, ResultMessage):
@@ -169,7 +167,7 @@ async def run_claude[T: BaseModel](
     tools: list[str] | None = None,
 ) -> T | None:
     """Run the Claude Agent SDK to execute a prompt."""
-    timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    timestamp = datetime.now().astimezone().strftime("%Y-%m-%d-%H%M%S")
     log_file = project.project_dir / "logs" / f"{kind}-{timestamp}.log"
     log_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -206,7 +204,7 @@ async def run_claude_plan_mode(
     *, kind: str, prompt: str, project: Project, model: str | None = None
 ):
     """Run the Claude Agent SDK with a Q&A loop for plan generation."""
-    timestamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    timestamp = datetime.now().astimezone().strftime("%Y-%m-%d-%H%M%S")
     log_file = project.project_dir / "logs" / f"{kind}-{timestamp}.log"
     log_file.parent.mkdir(parents=True, exist_ok=True)
 

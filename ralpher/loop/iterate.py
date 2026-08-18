@@ -1,14 +1,14 @@
+import contextlib
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
 import rich
 from pydantic import BaseModel, Field
-import tempfile
-import contextlib
 
+from ..backend import run_agent
 from ..models import Project
 from ..prompts import render_prompt
-from ..backend import run_agent
 from ..utils.hooks import HooksManager
 
 
@@ -30,7 +30,7 @@ class Result(BaseModel):
 def _append_verifier_notes(
     progress_md: Path, task_id: str, task_passed: bool, notes: str | None
 ) -> None:
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now().astimezone().strftime("%Y-%m-%d %H:%M:%S")
     status = "PASSED" if task_passed else "FAILED"
     body = notes.strip() if notes and notes.strip() else "N/A"
     section = (

@@ -1,5 +1,5 @@
-from pathlib import Path
 import subprocess
+from pathlib import Path
 from subprocess import DEVNULL
 
 from ralpher.utils.error import fail

@@ -1,6 +1,6 @@
+import sys
 from datetime import datetime
 from pathlib import Path
-import sys
 
 import rich
 from rich.prompt import Confirm
@@ -9,6 +9,7 @@ from ralpher.models import Project
 from ralpher.utils.error import fail
 from ralpher.utils.git import checkout_branch
 from ralpher.utils.hooks.hooks import HooksManager
+
 from ..plan.extract import extract_tasks
 
 
@@ -23,8 +24,8 @@ async def prepare(project: Project, hooks: HooksManager) -> bool:
         await hooks.on_extract_start()
         try:
             await extract_tasks(project)
-        except Exception as e:
-            fail(f"Failed to extract tasks.json: {str(e)}")
+        except Exception as e:  # noqa: BLE001 - any extraction failure is funnelled to fail()
+            fail(f"Failed to extract tasks.json: {e!s}")
         if not project.tasks_json.exists():
             fail(f"{project.tasks_json} still not found after extraction.")
         await hooks.on_extract_end()
@@ -80,7 +81,7 @@ async def prepare(project: Project, hooks: HooksManager) -> bool:
 def _init_progress(progress_file: Path) -> None:
     """Create or reset the progress file."""
     progress_file.write_text(
-        f"# Ralph Progress Log\n\n**Started:** {datetime.now()}\n\n---\n\n"
+        f"# Ralph Progress Log\n\n**Started:** {datetime.now().astimezone()}\n\n---\n\n"
     )
 
 
@@ -89,5 +90,5 @@ def finalize_progress(progress_file: Path) -> None:
     content = progress_file.read_text().strip()
     if not content.endswith("---"):
         content += "\n\n---"
-    content += f"\n\n**Finished:** {datetime.now()}\n"
+    content += f"\n\n**Finished:** {datetime.now().astimezone()}\n"
     progress_file.write_text(content)

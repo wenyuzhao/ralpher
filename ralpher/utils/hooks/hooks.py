@@ -2,7 +2,7 @@ import datetime
 
 import rich
 
-from ...models import Tasks, Status, Project
+from ...models import Project, Status, Tasks
 
 
 class Hooks:
@@ -19,7 +19,7 @@ class Hooks:
 
     async def init(self, project: Project):
         self.project = project
-        self.start_time = datetime.datetime.now()
+        self.start_time = datetime.datetime.now().astimezone()
         self.status: Status = Status(status="starting", label="Starting")
         await self.update()
 
@@ -85,7 +85,7 @@ class Hooks:
 
 
 class HooksManager:
-    def __init__(self, hooks: list["Hooks"] | None = None):
+    def __init__(self, hooks: list[Hooks] | None = None):
         if hooks is None:
             from .notion import NotionHooks
 

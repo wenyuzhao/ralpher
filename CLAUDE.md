@@ -24,13 +24,37 @@ uv run pytest tests/test_plan.py::TestGeneratePlan::test_returns_task_id_on_succ
 
 Requires Python 3.14+. Each command checks the selected backend's prerequisites at startup via `_require_agent`: the `claude` CLI on PATH for `claude-code`, or `GEMINI_API_KEY`/`GOOGLE_API_KEY` in the environment for `antigravity`.
 
-## Linting & Formatting
+## Linting, Formatting & Type Checking
 
 ```bash
 uvx ruff check .          # lint
 uvx ruff check --fix .    # lint + autofix
 uvx ruff format .         # format
+uvx ty check .            # type check
 ```
+
+**Every change must leave `uvx ruff check .`, `uvx ruff format --check .`, `uvx ty check .`, and
+`uv run pytest tests/ -v` all clean.** Run them before reporting a task done — a task with lint,
+format, type, or test errors is not finished. Notes on keeping them clean:
+
+- **No ruff config.** The repo has no `[tool.ruff]` section, so ruff's own (broad) default rule
+  set applies. Don't silence a rule project-wide to make a finding go away; fix the code.
+- **Deliberate blind excepts carry a `# noqa`.** `BLE001`/`S110` are suppressed per-site with a
+  one-line reason wherever a broad `except Exception` is the point — best-effort JSONL logging
+  that must never break a run, optional Notion sync that degrades to "no page", and the funnels
+  that turn any agent SDK failure into `fail()`. Match that style rather than adding new bare
+  suppressions or narrowing an intentionally broad catch.
+- **Timestamps are tz-aware.** `DTZ005` forbids a naked `datetime.now()`. Use
+  `datetime.now().astimezone()` — it keeps the local time these log names, project IDs, and
+  progress entries are meant to show, while satisfying the rule.
+- **`typer`, not `click`.** `typer` vendors its own click at `typer._click`, so a `TyperGroup`
+  override must annotate its context as `typer._click.core.Context` (imported as `TyperContext`
+  in [main.py](ralpher/main.py)); the top-level `click.Context` is a different class and ty
+  rejects it as an invalid override.
+- **Narrow optionals in tests.** SDK config objects expose unions (`str | ModelTarget | None`,
+  `list[...] | None`, `Callable | None`). Bind the attribute to a local and `assert isinstance(...)`
+  / `assert ... is not None` before drilling in, so the assertion reads as an assertion and ty can
+  follow it.
 
 ## Architecture
 

@@ -2,18 +2,23 @@ import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from google.antigravity.hooks.policy import Decision
+from google.antigravity.types import (
+    BuiltinTools,
+    GeminiAPIEndpoint,
+    ModelTarget,
+    ThinkingLevel,
+    ToolCall,
+)
 from pydantic import BaseModel
 
-from google.antigravity.hooks.policy import Decision
-from google.antigravity.types import BuiltinTools, ThinkingLevel, ToolCall
-
-from ralpher.models import Project
 from ralpher.backend import antigravity
 from ralpher.backend.antigravity import (
     _build_config,
     run_antigravity,
     run_antigravity_plan_mode,
 )
+from ralpher.models import Project
 
 
 class Out(BaseModel):
@@ -90,15 +95,22 @@ class TestBuildConfig:
         # Without a thinking level the simple `model` shorthand carries the name.
         assert cfg.model == "gemini-3-pro"
         # The SDK normalizes a pydantic class into its JSON-schema string.
-        assert json.loads(cfg.response_schema) == Out.model_json_schema()
+        response_schema = cfg.response_schema
+        assert isinstance(response_schema, str)
+        assert json.loads(response_schema) == Out.model_json_schema()
 
     def test_thinking_level_rides_on_model_target(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         cfg = _build_config(model="gemini-3.1-pro-preview", thinking_level="high")
         # A bare name can't carry a thinking level (it lives in the endpoint's
         # options), so the shorthand becomes a full ModelTarget.
-        assert cfg.model.name == "gemini-3.1-pro-preview"
-        assert cfg.model.endpoint.options.thinking_level == ThinkingLevel.HIGH
+        model = cfg.model
+        assert isinstance(model, ModelTarget)
+        assert model.name == "gemini-3.1-pro-preview"
+        endpoint = model.endpoint
+        assert isinstance(endpoint, GeminiAPIEndpoint)
+        assert endpoint.options is not None
+        assert endpoint.options.thinking_level == ThinkingLevel.HIGH
 
     def test_workspace_is_cwd(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -127,9 +139,11 @@ class TestBuildConfig:
         )
         outside = ToolCall(name="edit_file", canonical_path=str(tmp_path / "src.py"))
         no_path = ToolCall(name="edit_file")
-        assert deny.when(inside) is True
-        assert deny.when(outside) is False
-        assert deny.when(no_path) is False
+        when = deny.when
+        assert when is not None
+        assert when(inside) is True
+        assert when(outside) is False
+        assert when(no_path) is False
 
     def test_ask_question_always_disabled(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -138,7 +152,9 @@ class TestBuildConfig:
         assert cfg.capabilities.disabled_tools == [BuiltinTools.ASK_QUESTION]
         # Readonly (plan): the read-only whitelist excludes it anyway.
         cfg = _build_config(readonly=True)
-        assert BuiltinTools.ASK_QUESTION not in cfg.capabilities.enabled_tools
+        enabled_tools = cfg.capabilities.enabled_tools
+        assert enabled_tools is not None
+        assert BuiltinTools.ASK_QUESTION not in enabled_tools
 
     def test_readonly_whitelists_read_only_tools_via_capabilities(
         self, tmp_path, monkeypatch
@@ -181,11 +197,11 @@ class TestRunAntigravity:
         with (
             patch.object(antigravity, "Agent", FakeAgent),
             patch.object(antigravity, "Spinner", _NoSpinner),
+            pytest.raises(SystemExit),
         ):
-            with pytest.raises(SystemExit):
-                await run_antigravity(
-                    kind="verify", prompt="x", project=project, schema=Out
-                )
+            await run_antigravity(
+                kind="verify", prompt="x", project=project, schema=Out
+            )
 
     @pytest.mark.asyncio
     async def test_returns_none_without_schema(self, tmp_path, monkeypatch):
@@ -376,8 +392,8 @@ class TestPlanMode:
         with (
             patch.object(antigravity, "Agent", FakeAgent),
             patch.object(antigravity, "Spinner", _NoSpinner),
+            pytest.raises(SystemExit),
         ):
-            with pytest.raises(SystemExit):
-                await run_antigravity_plan_mode(
-                    kind="plan", prompt="build", project=project
-                )
+            await run_antigravity_plan_mode(
+                kind="plan", prompt="build", project=project
+            )

@@ -7,6 +7,7 @@ to the agent as the initial prompt (see `ralpher.backend.claude.run_claude`).
 """
 
 from pathlib import Path
+from typing import Any, cast
 
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
@@ -23,7 +24,10 @@ _env = Environment(
 # package; its full text is embedded directly into the plan/refine prompts so
 # the agent never has to read a file outside the run's workspace (the
 # antigravity backend confines file access to that workspace).
-_env.globals["plan_structure"] = (_PROMPTS_DIR / "plan-structure.md").read_text()
+# (`Environment.globals` is inferred from its default value, so it needs a cast.)
+cast("dict[str, Any]", _env.globals)["plan_structure"] = (
+    _PROMPTS_DIR / "plan-structure.md"
+).read_text()
 
 
 def render_prompt(name: str, /, **context: object) -> str:

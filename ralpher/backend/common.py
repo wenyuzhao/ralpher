@@ -11,7 +11,7 @@ import json
 
 import rich
 from prompt_toolkit import PromptSession
-from prompt_toolkit.formatted_text import HTML
+from prompt_toolkit.formatted_text import HTML, AnyFormattedText
 from prompt_toolkit.shortcuts.choice_input import ChoiceInput
 from pydantic import BaseModel
 
@@ -45,7 +45,7 @@ async def ask_user_questions(questions: Questions) -> str:
 
             print()
             header = q.header
-            choice_options = [
+            choice_options: list[tuple[str, AnyFormattedText]] = [
                 (opt.label, f"{opt.label} - {opt.description}") for opt in q.options
             ]
             choice_options.append(
@@ -53,7 +53,7 @@ async def ask_user_questions(questions: Questions) -> str:
                     "__other__",
                     HTML(
                         "Other - <style color='ansibrightblack'>[please specify]</style>"
-                    ),  # type: ignore
+                    ),
                 )
             )
             result = await ChoiceInput(

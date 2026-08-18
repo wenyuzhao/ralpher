@@ -1,6 +1,7 @@
-import time
+import asyncio
 
 import rich
+
 from ralpher.models import Project
 from ralpher.utils.hooks.hooks import HooksManager
 
@@ -46,7 +47,7 @@ async def run_ralph_loop(*, project: Project, hooks: HooksManager) -> None:
             break
 
         if project.max_iterations is None or iterations < project.max_iterations - 1:
-            time.sleep(3)
+            await asyncio.sleep(3)
 
     if all_passed:
         finalize_progress(project.progress_md)

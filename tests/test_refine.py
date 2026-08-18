@@ -17,9 +17,7 @@ class TestRefinePlan:
     async def test_raises_when_task_dir_missing(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         with pytest.raises(SystemExit):
-            await refine_plan(
-                project=Project(id="nonexistent-task"), prompt="add auth"
-            )
+            await refine_plan(project=Project(id="nonexistent-task"), prompt="add auth")
 
     @pytest.mark.asyncio
     async def test_raises_when_plan_md_missing(self, tmp_path, monkeypatch):
