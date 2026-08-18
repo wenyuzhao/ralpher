@@ -38,11 +38,11 @@ class AntigravityBackend(Backend):
     # ``agy models`` lists the names this backend accepts. Unlike the claude
     # defaults, these pin an effort explicitly via the ``:<level>`` suffix.
     default_models: ClassVar[dict[str, str]] = {
-        "plan": "gemini-3.1-pro:high",
-        "refine": "gemini-3.1-pro:high",
-        "loop": "gemini-3.1-pro:high",
-        "verify": "gemini-3.5-flash:high",
-        "extract-tasks": "gemini-3.5-flash:medium",
+        "plan": "gemini-3.7-flash:high",
+        "refine": "gemini-3.7-flash:high",
+        "loop": "gemini-3.7-flash:high",
+        "verify": "gemini-3.7-flash:high",
+        "extract-tasks": "gemini-3.7-flash:medium",
     }
     effort_levels: ClassVar[tuple[str, ...]] = ("low", "medium", "high")
 

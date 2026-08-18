@@ -61,11 +61,11 @@ class ClaudeBackend(Backend):
     # default effort (``high``). Pin a model per kind in settings.json to
     # override, with or without a suffix.
     default_models: ClassVar[dict[str, str]] = {
-        "plan": "claude-opus-5[1m]",
-        "refine": "claude-opus-5[1m]",
-        "loop": "claude-opus-5[1m]",
-        "verify": "claude-sonnet-5",
-        "extract-tasks": "haiku",
+        "plan": "opus",
+        "refine": "opus",
+        "loop": "opus",
+        "verify": "sonnet",
+        "extract-tasks": "sonnet",
     }
     effort_levels: ClassVar[tuple[str, ...]] = ("low", "medium", "high", "xhigh", "max")
 
