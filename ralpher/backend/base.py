@@ -25,7 +25,7 @@ from typing import Any, ClassVar, overload
 
 from pydantic import BaseModel
 
-from ralpher.models import BackendKind, Project, Settings, split_thinking_level
+from ralpher.models import BackendKind, Project, Settings
 from ralpher.utils.error import fail
 from ralpher.utils.spinner import Spinner
 
@@ -64,9 +64,31 @@ class Backend(abc.ABC):
     executable: ClassVar[str]
     #: Appended to the "not found on PATH" error, telling the user how to fix it.
     install_hint: ClassVar[str]
+    #: Per-kind default model specs for this CLI, keyed by the `kind` passed to
+    #: `run` ("plan", "refine", "loop", "verify", "extract-tasks"). A `models`
+    #: pin in settings.json overrides these. A trailing ``:<level>`` suffix on a
+    #: spec sets the reasoning effort; a bare name leaves the CLI's own default.
+    default_models: ClassVar[dict[str, str]]
+    #: Reasoning-effort levels this CLI accepts as ``--effort``. Only these are
+    #: recognized as a ``:<level>`` model suffix.
+    effort_levels: ClassVar[tuple[str, ...]]
 
     def __init__(self, project: Project) -> None:
         self.project = project
+
+    @classmethod
+    def split_effort(cls, spec: str) -> tuple[str, str | None]:
+        """Peel a trailing ``:<level>`` reasoning-effort suffix off a model spec.
+
+        ``"claude-opus-5:high"`` → ``("claude-opus-5", "high")``. The level must
+        be one this CLI accepts (`effort_levels`), so an unrecognized suffix
+        stays part of the name — as does the bracketed ``[1m]`` context-window
+        suffix on a Claude model, which is never a level.
+        """
+        name, sep, level = spec.rpartition(":")
+        if sep and name and level in cls.effort_levels:
+            return name, level
+        return spec, None
 
     @classmethod
     def check_prerequisites(cls) -> None:
@@ -200,16 +222,15 @@ class Backend(abc.ABC):
     ) -> tuple[str | None, str | None]:
         """Model name and reasoning effort for `kind`.
 
-        An explicitly passed `model` wins; otherwise the per-kind default for
-        this backend (settings.json pin, else the built-in). Either way a
-        trailing ``:<level>`` suffix is peeled off into the effort.
+        An explicitly passed `model` wins, else a `models` pin in settings.json,
+        else this backend's `default_models`. Whichever it is, a trailing
+        ``:<level>`` suffix is peeled off into the effort; a spec without one
+        leaves the effort unset, so the CLI applies its own default.
         """
-        if model is not None:
-            return split_thinking_level(model, self.kind)
-        settings = Settings.load()
-        return settings.model_for(kind, self.kind), settings.thinking_for(
-            kind, self.kind
+        spec = (
+            model or Settings.load().models.get(kind) or self.default_models.get(kind)
         )
+        return self.split_effort(spec) if spec else (None, None)
 
     def _start_log(self, kind: str, prompt: str) -> Path:
         """Create this run's log file, seeded with the initial prompt."""

@@ -48,59 +48,10 @@ def normalize_backend(value: str) -> BackendKind:
     return _BACKEND_ALIASES[key]
 
 
-# Per-kind default models for the ``claude-code`` backend. Like the antigravity
-# defaults below, a trailing ``:<level>`` suffix sets the reasoning effort
-# (Claude's ``--effort``); a bare name runs at the CLI's own default effort
-# (``high``), which is why these carry no suffix.
-CLAUDE_DEFAULT_MODELS: dict[str, str] = {
-    "plan": "claude-opus-5[1m]",
-    "refine": "claude-opus-5[1m]",
-    "loop": "claude-opus-5[1m]",
-    "verify": "claude-sonnet-5",
-    "extract-tasks": "haiku",
-}
-
-# Per-kind defaults for the ``antigravity`` backend, parallel to
-# ``CLAUDE_DEFAULT_MODELS``. ``agy`` separates the model from its reasoning
-# effort (``--model`` / ``--effort``), but rather than carry a separate field
-# the effort rides on the model string as a trailing ``:<level>`` suffix that
-# ``split_thinking_level`` peels off — so "gemini-3.5-flash:high" means the
-# flash model at high effort. A model pinned in settings.json may carry its own
-# suffix; a bare name runs at the CLI's own default effort. Run ``agy models``
-# for the names this backend accepts.
-ANTIGRAVITY_DEFAULT_MODELS: dict[str, str] = {
-    "plan": "gemini-3.1-pro:high",
-    "refine": "gemini-3.1-pro:high",
-    "loop": "gemini-3.1-pro:high",
-    "verify": "gemini-3.5-flash:high",
-    "extract-tasks": "gemini-3.5-flash:medium",
-}
-
-# Recognized thinking-level suffixes per backend. A trailing ``:<level>`` on a
-# model spec sets the reasoning effort, which both CLIs take as ``--effort``.
-# The valid set differs: ``claude`` accepts five levels, ``agy`` three.
-_THINKING_LEVELS: dict[BackendKind, tuple[str, ...]] = {
-    "claude-code": ("low", "medium", "high", "xhigh", "max"),
-    "antigravity": ("low", "medium", "high"),
-}
-
-
-def split_thinking_level(
-    model: str, backend: BackendKind = DEFAULT_BACKEND
-) -> tuple[str, str | None]:
-    """Peel a trailing ``:<level>`` thinking suffix off a model spec.
-
-    ``"claude-opus-5:high"`` → ``("claude-opus-5", "high")``. The level must
-    be valid for ``backend`` (see ``_THINKING_LEVELS``); a string without a
-    recognized suffix is returned unchanged, with ``None``.
-    """
-    name, sep, level = model.rpartition(":")
-    if sep and name and level in _THINKING_LEVELS[backend]:
-        return name, level
-    return model, None
-
-
 class Settings(BaseModel):
+    # Per-kind model pins ("plan", "refine", "loop", "verify", "extract-tasks"),
+    # overriding whichever backend is active and its `default_models`. A pin may
+    # carry a ``:<level>`` reasoning-effort suffix; see `Backend.split_effort`.
     models: dict[str, str] = {}
     # Default coding-agent backend for this checkout. Overridden per run by the
     # ``--backend`` CLI flag. Accepts aliases (e.g. "cc", "agy") via the
@@ -125,37 +76,6 @@ class Settings(BaseModel):
         if not path.exists():
             return cls()
         return cls.model_validate(json.loads(path.read_text()))
-
-    def _spec_for(self, kind: str, backend: BackendKind) -> str | None:
-        """Resolved model spec (name plus any ``:<level>`` suffix) for ``kind``.
-
-        A model pinned in settings.json wins over the backend's per-kind default.
-        """
-        defaults = (
-            CLAUDE_DEFAULT_MODELS
-            if backend == "claude-code"
-            else ANTIGRAVITY_DEFAULT_MODELS
-        )
-        return self.models.get(kind) or defaults.get(kind)
-
-    def model_for(
-        self, kind: str, backend: BackendKind = DEFAULT_BACKEND
-    ) -> str | None:
-        spec = self._spec_for(kind, backend)
-        return split_thinking_level(spec, backend)[0] if spec else None
-
-    def thinking_for(
-        self, kind: str, backend: BackendKind = DEFAULT_BACKEND
-    ) -> str | None:
-        """Default thinking level (reasoning effort) for ``kind``.
-
-        The level is the ``:<level>`` suffix on the resolved model spec (pinned
-        in settings.json, else the backend's per-kind default), so a bare name
-        yields ``None`` — the CLI's own default effort. Both CLIs take it as
-        ``--effort``, but their valid levels differ (see ``_THINKING_LEVELS``).
-        """
-        spec = self._spec_for(kind, backend)
-        return split_thinking_level(spec, backend)[1] if spec else None
 
 
 def resolve_backend(cli_backend: str | None) -> BackendKind:

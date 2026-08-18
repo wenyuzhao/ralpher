@@ -9,6 +9,7 @@ canned JSONL stream), which keeps `_spawn` honest without a network call.
 import json
 import sys
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 from pydantic import BaseModel
@@ -77,6 +78,103 @@ class TestDispatcher:
     def test_present_executable_passes(self, monkeypatch):
         monkeypatch.setattr("ralpher.backend.base.shutil.which", lambda _: "/bin/agy")
         AntigravityBackend.check_prerequisites()
+
+
+# --- per-backend model defaults -------------------------------------------- #
+
+
+class TestDefaultModels:
+    """Each backend owns its own per-kind defaults and effort vocabulary."""
+
+    def test_claude_defaults(self, tmp_path, monkeypatch):
+        backend = get_backend(_project(tmp_path, monkeypatch))
+        assert backend._resolve_model("plan", None) == ("claude-opus-5[1m]", None)
+        assert backend._resolve_model("verify", None) == ("claude-sonnet-5", None)
+        assert backend._resolve_model("extract-tasks", None) == ("haiku", None)
+
+    def test_antigravity_defaults(self, tmp_path, monkeypatch):
+        project = _project(tmp_path, monkeypatch, backend="antigravity")
+        backend = get_backend(project)
+        assert backend._resolve_model("plan", None) == ("gemini-3.1-pro", "high")
+        assert backend._resolve_model("verify", None) == ("gemini-3.5-flash", "high")
+        assert backend._resolve_model("extract-tasks", None) == (
+            "gemini-3.5-flash",
+            "medium",
+        )
+
+    def test_every_kind_has_a_default_on_both_backends(self):
+        kinds = {"plan", "refine", "loop", "verify", "extract-tasks"}
+        for cls in BACKENDS.values():
+            assert kinds <= set(cls.default_models)
+
+    def test_defaults_do_not_leak_across_backends(self):
+        assert ClaudeBackend.default_models != AntigravityBackend.default_models
+
+    def test_unknown_kind_has_no_default(self, tmp_path, monkeypatch):
+        backend = get_backend(_project(tmp_path, monkeypatch))
+        assert backend._resolve_model("nope", None) == (None, None)
+
+    def test_explicit_model_wins(self, tmp_path, monkeypatch):
+        backend = get_backend(_project(tmp_path, monkeypatch))
+        assert backend._resolve_model("plan", "haiku:low") == ("haiku", "low")
+
+    def test_settings_pin_beats_the_default(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        ralpher = tmp_path / ".ralpher"
+        ralpher.mkdir()
+        (ralpher / "settings.json").write_text(
+            json.dumps({"models": {"plan": "some-model:medium"}})
+        )
+        # The pin applies whichever backend is active.
+        for kind in ("claude-code", "antigravity"):
+            backend = get_backend(Project(id="proj", backend=kind))
+            assert backend._resolve_model("plan", None) == ("some-model", "medium")
+
+    def test_bare_pin_leaves_effort_to_the_cli(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        ralpher = tmp_path / ".ralpher"
+        ralpher.mkdir()
+        (ralpher / "settings.json").write_text(
+            json.dumps({"models": {"plan": "some-model"}})
+        )
+        backend = get_backend(Project(id="proj"))
+        assert backend._resolve_model("plan", None) == ("some-model", None)
+
+
+class TestSplitEffort:
+    def test_peels_a_known_suffix(self):
+        assert AntigravityBackend.split_effort("gemini-3.5-flash:high") == (
+            "gemini-3.5-flash",
+            "high",
+        )
+
+    def test_no_suffix_returns_the_spec_unchanged(self):
+        assert ClaudeBackend.split_effort("haiku") == ("haiku", None)
+
+    def test_unknown_trailing_word_is_not_a_level(self):
+        assert AntigravityBackend.split_effort("gemini-3.1-pro:preview") == (
+            "gemini-3.1-pro:preview",
+            None,
+        )
+
+    def test_bracketed_context_window_is_kept(self):
+        # Only a recognized ":<level>" is peeled; "[1m]" is part of the name.
+        assert ClaudeBackend.split_effort("claude-opus-5[1m]:high") == (
+            "claude-opus-5[1m]",
+            "high",
+        )
+        assert ClaudeBackend.split_effort("claude-opus-5[1m]") == (
+            "claude-opus-5[1m]",
+            None,
+        )
+
+    def test_levels_are_per_backend(self):
+        # agy takes only low/medium/high; xhigh and max are claude-only.
+        assert ClaudeBackend.split_effort("m:xhigh") == ("m", "xhigh")
+        assert ClaudeBackend.split_effort("m:max") == ("m", "max")
+        assert AntigravityBackend.split_effort("m:xhigh") == ("m:xhigh", None)
+        assert AntigravityBackend.split_effort("m:max") == ("m:max", None)
+        assert AntigravityBackend.split_effort("m:high") == ("m", "high")
 
 
 # --- claude argv ----------------------------------------------------------- #
@@ -314,6 +412,8 @@ class _StubBackend(Backend):
     kind = "claude-code"
     executable = sys.executable
     install_hint = ""
+    default_models: ClassVar[dict[str, str]] = {}
+    effort_levels: ClassVar[tuple[str, ...]] = ()
 
     script: str = ""
 

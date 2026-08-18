@@ -19,7 +19,7 @@ Flags this backend relies on:
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from ralpher.models import ralpher_root
 
@@ -56,6 +56,18 @@ class ClaudeBackend(Backend):
     kind = "claude-code"
     executable = "claude"
     install_hint = "Install it first: https://docs.anthropic.com/en/docs/claude-code"
+
+    # None of these carry a ``:<level>`` suffix, so they run at the CLI's own
+    # default effort (``high``). Pin a model per kind in settings.json to
+    # override, with or without a suffix.
+    default_models: ClassVar[dict[str, str]] = {
+        "plan": "claude-opus-5[1m]",
+        "refine": "claude-opus-5[1m]",
+        "loop": "claude-opus-5[1m]",
+        "verify": "claude-sonnet-5",
+        "extract-tasks": "haiku",
+    }
+    effort_levels: ClassVar[tuple[str, ...]] = ("low", "medium", "high", "xhigh", "max")
 
     def build_command(
         self,

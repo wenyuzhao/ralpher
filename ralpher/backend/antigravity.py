@@ -22,7 +22,7 @@ turn can write into `.ralpher` here where claude is hard-blocked.
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 from .base import AgentResult, Backend
 
@@ -34,6 +34,17 @@ class AntigravityBackend(Backend):
         "Install the Antigravity CLI and sign in with `agy` — "
         "see https://antigravity.google."
     )
+
+    # ``agy models`` lists the names this backend accepts. Unlike the claude
+    # defaults, these pin an effort explicitly via the ``:<level>`` suffix.
+    default_models: ClassVar[dict[str, str]] = {
+        "plan": "gemini-3.1-pro:high",
+        "refine": "gemini-3.1-pro:high",
+        "loop": "gemini-3.1-pro:high",
+        "verify": "gemini-3.5-flash:high",
+        "extract-tasks": "gemini-3.5-flash:medium",
+    }
+    effort_levels: ClassVar[tuple[str, ...]] = ("low", "medium", "high")
 
     def build_command(
         self,
