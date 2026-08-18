@@ -1,299 +1,98 @@
-"""Antigravity (Google Gemini) backend for the agent helpers.
+"""Antigravity (Google Gemini) backend — drives the `agy` CLI as a subprocess.
 
-Mirrors the Claude Agent SDK backend in :mod:`ralpher.backend.claude`: the two
-public entry points here (`run_antigravity`, `run_antigravity_plan_mode`) have
-the same signatures and behaviour as `run_claude` / `run_claude_plan_mode`, so
-the dispatcher in :mod:`ralpher.backend` can route to either based on
-``project.backend`` without callers needing to know which backend is active.
+The counterpart of `ralpher.backend.claude`; both are thin argv builders over
+the shared driver in `ralpher.backend.base`. The `agy` CLI is close to
+`claude`'s in shape, so most flags map one-to-one. Where they differ:
 
-Differences from the claude-code backend:
-- Structured output is requested via ``LocalAgentConfig.response_schema`` and
-  read back with ``ChatResponse.structured_output()`` (a plain dict, which we
-  validate against the pydantic ``schema`` ourselves).
-- The read-only ``.ralpher`` guarantee is enforced with deny *policies* on the
-  file-writing builtins rather than Claude Code ``deny`` permission rules.
-  Whole-tool restrictions (disabling ``ask_question``, the read-only tool set)
-  instead go through ``CapabilitiesConfig``, which drops the tool from the
-  model's context entirely.
-- The OS Bash sandbox (``project.sandbox``) has no antigravity equivalent and
-  is ignored; file writes are still confined to the workspace + the .ralpher
-  deny policies.
+- The conversation handle is ``--conversation <id>`` (claude: ``--resume``),
+  and it arrives on the result record as ``conversation_id``.
+- The stream-json envelope is ``{"event": "result", "result": {...}}`` rather
+  than a flat ``{"type": "result", ...}``.
+- There is no per-tool flag. Read-only turns use ``--mode plan`` instead, which
+  soft-denies every file write even under ``--dangerously-skip-permissions``.
+- Reasoning effort is ``low|medium|high`` (claude also has ``xhigh``/``max``).
+
+Known gap: the `.ralpher` state directory can't be made read-only for this
+backend. `agy` has no inline-settings flag (claude's ``--settings``) to carry
+per-run deny rules, and its permission config is global to the user's install,
+which ralpher will not edit. Read-only turns are still write-free via
+``--mode plan``, and `--sandbox` restricts the terminal, but an implementation
+turn can write into `.ralpher` here where claude is hard-blocked.
 """
 
 import json
-import os
-from datetime import datetime
 from pathlib import Path
-from typing import Any, overload
+from typing import Any
 
-from google.antigravity import Agent, CapabilitiesConfig, LocalAgentConfig
-from google.antigravity.hooks import policy
-from google.antigravity.models import DEFAULT_MODEL
-from google.antigravity.types import (
-    BuiltinTools,
-    GeminiAPIEndpoint,
-    GeminiModelOptions,
-    ModelTarget,
-    ThinkingLevel,
-    ToolCall,
-)
-from pydantic import BaseModel
-
-from ralpher.models import Project, Settings, ralpher_root, split_thinking_level
-from ralpher.utils.error import fail
-
-# The question prompt UX and the plan-mode output schema are backend-agnostic
-# and shared via common, so this backend never depends on the claude one.
-from ralpher.utils.spinner import Spinner
-
-from .common import Plan, PlanOrQuestions, ask_user_questions
-
-# Builtins that create or mutate files. Reads (view_file, list_directory, …)
-# are always permitted so the agent can read its task/plan/progress files.
-_WRITE_TOOLS = [BuiltinTools.CREATE_FILE, BuiltinTools.EDIT_FILE]
+from .base import AgentResult, Backend
 
 
-def _ralpher_readonly_policies() -> list[policy.Policy]:
-    """Deny policies that make the ``.ralpher`` state directory read-only.
+class AntigravityBackend(Backend):
+    kind = "antigravity"
+    executable = "agy"
+    install_hint = (
+        "Install the Antigravity CLI and sign in with `agy` — "
+        "see https://antigravity.google."
+    )
 
-    The agent must read the task/plan/progress files (passed by absolute path)
-    but never write into them — progress updates are mediated through a temp
-    file in the loop. These are *specific deny* policies, the highest priority
-    bucket, so they win even over the read-only allow-list below.
-    """
-    root = str(ralpher_root().resolve())
+    def build_command(
+        self,
+        *,
+        prompt: str,
+        model: str | None,
+        effort: str | None,
+        schema: dict[str, Any] | None,
+        readonly: bool,
+        tools: list[str] | None,
+        session_id: str | None,
+    ) -> list[str]:
+        """Argv for one `agy` turn.
 
-    def _in_ralpher(tc: ToolCall) -> bool:
-        path = tc.canonical_path or ""
-        if not path:
-            return False
-        target = str(Path(path).resolve())
-        return target == root or target.startswith(root + os.sep)
+        `tools` is accepted for signature parity with the claude backend but is
+        not applied: `agy` has no per-tool flag. Its sole caller pairs it with
+        ``readonly=True``, and plan mode already blocks every write.
+        """
+        argv = [
+            self.executable,
+            "--print",
+            prompt,
+            "--output-format",
+            "stream-json",
+            # Unattended runs must never block on a permission prompt. In
+            # read-only turns this is still safe: plan mode's write block is
+            # independent of permissions.
+            "--dangerously-skip-permissions",
+            # Confine file access to the run's workspace.
+            "--add-dir",
+            str(Path.cwd().resolve()),
+        ]
+        if readonly:
+            argv += ["--mode", "plan"]
+        if self.project.sandbox:
+            argv.append("--sandbox")
+        if model:
+            argv += ["--model", model]
+        if effort:
+            argv += ["--effort", effort]
+        if schema:
+            argv += ["--json-schema", json.dumps(schema)]
+        if session_id:
+            argv += ["--conversation", session_id]
+        return argv
 
-    return [
-        policy.deny(tool.value, when=_in_ralpher, name="ralpher_readonly")
-        for tool in _WRITE_TOOLS
-    ]
-
-
-def _build_config(
-    *,
-    model: str | None = None,
-    thinking_level: str | None = None,
-    schema: type[BaseModel] | None = None,
-    readonly: bool = False,
-    tools: list[str] | None = None,
-) -> LocalAgentConfig:
-    """Build the ``LocalAgentConfig`` for one antigravity run.
-
-    ``thinking_level`` (one of the ``ThinkingLevel`` values) sets the model's
-    reasoning effort. It lives in the *endpoint*'s ``GeminiModelOptions``, so a
-    bare model name can't carry it: when a level is given we hand ``model`` a
-    full ``ModelTarget`` with an explicit ``GeminiAPIEndpoint`` instead of the
-    plain string. That pins the run to the Gemini Developer API, which is the
-    only auth path this backend advertises (``GEMINI_API_KEY``) anyway.
-
-    ``tools`` is accepted for signature parity with ``run_claude`` but is not
-    applied here — its sole caller pairs it with ``readonly=True``, and the
-    read-only capability set below is exactly the safe read tool set.
-
-    Which builtins the model can even see is set via ``capabilities`` rather
-    than policies: capabilities drop a tool from the model's context entirely
-    (the SDK's recommended mechanism for an unconditional restriction), whereas
-    a deny policy still shows the tool and rejects calls at the hook layer. The
-    path-conditional ``.ralpher`` write guard can't be a capability (it gates a
-    tool only for certain paths), so it stays a policy.
-    """
-    workspace = str(Path.cwd().resolve())
-
-    # The .ralpher write guard is path-conditional, so it must remain a policy.
-    # It also doubles as the safety policy the SDK requires whenever write
-    # tools are active (it raises otherwise), which is the non-readonly case.
-    policies: list[policy.Policy] = list(_ralpher_readonly_policies())
-
-    # ask_question is always disabled: the loop/verify turns run unattended and
-    # plan mode drives its own clarification UX, so an interactive question tool
-    # would only stall the run. Read-only mode narrows the set further to the
-    # safe read builtins (a whitelist, which already excludes ask_question);
-    # enabled_tools and disabled_tools are mutually exclusive, hence either/or.
-    if readonly:
-        capabilities = CapabilitiesConfig(enabled_tools=BuiltinTools.read_only())
-    else:
-        capabilities = CapabilitiesConfig(disabled_tools=[BuiltinTools.ASK_QUESTION])
-
-    model_arg: str | ModelTarget | None = model
-    if thinking_level is not None:
-        model_arg = ModelTarget(
-            name=model or DEFAULT_MODEL,
-            endpoint=GeminiAPIEndpoint(
-                options=GeminiModelOptions(thinking_level=ThinkingLevel(thinking_level))
-            ),
+    def read_result(self, record: dict[str, Any]) -> AgentResult | None:
+        if record.get("event") != "result":
+            return None
+        result = record.get("result")
+        if not isinstance(result, dict):
+            return None
+        status = result.get("status")
+        failed = status != "SUCCESS"
+        return AgentResult(
+            session_id=result.get("conversation_id"),
+            structured_output=result.get("structured_output"),
+            is_error=failed,
+            error=f"The antigravity agent finished with status {status}."
+            if failed
+            else None,
         )
-
-    return LocalAgentConfig(
-        response_schema=schema,
-        workspaces=[workspace],
-        policies=policies,
-        capabilities=capabilities,
-        model=model_arg,
-    )
-
-
-def _log_chunk(log_file: Path, chunk: Any) -> None:
-    """Append one streamed chunk to the JSONL log (best-effort)."""
-    try:
-        if hasattr(chunk, "model_dump"):
-            payload = {"type": type(chunk).__name__, **chunk.model_dump(mode="json")}
-        else:
-            payload = {"type": type(chunk).__name__, "repr": repr(chunk)}
-        with log_file.open("a") as f:
-            f.write(json.dumps(payload, default=str) + "\n")
-    except Exception:  # noqa: S110, BLE001 - chunk logging is best-effort; never break a run
-        pass
-
-
-async def _run_chat(
-    prompt: str, config: LocalAgentConfig, log_file: Path, *, expect_structured: bool
-) -> dict[str, Any] | None:
-    """Run a single antigravity turn, stream chunks to the log, return output."""
-    structured: dict[str, Any] | None = None
-    async with Spinner():
-        try:
-            async with Agent(config) as agent:
-                response = await agent.chat(prompt)
-                async for chunk in response.chunks:
-                    _log_chunk(log_file, chunk)
-                if expect_structured:
-                    structured = await response.structured_output()
-        except Exception as e:  # noqa: BLE001 - any SDK failure is funnelled to fail()
-            fail(f"Antigravity agent returned an error: {e}")
-    return structured
-
-
-@overload
-async def run_antigravity(
-    *,
-    kind: str,
-    prompt: str,
-    project: Project,
-    model: str | None = None,
-    schema: None = None,
-    readonly: bool = False,
-    tools: list[str] | None = None,
-) -> None: ...
-
-
-@overload
-async def run_antigravity[T: BaseModel](
-    *,
-    kind: str,
-    prompt: str,
-    project: Project,
-    model: str | None = None,
-    schema: type[T],
-    readonly: bool = False,
-    tools: list[str] | None = None,
-) -> T: ...
-
-
-async def run_antigravity[T: BaseModel](
-    *,
-    kind: str,
-    prompt: str,
-    project: Project,
-    model: str | None = None,
-    schema: type[T] | None = None,
-    readonly: bool = False,
-    tools: list[str] | None = None,
-) -> T | None:
-    """Run the antigravity SDK to execute a prompt (counterpart of run_claude)."""
-    timestamp = datetime.now().astimezone().strftime("%Y-%m-%d-%H%M%S")
-    log_file = project.project_dir / "logs" / f"{kind}-{timestamp}.log"
-    log_file.parent.mkdir(parents=True, exist_ok=True)
-
-    with log_file.open("w") as f:
-        f.write(json.dumps({"initial_prompt": prompt}) + "\n\n")
-
-    settings = Settings.load()
-    if model is None:
-        model = settings.model_for(kind, backend="antigravity")
-        thinking_level = settings.thinking_for(kind, backend="antigravity")
-    else:
-        model, thinking_level = split_thinking_level(model, backend="antigravity")
-
-    config = _build_config(
-        model=model,
-        thinking_level=thinking_level,
-        schema=schema,
-        readonly=readonly,
-        tools=tools,
-    )
-
-    structured = await _run_chat(
-        prompt, config, log_file, expect_structured=schema is not None
-    )
-
-    if schema:
-        if structured is None:
-            fail("Failed to get structured output from the antigravity agent.")
-        return schema.model_validate(structured)
-    return None
-
-
-async def run_antigravity_plan_mode(
-    *, kind: str, prompt: str, project: Project, model: str | None = None
-):
-    """Run the antigravity SDK with a Q&A loop for plan generation.
-
-    A single ``Agent`` is held open across turns, so its conversation history
-    carries the context forward — the antigravity equivalent of Claude Code's
-    ``--resume <session_id>`` continuation.
-    """
-    timestamp = datetime.now().astimezone().strftime("%Y-%m-%d-%H%M%S")
-    log_file = project.project_dir / "logs" / f"{kind}-{timestamp}.log"
-    log_file.parent.mkdir(parents=True, exist_ok=True)
-
-    with log_file.open("w") as f:
-        f.write(json.dumps({"initial_prompt": prompt}) + "\n\n")
-
-    settings = Settings.load()
-    if model is None:
-        model = settings.model_for(kind, backend="antigravity")
-        thinking_level = settings.thinking_for(kind, backend="antigravity")
-    else:
-        model, thinking_level = split_thinking_level(model, backend="antigravity")
-
-    config = _build_config(
-        model=model,
-        thinking_level=thinking_level,
-        schema=PlanOrQuestions,
-        readonly=True,
-    )
-    current_prompt = prompt
-
-    try:
-        async with Agent(config) as agent:
-            while True:
-                async with Spinner():
-                    response = await agent.chat(current_prompt)
-                    async for chunk in response.chunks:
-                        _log_chunk(log_file, chunk)
-                    data = await response.structured_output()
-
-                if data is None:
-                    fail("Failed to get structured output from the antigravity agent.")
-
-                output = PlanOrQuestions.model_validate(data)
-
-                if isinstance(output.plan_or_questions, Plan):
-                    project.plan_md.write_text(output.plan_or_questions.markdown)
-                    return
-
-                # Q&A turn: prompt the user, then continue the same conversation.
-                current_prompt = await ask_user_questions(output.plan_or_questions)
-                with log_file.open("a") as f:
-                    f.write("\n" + json.dumps({"answers": current_prompt}) + "\n\n")
-    except SystemExit:
-        raise
-    except Exception as e:  # noqa: BLE001 - any SDK failure is funnelled to fail()
-        fail(f"Antigravity agent returned an error: {e}")

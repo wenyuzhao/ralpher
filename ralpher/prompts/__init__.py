@@ -3,7 +3,7 @@
 These replace the former `ralpher` plugin and its `/ralpher:*` skills. Each
 `.md` file in this package is the body of a skill with its positional `$0`/`$1`
 arguments turned into Jinja2 variables. The rendered string is passed directly
-to the agent as the initial prompt (see `ralpher.backend.claude.run_claude`).
+to the agent as the initial prompt (see `ralpher.backend.base.Backend.run`).
 """
 
 from pathlib import Path

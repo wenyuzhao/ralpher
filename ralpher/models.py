@@ -16,10 +16,10 @@ def ralpher_root() -> Path:
 
 
 # Which coding-agent backend drives a run. ``claude-code`` shells out to the
-# ``claude`` CLI via the Claude Agent SDK; ``antigravity`` uses the Google
-# Antigravity SDK (Gemini) instead. Both are driven through the same
-# ``run_agent`` / ``run_agent_plan_mode`` dispatcher, which selects on the
-# resolved backend (see ``ralpher.backend``).
+# ``claude`` CLI; ``antigravity`` shells out to Google's ``agy`` CLI (Gemini)
+# instead. Both are driven through the same ``run_agent`` /
+# ``run_agent_plan_mode`` dispatcher, which selects on the resolved backend
+# (see ``ralpher.backend``).
 BackendKind = Literal["claude-code", "antigravity"]
 
 # CLI / settings aliases accepted for each backend. ``--backend`` and the
@@ -50,7 +50,7 @@ def normalize_backend(value: str) -> BackendKind:
 
 # Per-kind default models for the ``claude-code`` backend. Like the antigravity
 # defaults below, a trailing ``:<level>`` suffix sets the reasoning effort
-# (Claude's ``--effort``); a bare name runs at the SDK's own default effort
+# (Claude's ``--effort``); a bare name runs at the CLI's own default effort
 # (``high``), which is why these carry no suffix.
 CLAUDE_DEFAULT_MODELS: dict[str, str] = {
     "plan": "claude-opus-5[1m]",
@@ -61,28 +61,27 @@ CLAUDE_DEFAULT_MODELS: dict[str, str] = {
 }
 
 # Per-kind defaults for the ``antigravity`` backend, parallel to
-# ``CLAUDE_DEFAULT_MODELS``. antigravity separates the model from its reasoning
-# effort, but rather than carry a separate field the effort rides on the model
-# string as a trailing ``:<level>`` suffix that ``split_thinking_level`` peels
-# off — so "gemini-3.5-flash:high" means the flash model at high thinking. A
-# model pinned in settings.json may carry its own suffix; a bare name runs at
-# the SDK's own default effort.
+# ``CLAUDE_DEFAULT_MODELS``. ``agy`` separates the model from its reasoning
+# effort (``--model`` / ``--effort``), but rather than carry a separate field
+# the effort rides on the model string as a trailing ``:<level>`` suffix that
+# ``split_thinking_level`` peels off — so "gemini-3.5-flash:high" means the
+# flash model at high effort. A model pinned in settings.json may carry its own
+# suffix; a bare name runs at the CLI's own default effort. Run ``agy models``
+# for the names this backend accepts.
 ANTIGRAVITY_DEFAULT_MODELS: dict[str, str] = {
-    "plan": "gemini-3.1-pro-preview:high",
-    "refine": "gemini-3.1-pro-preview:high",
-    "loop": "gemini-3.1-pro-preview:high",
+    "plan": "gemini-3.1-pro:high",
+    "refine": "gemini-3.1-pro:high",
+    "loop": "gemini-3.1-pro:high",
     "verify": "gemini-3.5-flash:high",
     "extract-tasks": "gemini-3.5-flash:medium",
 }
 
 # Recognized thinking-level suffixes per backend. A trailing ``:<level>`` on a
-# model spec sets the reasoning effort; the valid set differs by backend.
-# claude-code mirrors the SDK's ``EffortLevel`` (passed as ``--effort``);
-# antigravity mirrors its ``ThinkingLevel`` enum. Kept as plain strings so this
-# module needs no SDK import.
+# model spec sets the reasoning effort, which both CLIs take as ``--effort``.
+# The valid set differs: ``claude`` accepts five levels, ``agy`` three.
 _THINKING_LEVELS: dict[BackendKind, tuple[str, ...]] = {
     "claude-code": ("low", "medium", "high", "xhigh", "max"),
-    "antigravity": ("minimal", "low", "medium", "high", "extra_high"),
+    "antigravity": ("low", "medium", "high"),
 }
 
 
@@ -107,10 +106,10 @@ class Settings(BaseModel):
     # ``--backend`` CLI flag. Accepts aliases (e.g. "cc", "agy") via the
     # validator below, which stores the canonical BackendKind.
     backend: BackendKind = DEFAULT_BACKEND
-    # Run Claude's Bash tool in an OS sandbox so the read-only .ralpher deny
-    # rule is enforced against shell writes too. Enabled by default; the loop's
-    # --sandbox/--no-sandbox flag overrides this per run. Only applies to the
-    # claude-code backend.
+    # Run the agent's shell tool in an OS sandbox: for claude-code so the
+    # read-only .ralpher deny rule is enforced against shell writes too, for
+    # antigravity as `agy --sandbox`. Enabled by default; the loop's
+    # --sandbox/--no-sandbox flag overrides this per run.
     sandbox: bool = True
 
     @field_validator("backend", mode="before")
@@ -152,8 +151,8 @@ class Settings(BaseModel):
 
         The level is the ``:<level>`` suffix on the resolved model spec (pinned
         in settings.json, else the backend's per-kind default), so a bare name
-        yields ``None`` — the SDK's own default effort. Valid levels differ by
-        backend (claude-code: ``--effort``; antigravity: ``ThinkingLevel``).
+        yields ``None`` — the CLI's own default effort. Both CLIs take it as
+        ``--effort``, but their valid levels differ (see ``_THINKING_LEVELS``).
         """
         spec = self._spec_for(kind, backend)
         return split_thinking_level(spec, backend)[1] if spec else None
@@ -245,10 +244,9 @@ class Project(BaseModel):
     # --backend flag, else Settings.backend) and read by run_agent /
     # run_agent_plan_mode to dispatch to the right SDK.
     backend: BackendKind = DEFAULT_BACKEND
-    # Whether the claude subprocess runs with OS-level Bash sandboxing for this
+    # Whether the agent subprocess runs with OS-level shell sandboxing for this
     # run. Resolved once by the loop command (CLI flag, else Settings.sandbox)
-    # and read by the claude helpers when building options. Only meaningful for
-    # the claude-code backend.
+    # and read by the backend when building its argv.
     sandbox: bool = False
 
     @property

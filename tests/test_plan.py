@@ -199,7 +199,7 @@ class TestGeneratePlan:
     @patch("ralpher.plan.plan.init_project")
     @patch("ralpher.plan.plan.run_agent_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_calls_run_claude_with_correct_args(
+    async def test_calls_run_agent_with_correct_args(
         self, mock_run, mock_init, tmp_path, monkeypatch
     ):
         monkeypatch.chdir(tmp_path)

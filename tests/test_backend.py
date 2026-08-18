@@ -105,7 +105,7 @@ class TestModelForBackendAware:
 
     def test_antigravity_uses_defaults(self):
         s = Settings()
-        assert s.model_for("plan", backend="antigravity") == "gemini-3.1-pro-preview"
+        assert s.model_for("plan", backend="antigravity") == "gemini-3.1-pro"
         assert s.model_for("verify", backend="antigravity") == "gemini-3.5-flash"
         assert s.model_for("extract-tasks", backend="antigravity") == "gemini-3.5-flash"
 
@@ -193,18 +193,11 @@ class TestSplitThinkingLevel:
         )
 
     def test_levels_are_backend_specific(self):
-        # "xhigh" is a claude level only; "minimal"/"extra_high" antigravity ones.
+        # agy takes only low/medium/high; xhigh/max are claude-only levels.
         assert split_thinking_level("m:xhigh", "antigravity") == ("m:xhigh", None)
-        assert split_thinking_level("m:extra_high", "antigravity") == (
-            "m",
-            "extra_high",
-        )
-        assert split_thinking_level("m:extra_high", "claude-code") == (
-            "m:extra_high",
-            None,
-        )
-        assert split_thinking_level("m:minimal", "antigravity") == ("m", "minimal")
-        assert split_thinking_level("m:minimal", "claude-code") == ("m:minimal", None)
+        assert split_thinking_level("m:max", "antigravity") == ("m:max", None)
+        assert split_thinking_level("m:xhigh", "claude-code") == ("m", "xhigh")
+        assert split_thinking_level("m:high", "antigravity") == ("m", "high")
 
 
 class TestProjectBackend:

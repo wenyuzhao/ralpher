@@ -1,6 +1,6 @@
 # Ralpher
 
-A CLI tool that orchestrates a coding agent for autonomous software development. Give it a prompt, and it generates a Project Plan, breaks it into tasks, then runs iterative development loops to implement each one. It can drive either [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (default) or the [Google Antigravity SDK](https://github.com/google-antigravity/antigravity-sdk-python) — see [Backends](#backends).
+A CLI tool that orchestrates a coding agent for autonomous software development. Give it a prompt, and it generates a Project Plan, breaks it into tasks, then runs iterative development loops to implement each one. It can drive either [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (default) or [Google Antigravity](https://antigravity.google) — see [Backends](#backends).
 
 Workflow: `User Prompt` ➔ `Project Plan` ➔ `Ralph Wiggum Loop⁠`
 
@@ -27,10 +27,12 @@ ralpher loop
 
 Ralpher can drive either coding agent backend. Pick one per command with `--backend` / `-b`, or set a default in `.ralpher/settings.json`:
 
+Both backends are the vendor's own CLI, driven as a subprocess — ralpher bundles no agent SDK and reads no API keys, so each CLI's existing login is what authenticates a run.
+
 | Backend | Aliases | Engine | Requirements |
 | --- | --- | --- | --- |
-| `claude-code` (default) | `cc` | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) via the Claude Agent SDK | `claude` CLI on `PATH` |
-| `antigravity` | `agy` | [Google Antigravity SDK](https://github.com/google-antigravity/antigravity-sdk-python) (Gemini) | `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) |
+| `claude-code` (default) | `cc` | [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `claude` CLI on `PATH`, signed in |
+| `antigravity` | `agy` | [Google Antigravity](https://antigravity.google) (Gemini) | `agy` CLI on `PATH`, signed in |
 
 ```bash
 # Per-run: use the antigravity backend
@@ -45,7 +47,7 @@ ralpher loop -b agy
 }
 ```
 
-The `--backend` flag wins over the `backend` key in `settings.json`, which in turn beats the `claude-code` default. The antigravity backend reads `GEMINI_API_KEY` from the environment (or a `.env` file); get a key at <https://aistudio.google.com/app/api-keys>.
+The `--backend` flag wins over the `backend` key in `settings.json`, which in turn beats the `claude-code` default. Run `claude` or `agy` once to sign in before pointing ralpher at it; `agy models` lists the model names the antigravity backend accepts.
 
 ## How it works
 

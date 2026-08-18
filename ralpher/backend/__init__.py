@@ -2,24 +2,51 @@
 
 This package is the single abstraction boundary for invoking a coding agent.
 Callers import `run_agent` / `run_agent_plan_mode` from here and never reach
-into a specific backend; the dispatcher picks one based on ``project.backend``:
+into a specific backend; the dispatcher builds one based on ``project.backend``:
 
-- ``claude-code`` → :mod:`ralpher.backend.claude` (Claude Agent SDK)
-- ``antigravity`` → :mod:`ralpher.backend.antigravity` (Google Antigravity SDK)
+- ``claude-code`` → :class:`ralpher.backend.claude.ClaudeBackend` (the `claude` CLI)
+- ``antigravity`` → :class:`ralpher.backend.antigravity.AntigravityBackend` (the `agy` CLI)
 
-The two backends are independent of each other; anything they share (the
-plan-mode schema, the clarification-question UX) lives in
-:mod:`ralpher.backend.common`. Backends are imported lazily so a run only
-loads the SDK it actually uses.
+Both are subclasses of :class:`ralpher.backend.base.Backend`, which drives the
+chosen CLI as a subprocess and owns everything the two have in common; each
+subclass only builds its argv and recognizes its own terminal result record.
+Anything shared above that layer (the plan-mode schema, the clarification
+question UX) lives in :mod:`ralpher.backend.common`.
 """
 
 from typing import overload
 
 from pydantic import BaseModel
 
-from ralpher.models import Project
+from ralpher.models import BackendKind, Project
 
-__all__ = ["run_agent", "run_agent_plan_mode"]
+from .antigravity import AntigravityBackend
+from .base import AgentResult, Backend
+from .claude import ClaudeBackend
+
+__all__ = [
+    "AgentResult",
+    "Backend",
+    "check_prerequisites",
+    "get_backend",
+    "run_agent",
+    "run_agent_plan_mode",
+]
+
+BACKENDS: dict[BackendKind, type[Backend]] = {
+    "claude-code": ClaudeBackend,
+    "antigravity": AntigravityBackend,
+}
+
+
+def get_backend(project: Project) -> Backend:
+    """The backend instance driving `project`'s run."""
+    return BACKENDS[project.backend](project)
+
+
+def check_prerequisites(kind: BackendKind) -> None:
+    """Exit with an error if `kind`'s CLI is not available."""
+    BACKENDS[kind].check_prerequisites()
 
 
 @overload
@@ -59,25 +86,9 @@ async def run_agent[T: BaseModel](
     tools: list[str] | None = None,
 ) -> T | None:
     """Run the project's selected agent to execute a prompt."""
-    if project.backend == "antigravity":
-        from .antigravity import run_antigravity
-
-        return await run_antigravity(
-            kind=kind,
-            prompt=prompt,
-            project=project,
-            model=model,
-            schema=schema,
-            readonly=readonly,
-            tools=tools,
-        )
-
-    from .claude import run_claude
-
-    return await run_claude(
+    return await get_backend(project).run(
         kind=kind,
         prompt=prompt,
-        project=project,
         model=model,
         schema=schema,
         readonly=readonly,
@@ -87,17 +98,6 @@ async def run_agent[T: BaseModel](
 
 async def run_agent_plan_mode(
     *, kind: str, prompt: str, project: Project, model: str | None = None
-):
+) -> None:
     """Run the project's selected agent with a Q&A loop for plan generation."""
-    if project.backend == "antigravity":
-        from .antigravity import run_antigravity_plan_mode
-
-        return await run_antigravity_plan_mode(
-            kind=kind, prompt=prompt, project=project, model=model
-        )
-
-    from .claude import run_claude_plan_mode
-
-    return await run_claude_plan_mode(
-        kind=kind, prompt=prompt, project=project, model=model
-    )
+    await get_backend(project).run_plan_mode(kind=kind, prompt=prompt, model=model)

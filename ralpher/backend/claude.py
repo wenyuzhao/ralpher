@@ -1,22 +1,29 @@
-import dataclasses
+"""Claude Code backend — drives the `claude` CLI as a subprocess.
+
+Only the two backend-specific pieces live here (see `ralpher.backend.base` for
+everything shared): the argv for one turn, and how to spot the terminal
+`{"type": "result", ...}` record in the CLI's stream-json output.
+
+Flags this backend relies on:
+- ``--print <prompt> --output-format stream-json --verbose`` — one turn, JSONL out
+- ``--json-schema <schema>`` — structured output, echoed back on the result
+  record's ``structured_output`` field
+- ``--permission-mode`` + ``--dangerously-skip-permissions`` — unattended runs
+- ``--tools`` / ``--allowed-tools`` — the read-only tool set
+- ``--effort <level>`` — reasoning effort, from the model spec's ``:<level>``
+  suffix; omitted for a bare model so the CLI's own default (``high``) applies
+- ``--settings <json>`` — inline settings keeping ``.ralpher`` read-only, plus
+  the optional Bash sandbox
+- ``--resume <session_id>`` — plan-mode Q&A continuation
+"""
+
 import json
-from datetime import datetime
 from pathlib import Path
-from typing import Any, cast, overload
+from typing import Any
 
-from claude_agent_sdk import (
-    ClaudeAgentOptions,
-    ResultMessage,
-    query,
-)
-from claude_agent_sdk.types import EffortLevel
-from pydantic import BaseModel
+from ralpher.models import ralpher_root
 
-from ralpher.models import Project, Settings, ralpher_root, split_thinking_level
-from ralpher.utils.error import fail
-from ralpher.utils.spinner import Spinner
-
-from .common import Plan, PlanOrQuestions, ask_user_questions
+from .base import AgentResult, Backend
 
 READONLY_TOOLS = [
     "Agent",
@@ -45,210 +52,104 @@ READONLY_TOOLS = [
 ]
 
 
-def _readonly_ralpher_settings() -> str:
-    """Settings JSON that makes the ``.ralpher`` state directory read-only.
+class ClaudeBackend(Backend):
+    kind = "claude-code"
+    executable = "claude"
+    install_hint = "Install it first: https://docs.anthropic.com/en/docs/claude-code"
 
-    Claude must be able to read its task/plan/progress files (which are passed
-    by absolute path) but never write into them — progress updates are mediated
-    through a temp file in the loop. ``deny`` rules are a hard block that is
-    enforced even under ``bypassPermissions``, so this holds for every call.
+    def build_command(
+        self,
+        *,
+        prompt: str,
+        model: str | None,
+        effort: str | None,
+        schema: dict[str, Any] | None,
+        readonly: bool,
+        tools: list[str] | None,
+        session_id: str | None,
+    ) -> list[str]:
+        if readonly:
+            tools = tools or READONLY_TOOLS
 
-    The absolute path uses the ``//`` prefix required by Claude Code's
-    gitignore-style permission patterns for filesystem-root paths.
-    """
-    root = ralpher_root().resolve()
-    pattern = f"//{str(root).lstrip('/')}/**"
-    deny = [f"Write({pattern})", f"Edit({pattern})", f"NotebookEdit({pattern})"]
-    return json.dumps({"permissions": {"deny": deny}})
+        argv = [
+            self.executable,
+            "--output-format",
+            "stream-json",
+            "--verbose",
+            "--permission-mode",
+            "dontAsk" if readonly else "bypassPermissions",
+            # Load the user's Claude Code settings rather than running
+            # hermetically, so e.g. a sandbox.network allowlist in
+            # .claude/settings.json applies on top of the inline settings.
+            "--setting-sources",
+            "user,project,local",
+            "--settings",
+            self._settings_json(),
+        ]
+        if not readonly:
+            argv.append("--dangerously-skip-permissions")
+        if model:
+            argv += ["--model", model]
+        if effort:
+            argv += ["--effort", effort]
+        if schema:
+            argv += ["--json-schema", json.dumps(schema)]
+        if tools is not None:
+            # These options are variadic, so they would otherwise swallow every
+            # following argv element (the prompt included). The "--opt=value"
+            # form binds exactly one value.
+            joined = ",".join(tools)
+            argv += [f"--tools={joined}", f"--allowed-tools={joined}"]
+        if session_id:
+            argv += ["--resume", session_id]
 
+        # The prompt is positional, so it goes last.
+        argv.append(prompt)
+        return argv
 
-def _build_options(
-    *,
-    model: str | None = None,
-    effort: str | None = None,
-    session_id: str | None = None,
-    schema: dict[str, Any] | None = None,
-    readonly: bool = False,
-    tools: list[str] | None = None,
-    sandbox: bool = False,
-) -> ClaudeAgentOptions:
-    if readonly:
-        tools = tools or READONLY_TOOLS
-
-    options = ClaudeAgentOptions(
-        permission_mode="dontAsk" if readonly else "bypassPermissions",
-        model=model,
-        # Reasoning effort (Claude's --effort). Peeled off the model spec's
-        # ":<level>" suffix; None leaves the SDK's own default (high). The value
-        # is validated against EffortLevel by split_thinking_level upstream.
-        effort=cast("EffortLevel | None", effort),
-        resume=session_id,
-        output_format={"type": "json_schema", "schema": schema} if schema else None,
-        allowed_tools=tools if tools is not None else [],
-        tools=(
-            tools if tools is not None else {"type": "preset", "preset": "claude_code"}
-        ),
-        # Keep the .ralpher state directory read-only to Claude. deny rules are
-        # enforced even under bypassPermissions, so this holds in the loop too.
-        settings=_readonly_ralpher_settings(),
-        # Run Bash in an OS sandbox so the .ralpher deny rule is enforced against
-        # shell writes, not just the file tools.
-        sandbox={"enabled": True, "network": {"allowedDomains": ["*"]}}
-        if sandbox
-        else None,
-        # Load the user's Claude Code settings rather than running hermetically,
-        # so e.g. a sandbox.network allowlist in .claude/settings.json applies.
-        setting_sources=["user", "project", "local"],
-    )
-    return options
-
-
-async def _run_query(
-    prompt: str, options: ClaudeAgentOptions, log_file: Path
-) -> ResultMessage:
-    """Run a claude SDK query, stream messages to log, return the ResultMessage."""
-    result: ResultMessage | None = None
-
-    async with Spinner():
-        async for message in query(prompt=prompt, options=options):
-            # Log each message as JSONL
-            with log_file.open("a") as f:
-                try:
-                    f.write(json.dumps(dataclasses.asdict(message)) + "\n")
-                except Exception:  # noqa: S110, BLE001 - message logging is best-effort; never break a run
-                    pass
-
-            if isinstance(message, ResultMessage):
-                result = message
-
-    if result is None:
-        fail("No result received from Claude.")
-
-    if result.is_error:
-        fail("Claude process returned an error.")
-
-    return result
-
-
-@overload
-async def run_claude(
-    *,
-    kind: str,
-    prompt: str,
-    project: Project,
-    model: str | None = None,
-    schema: None = None,
-    readonly: bool = False,
-    tools: list[str] | None = None,
-) -> None: ...
-
-
-@overload
-async def run_claude[T: BaseModel](
-    *,
-    kind: str,
-    prompt: str,
-    project: Project,
-    model: str | None = None,
-    schema: type[T],
-    readonly: bool = False,
-    tools: list[str] | None = None,
-) -> T: ...
-
-
-async def run_claude[T: BaseModel](
-    *,
-    kind: str,
-    prompt: str,
-    project: Project,
-    model: str | None = None,
-    schema: type[T] | None = None,
-    readonly: bool = False,
-    tools: list[str] | None = None,
-) -> T | None:
-    """Run the Claude Agent SDK to execute a prompt."""
-    timestamp = datetime.now().astimezone().strftime("%Y-%m-%d-%H%M%S")
-    log_file = project.project_dir / "logs" / f"{kind}-{timestamp}.log"
-    log_file.parent.mkdir(parents=True, exist_ok=True)
-
-    # Log initial prompt
-    with log_file.open("w") as f:
-        f.write(json.dumps({"initial_prompt": prompt}) + "\n\n")
-
-    schema_dict = schema.model_json_schema() if schema else None
-    settings = Settings.load()
-    if model is None:
-        model = settings.model_for(kind)
-        effort = settings.thinking_for(kind)
-    else:
-        model, effort = split_thinking_level(model)
-    options = _build_options(
-        model=model,
-        effort=effort,
-        schema=schema_dict,
-        readonly=readonly,
-        tools=tools,
-        sandbox=project.sandbox,
-    )
-
-    result = await _run_query(prompt, options, log_file)
-
-    if schema:
-        if result.structured_output is None:
-            fail("Failed to get structured output from Claude.")
-        return schema.model_validate(result.structured_output)
-    return None
-
-
-async def run_claude_plan_mode(
-    *, kind: str, prompt: str, project: Project, model: str | None = None
-):
-    """Run the Claude Agent SDK with a Q&A loop for plan generation."""
-    timestamp = datetime.now().astimezone().strftime("%Y-%m-%d-%H%M%S")
-    log_file = project.project_dir / "logs" / f"{kind}-{timestamp}.log"
-    log_file.parent.mkdir(parents=True, exist_ok=True)
-
-    # Log initial prompt
-    with log_file.open("w") as f:
-        f.write(json.dumps({"initial_prompt": prompt}) + "\n\n")
-
-    settings = Settings.load()
-    if model is None:
-        model = settings.model_for(kind)
-        effort = settings.thinking_for(kind)
-    else:
-        model, effort = split_thinking_level(model)
-    session_id: str | None = None
-    current_prompt = prompt
-
-    while True:
-        schema = PlanOrQuestions.model_json_schema()
-        options = _build_options(
-            model=model,
-            effort=effort,
-            session_id=session_id,
-            schema=schema,
-            readonly=True,
-            sandbox=project.sandbox,
+    def read_result(self, record: dict[str, Any]) -> AgentResult | None:
+        if record.get("type") != "result":
+            return None
+        failed = bool(record.get("is_error")) or record.get("subtype") != "success"
+        return AgentResult(
+            session_id=record.get("session_id"),
+            structured_output=record.get("structured_output"),
+            is_error=failed,
+            error=f"Claude returned an error: {record.get('subtype')}."
+            if failed
+            else None,
         )
 
-        result = await _run_query(current_prompt, options, log_file)
+    def _settings_json(self) -> str:
+        """Inline settings JSON for the `claude` subprocess.
 
-        # Capture session_id for resumption
-        if not session_id:
-            session_id = result.session_id
+        Keeps the ``.ralpher`` state directory read-only: Claude must be able to
+        read its task/plan/progress files (which are passed by absolute path)
+        but never write into them — progress updates are mediated through a temp
+        file in the loop. ``deny`` rules are a hard block that is enforced even
+        under ``bypassPermissions``, so this holds for every call.
 
-        # Parse structured output
-        if result.structured_output is None:
-            fail("Failed to get structured output from Claude.")
+        The absolute path uses the ``//`` prefix required by Claude Code's
+        gitignore-style permission patterns for filesystem-root paths.
 
-        output = PlanOrQuestions.model_validate(result.structured_output)
-
-        if isinstance(output.plan_or_questions, Plan):
-            project.plan_md.write_text(output.plan_or_questions.markdown)
-            return
-        else:
-            current_prompt = await ask_user_questions(output.plan_or_questions)
-            with log_file.open("a") as f:
-                f.write("\n" + json.dumps({"answers": current_prompt}) + "\n\n")
-            continue
+        When the run is sandboxed, the OS Bash sandbox is enabled here too, so
+        the deny rule is enforced against shell writes and not just the file
+        tools (a tool-path deny alone doesn't cover arbitrary Bash).
+        """
+        root = Path(ralpher_root()).resolve()
+        pattern = f"//{str(root).lstrip('/')}/**"
+        settings: dict[str, Any] = {
+            "permissions": {
+                "deny": [
+                    f"Write({pattern})",
+                    f"Edit({pattern})",
+                    f"NotebookEdit({pattern})",
+                ]
+            }
+        }
+        if self.project.sandbox:
+            settings["sandbox"] = {
+                "enabled": True,
+                "network": {"allowedDomains": ["*"]},
+            }
+        return json.dumps(settings)

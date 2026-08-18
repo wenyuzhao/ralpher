@@ -15,8 +15,6 @@ dependencies = [
     "python-dotenv>=1.2.2",
     "znotion>=0.1.1",
     "python-slugify>=8.0.4",
-    "claude-agent-sdk>=0.2.139",
-    "google-antigravity>=0.1.0",
 ]
 
 [project.scripts]

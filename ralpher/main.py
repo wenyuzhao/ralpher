@@ -1,6 +1,5 @@
 import asyncio
 import datetime
-import shutil
 from pathlib import Path
 from typing import Annotated
 
@@ -11,6 +10,7 @@ from slugify import slugify
 from typer._click.core import Context as TyperContext
 from typer.core import TyperGroup
 
+from ralpher.backend import check_prerequisites
 from ralpher.loop import run_ralph_loop
 from ralpher.models import BackendKind, Project, Settings, ralpher_root, resolve_backend
 from ralpher.plan.extract import extract_tasks
@@ -37,24 +37,6 @@ def _sync_to_notion(project: Project) -> None:
     else:
         rich.print(
             "[yellow]⚠ Notion env vars set but could not sync — check RALPHER_NOTION_PAGE_ID or RALPHER_NOTION_PARENT_PAGE_ID.[/]"
-        )
-
-
-def _require_backend(backend: BackendKind) -> None:
-    """Exit with an error if the selected backend's prerequisites are missing."""
-    if backend == "antigravity":
-        import os
-
-        if not (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")):
-            fail(
-                "GEMINI_API_KEY not set. The antigravity backend needs a Gemini API key — "
-                "get one at https://aistudio.google.com/app/api-keys and set GEMINI_API_KEY "
-                "(e.g. in .env)."
-            )
-        return
-    if not shutil.which("claude"):
-        fail(
-            "'claude' CLI not found on PATH. Install it first: https://docs.anthropic.com/en/docs/claude-code"
         )
 
 
@@ -127,7 +109,7 @@ def plan(
     """Generate a Project Plan."""
     load_dotenv(find_dotenv(usecwd=True))
     backend_kind = _resolve_backend_or_fail(backend)
-    _require_backend(backend_kind)
+    check_prerequisites(backend_kind)
     if Path(prompt).is_file():
         prompt = Path(prompt).read_text()
     project_id = _gen_project_id(name)
@@ -186,7 +168,7 @@ def refine(
     """
     load_dotenv(find_dotenv(usecwd=True))
     backend_kind = _resolve_backend_or_fail(backend)
-    _require_backend(backend_kind)
+    check_prerequisites(backend_kind)
     if not project_id:
         # Default to the latest project if no project_id is provided
         project_id = _get_latest_project_id()
@@ -216,7 +198,7 @@ def extract(
     """Extract tasks.json for a given project ID."""
     load_dotenv(find_dotenv(usecwd=True))
     backend_kind = _resolve_backend_or_fail(backend)
-    _require_backend(backend_kind)
+    check_prerequisites(backend_kind)
     if not project_id:
         project_id = _get_latest_project_id()
     rich.print(f"[bold blue]Extracting tasks.json for project: [i]{project_id}[/][/]\n")
@@ -243,7 +225,7 @@ def loop(
         bool | None,
         typer.Option(
             "--sandbox/--no-sandbox",
-            help="Run Claude's Bash tool in an OS sandbox (claude-code agent only).",
+            help="Run the agent's shell tool in an OS sandbox.",
         ),
     ] = None,
     backend: BackendOption = None,
@@ -252,7 +234,7 @@ def loop(
     load_dotenv(find_dotenv(usecwd=True))
 
     backend_kind = _resolve_backend_or_fail(backend)
-    _require_backend(backend_kind)
+    check_prerequisites(backend_kind)
 
     if not project_id:
         project_id = _get_latest_project_id()
