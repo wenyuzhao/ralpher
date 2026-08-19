@@ -98,12 +98,19 @@ class AntigravityBackend(Backend):
         if not isinstance(result, dict):
             return None
         status = result.get("status")
-        failed = status != "SUCCESS"
+        failed = (
+            status != "SUCCESS"
+            and result.get("structured_output") is None
+            and not result.get("response")
+        )
         return AgentResult(
             session_id=result.get("conversation_id"),
             structured_output=result.get("structured_output"),
             is_error=failed,
-            error=f"The antigravity agent finished with status {status}."
+            error=(
+                result.get("error")
+                or f"The antigravity agent finished with status {status}."
+            )
             if failed
             else None,
         )
