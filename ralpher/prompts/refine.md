@@ -75,6 +75,12 @@ You may need to add, update, or remove tasks to fit the new plan.
 
 You can do step-2 multiple times to ask more questions before making the plan.
 
+**Important instructions for returning the plan:**
+- Do NOT write the plan to any files or create any artifacts on the disk.
+- You MUST return the plan using the structured output tool
+- The structured output must be an object containing `plan_or_questions` formatted as a `Plan` object: `{"plan_or_questions": {"markdown": "<full markdown content of the project plan>"}}`.
+- Do NOT put a summary, message, or file path in `markdown` -- it must contain the entire, complete markdown text of the Project Plan.
+
 ---
 
 ## Checklist
@@ -86,4 +92,4 @@ Before outputing the new Project Plan:
 - [ ] (Optional) Asked clarifying questions and incorporated user's answers
 - [ ] Did not change unrelated parts of the plan
 - [ ] The project plan follows the required structure and includes all required sections
-- [ ] Output: Use `StructuredOutput` tool to output the project plan markdown content or questions, WITHOUT WRITING TO ANY FILES.
+- [ ] Output: Use the structured output tool to return `{"plan_or_questions": {"markdown": "..."}}` containing the complete project plan markdown content (or `{"plan_or_questions": {"questions": [...]}}` if asking questions). Do NOT write to any files or create any artifacts.

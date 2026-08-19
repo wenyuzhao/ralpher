@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 def ralpher_root() -> Path:
@@ -149,18 +149,26 @@ class Status(BaseModel):
 
 
 class QuestionOption(BaseModel):
-    label: str
-    description: str
+    label: str = Field(description="A short label for the option.")
+    description: str = Field(
+        description="A detailed description of the option to help the user choose."
+    )
 
 
 class Question(BaseModel):
-    header: str
-    question: str
-    options: list[QuestionOption]
+    header: str = Field(
+        description="A short header in 1-2 words describing the question."
+    )
+    question: str = Field(
+        description="The question to ask the user. Must be a multiple-choice single-answer question."
+    )
+    options: list[QuestionOption] = Field(description="A list of 2-6 concrete options.")
 
 
 class Questions(BaseModel):
-    questions: list[Question]
+    questions: list[Question] = Field(
+        description="A list of clarification questions to ask the user."
+    )
 
 
 class ProjectConfig(BaseModel):

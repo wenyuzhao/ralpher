@@ -13,17 +13,25 @@ import rich
 from prompt_toolkit import PromptSession
 from prompt_toolkit.formatted_text import HTML, AnyFormattedText
 from prompt_toolkit.shortcuts.choice_input import ChoiceInput
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ralpher.models import Questions
 
 
 class Plan(BaseModel):
-    markdown: str
+    """Returned when the Project Plan is complete and ready."""
+
+    markdown: str = Field(
+        description="The complete markdown content of the Project Plan. DO NOT provide a summary or file path -- you MUST return the full markdown text of the plan here."
+    )
 
 
 class PlanOrQuestions(BaseModel):
-    plan_or_questions: Questions | Plan
+    """Root structured output for plan mode."""
+
+    plan_or_questions: Questions | Plan = Field(
+        description="Must be either a Questions object (with a 'questions' list) if clarification is needed, or a Plan object (with a 'markdown' containing the full markdown text of the Project Plan)."
+    )
 
 
 async def ask_user_questions(questions: Questions) -> str:
