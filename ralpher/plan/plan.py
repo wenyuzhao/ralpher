@@ -13,7 +13,7 @@ async def generate_plan(
     base_branch: str | None = None,
     target_branch: str | None = None,
 ) -> str:
-    """Run a Claude Code session to generate a Project Plan."""
+    """Run a coding-agent session to generate DESIGN.md and tasks.toml."""
 
     init_project(project, prompt, base_branch=base_branch, target_branch=target_branch)
 
@@ -23,7 +23,9 @@ async def generate_plan(
         project=project,
     )
 
-    if not (project.plan_md).exists():
-        fail(f"{project.plan_md} was not created.")
+    if not (project.design_md).exists():
+        fail(f"{project.design_md} was not created.")
+    if not (project.tasks_toml).exists():
+        fail(f"{project.tasks_toml} was not created.")
 
     return project.id

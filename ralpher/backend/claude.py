@@ -67,7 +67,6 @@ class ClaudeBackend(Backend):
         "refine": "opus",
         "loop": "opus",
         "verify": "sonnet",
-        "extract-tasks": "sonnet",
     }
     effort_levels: ClassVar[tuple[str, ...]] = ("low", "medium", "high", "xhigh", "max")
 

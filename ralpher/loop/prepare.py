@@ -10,25 +10,16 @@ from ralpher.utils.error import fail
 from ralpher.utils.git import checkout_branch
 from ralpher.utils.hooks.hooks import HooksManager
 
-from ..plan.extract import extract_tasks
-
 
 async def prepare(project: Project, hooks: HooksManager) -> bool:
-    # Check if PLAN.md exists
-    if not project.plan_md.exists():
-        fail(f"{project.plan_md} not found.")
+    # Both halves of the plan come out of `ralpher plan` together, so a missing
+    # one means planning never ran (or was interrupted) rather than something
+    # the loop can recover from.
+    if not project.design_md.exists():
+        fail(f"{project.design_md} not found. Run 'ralpher plan' first.")
 
-    # Extract tasks.toml from PLAN.md if it doesn't exist
     if not project.tasks_toml.exists():
-        rich.print("[bold blue]Extracting tasks.toml from PLAN.md[/]\n")
-        await hooks.on_extract_start()
-        try:
-            await extract_tasks(project)
-        except Exception as e:  # noqa: BLE001 - any extraction failure is funnelled to fail()
-            fail(f"Failed to extract tasks.toml: {e!s}")
-        if not project.tasks_toml.exists():
-            fail(f"{project.tasks_toml} still not found after extraction.")
-        await hooks.on_extract_end()
+        fail(f"{project.tasks_toml} not found. Run 'ralpher plan' first.")
 
     # Create logs directory
     logs_dir = project.project_dir / "logs"

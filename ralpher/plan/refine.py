@@ -9,7 +9,7 @@ from ralpher.models import Project
 from ralpher.prompts import render_prompt
 from ralpher.utils.git import checkout_existing_branch
 from ralpher.utils.notion_comments import (
-    fetch_project_plan_comments,
+    fetch_plan_comments,
     render_comments_as_prompt,
     resolve_comments,
 )
@@ -28,12 +28,12 @@ def _notion_configured() -> bool:
 
 
 async def refine_plan(*, project: Project, prompt: str | None) -> str | None:
-    """Run a Claude Code session to refine a Project Plan.
+    """Run a coding-agent session to refine DESIGN.md and tasks.toml.
 
     `prompt` is the user-supplied refinement instruction. If Notion is
     configured (see `_notion_configured`), any unresolved comments under the
-    `📜 Project Plan` section of the project's Notion page are appended to
-    the prompt and then marked resolved after refinement.
+    `📐 Design` and `📋 Task List` sections of the project's Notion page are
+    appended to the prompt and then marked resolved after refinement.
 
     Returns the project id when refinement runs, or None when there is
     nothing to refine (empty prompt and no Notion comments).
@@ -42,15 +42,15 @@ async def refine_plan(*, project: Project, prompt: str | None) -> str | None:
     if not project.project_dir.exists():
         fail(f"{project.project_dir} does not exist.")
 
-    if not (project.plan_md).exists():
-        fail(f"{project.plan_md} does not exist.")
+    if not (project.design_md).exists():
+        fail(f"{project.design_md} does not exist.")
 
     comments = []
     if _notion_configured():
-        comments = await fetch_project_plan_comments(project)
+        comments = await fetch_plan_comments(project)
         if comments:
             rich.print(
-                f"[bold blue]Found {len(comments)} Notion comment(s) on the Project Plan section.[/]\n"
+                f"[bold blue]Found {len(comments)} Notion comment(s) on the Design and Task List sections.[/]\n"
             )
 
     combined = _combine_prompt(prompt, comments)
@@ -71,15 +71,16 @@ async def refine_plan(*, project: Project, prompt: str | None) -> str | None:
             kind="refine",
             prompt=render_prompt(
                 "refine",
-                plan_path=str(project.plan_md),
+                design_path=str(project.design_md),
+                tasks_path=str(project.tasks_toml),
                 input_path=str(tmp_path),
                 jj=project.jj,
             ),
             project=project,
         )
 
-    if not (project.plan_md).exists():
-        fail(f"{project.plan_md} was not created after refinement.")
+    if not (project.design_md).exists():
+        fail(f"{project.design_md} was not created after refinement.")
 
     if comments:
         rich.print(f"[bold blue]Resolving {len(comments)} Notion comment(s)…[/]")

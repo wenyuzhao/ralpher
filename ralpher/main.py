@@ -20,7 +20,6 @@ from ralpher.models import (
     resolve_backend,
     resolve_jj,
 )
-from ralpher.plan.extract import extract_tasks
 from ralpher.plan.plan import generate_plan
 from ralpher.plan.refine import refine_plan
 
@@ -137,7 +136,7 @@ def plan(
     backend: BackendOption = None,
     jj: JjOption = None,
 ) -> None:
-    """Generate a Project Plan."""
+    """Generate a design document and task list."""
     load_dotenv(find_dotenv(usecwd=True))
     backend_kind = _resolve_backend_or_fail(backend)
     check_prerequisites(backend_kind)
@@ -157,7 +156,8 @@ def plan(
         )
     )
     rich.print(
-        f"[green]✔ Project plan generated at .ralpher/projects/{project.id}/PLAN.md[/]"
+        f"[green]✔ Plan generated at .ralpher/projects/{project.id}/"
+        "{DESIGN.md,tasks.toml}[/]"
     )
     _sync_to_notion(project)
 
@@ -179,7 +179,7 @@ def refine(
     prompt: Annotated[
         str | None,
         typer.Argument(
-            help="The refinement prompt or file. Optional when Notion is configured and has unresolved comments on the Project Plan section."
+            help="The refinement prompt or file. Optional when Notion is configured and has unresolved comments on the Design or Task List sections."
         ),
     ] = None,
     project_id: Annotated[
@@ -187,16 +187,16 @@ def refine(
         typer.Option(
             "--project",
             "-p",
-            help="The project ID of the Project Plan to refine. Defaults to the latest project.",
+            help="The project ID of the plan to refine. Defaults to the latest project.",
         ),
     ] = None,
     backend: BackendOption = None,
     jj: JjOption = None,
 ) -> None:
-    """Refine an existing Project Plan.
+    """Refine an existing design document and task list.
 
-    When Notion env vars are configured, unresolved comments on the Project
-    Plan section are fetched automatically, combined with the prompt, and
+    When Notion env vars are configured, unresolved comments on the Design and
+    Task List sections are fetched automatically, combined with the prompt, and
     resolved after refinement.
     """
     load_dotenv(find_dotenv(usecwd=True))
@@ -214,31 +214,10 @@ def refine(
     if result is None:
         return
     rich.print(
-        f"[green]✔ Project Plan refined at .ralpher/projects/{project_id}/PLAN.md[/]"
+        f"[green]✔ Plan refined at .ralpher/projects/{project_id}/"
+        "{DESIGN.md,tasks.toml}[/]"
     )
     _sync_to_notion(project)
-
-
-@app.command(hidden=True)
-def extract(
-    project_id: Annotated[
-        str | None,
-        typer.Argument(
-            help="The project ID to extract tasks from. Defaults to the latest project.",
-        ),
-    ] = None,
-    backend: BackendOption = None,
-) -> None:
-    """Extract tasks.toml for a given project ID."""
-    load_dotenv(find_dotenv(usecwd=True))
-    backend_kind = _resolve_backend_or_fail(backend)
-    check_prerequisites(backend_kind)
-    if not project_id:
-        project_id = _get_latest_project_id()
-    rich.print(f"[bold blue]Extracting tasks.toml for project: [i]{project_id}[/][/]\n")
-    project = Project(id=project_id, backend=backend_kind)
-    asyncio.run(extract_tasks(project=project))
-    rich.print(f"[green]✔ Extracted to .ralpher/projects/{project_id}/tasks.toml[/]")
 
 
 @app.command()

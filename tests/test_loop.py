@@ -230,23 +230,30 @@ class TestIterate:
 
 
 class TestLoop:
-    @patch("ralpher.loop.prepare.extract_tasks", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_raises_when_plan_md_missing(
-        self, mock_extract, tmp_path, monkeypatch
-    ):
+    async def test_raises_when_design_md_missing(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         project = _make_project("no-plan")
         project.project_dir.mkdir(parents=True)
         with pytest.raises(SystemExit):
             await run_ralph_loop(project=project, hooks=HooksManager([]))
 
+    @pytest.mark.asyncio
+    async def test_raises_when_tasks_toml_missing(self, tmp_path, monkeypatch):
+        # Both halves come out of `ralpher plan` together; the loop no longer
+        # extracts tasks itself, so a missing tasks.toml is a hard stop.
+        monkeypatch.chdir(tmp_path)
+        project = _make_project("no-tasks")
+        project.project_dir.mkdir(parents=True)
+        project.design_md.write_text("# Design")
+        with pytest.raises(SystemExit):
+            await run_ralph_loop(project=project, hooks=HooksManager([]))
+
     @patch("ralpher.loop.prepare.checkout_branch")
-    @patch("ralpher.loop.prepare.extract_tasks", new_callable=AsyncMock)
     @patch("ralpher.loop.iterate.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_completes_when_all_tasks_pass(
-        self, mock_run, mock_extract, mock_checkout, tmp_path, monkeypatch
+        self, mock_run, mock_checkout, tmp_path, monkeypatch
     ):
         monkeypatch.chdir(tmp_path)
         project = _make_project("loop-done")
@@ -254,7 +261,7 @@ class TestLoop:
         _write_config(project)
 
         tasks_data = _make_tasks_data()
-        project.plan_md.write_text("# Plan")
+        project.design_md.write_text("# Design")
         project.tasks_toml.write_text(tomli_w.dumps(tasks_data))
 
         # Each iteration: implement() returns a ProgressReport, verify() a Result.
@@ -266,11 +273,10 @@ class TestLoop:
         assert mock_run.call_count == 2
 
     @patch("ralpher.loop.prepare.checkout_branch")
-    @patch("ralpher.loop.prepare.extract_tasks", new_callable=AsyncMock)
     @patch("ralpher.loop.iterate.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_exits_with_error_when_max_iterations_reached(
-        self, mock_run, mock_extract, mock_checkout, tmp_path, monkeypatch
+        self, mock_run, mock_checkout, tmp_path, monkeypatch
     ):
         monkeypatch.chdir(tmp_path)
         project = _make_project("loop-fail", max_iterations=2)
@@ -278,7 +284,7 @@ class TestLoop:
         _write_config(project)
 
         tasks_data = _make_tasks_data()
-        project.plan_md.write_text("# Plan")
+        project.design_md.write_text("# Design")
         project.tasks_toml.write_text(tomli_w.dumps(tasks_data))
 
         # Two iterations × (implement + verify) == 4 run_agent calls.
@@ -297,10 +303,9 @@ class TestLoop:
         assert mock_run.call_count == 4
 
     @patch("ralpher.loop.prepare.checkout_branch")
-    @patch("ralpher.loop.prepare.extract_tasks", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_skips_loop_when_all_tasks_already_pass(
-        self, mock_extract, mock_checkout, tmp_path, monkeypatch
+        self, mock_checkout, tmp_path, monkeypatch
     ):
         monkeypatch.chdir(tmp_path)
         project = _make_project("loop-skip")
@@ -318,7 +323,7 @@ class TestLoop:
                 }
             ]
         )
-        project.plan_md.write_text("# Plan")
+        project.design_md.write_text("# Design")
         project.tasks_toml.write_text(tomli_w.dumps(tasks_data))
 
         await run_ralph_loop(project=project, hooks=HooksManager([]))

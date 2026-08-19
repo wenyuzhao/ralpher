@@ -69,7 +69,7 @@ class Backend(abc.ABC):
     #: name so the agent updates the file its own CLI will pick up later.
     context_file: ClassVar[str]
     #: Per-kind default model specs for this CLI, keyed by the `kind` passed to
-    #: `run` ("plan", "refine", "loop", "verify", "extract-tasks"). A `models`
+    #: `run` ("plan", "refine", "loop", "verify"). A `models`
     #: pin in settings.toml overrides these. A trailing ``:<level>`` suffix on a
     #: spec sets the reasoning effort; a bare name leaves the CLI's own default.
     default_models: ClassVar[dict[str, str]]
@@ -180,7 +180,11 @@ class Backend(abc.ABC):
     async def run_plan_mode(
         self, *, kind: str, prompt: str, model: str | None = None
     ) -> None:
-        """Run a Q&A loop until the agent returns a plan, then write PLAN.md.
+        """Run a Q&A loop until the agent returns a plan, then write it out.
+
+        The plan arrives in two halves — the design document, written to
+        DESIGN.md, and the structured task list, written to tasks.toml — so no
+        separate extraction pass is needed to turn prose back into tasks.
 
         Each turn asks for a `PlanOrQuestions`: either the finished plan, or
         clarification questions to put to the user. Answers are fed back as the
@@ -213,7 +217,9 @@ class Backend(abc.ABC):
 
             output = PlanOrQuestions.model_validate(result.structured_output)
             if isinstance(output.plan_or_questions, Plan):
-                self.project.plan_md.write_text(output.plan_or_questions.markdown)
+                plan = output.plan_or_questions
+                self.project.design_md.write_text(plan.markdown)
+                self.project.save_planned_tasks(plan.tasks)
                 return
 
             current_prompt = await ask_user_questions(output.plan_or_questions)

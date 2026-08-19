@@ -103,8 +103,8 @@ async def update_notion_page(project: Project, status: Status | None) -> str | N
     branch = config.target_branch if config else "N/A"
     tasks = project.load_tasks()
 
-    plan_md_file = project_dir / "PLAN.md"
-    plan_md = plan_md_file.read_text() if plan_md_file.exists() else "*N/A*"
+    design_md_file = project.design_md
+    design_md = design_md_file.read_text() if design_md_file.exists() else "*N/A*"
 
     promot_md_file = project_dir / "PROMPT.md"
     prompt_md = promot_md_file.read_text() if promot_md_file.exists() else "*N/A*"
@@ -115,7 +115,7 @@ async def update_notion_page(project: Project, status: Status | None) -> str | N
     template = jinja2.Template(template_content)
     rendered = template.render(
         tasks=tasks.tasks if tasks else None,
-        plan_md=plan_md,
+        design_md=design_md,
         prompt_md=prompt_md,
         progress_md=progress_md,
         active_task=status.active_task if status else None,

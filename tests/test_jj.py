@@ -88,7 +88,8 @@ class TestJjPrompts:
         return render_prompt(
             "iterate",
             current_task_path="/tmp/current_task.toml",
-            plan_path="/tmp/PLAN.md",
+            design_path="/tmp/DESIGN.md",
+            tasks_path="/tmp/tasks.toml",
             progress_path="/tmp/progress.md",
             jj=jj,
             context_file="CLAUDE.md",
@@ -98,7 +99,8 @@ class TestJjPrompts:
         return render_prompt(
             "verify",
             current_task_path="/tmp/current_task.toml",
-            plan_path="/tmp/PLAN.md",
+            design_path="/tmp/DESIGN.md",
+            tasks_path="/tmp/tasks.toml",
             jj=jj,
         )
 
@@ -127,7 +129,11 @@ class TestJjPrompts:
     def test_plan_prompts_mention_jj_only_when_enabled(self, name):
         paths = {"prompt_path": "/tmp/PROMPT.md"}
         if name == "refine":
-            paths = {"plan_path": "/tmp/PLAN.md", "input_path": "/tmp/in.md"}
+            paths = {
+                "design_path": "/tmp/DESIGN.md",
+                "tasks_path": "/tmp/tasks.toml",
+                "input_path": "/tmp/in.md",
+            }
         assert "Jujutsu" in render_prompt(name, jj=True, **paths)
         assert "Jujutsu" not in render_prompt(name, jj=False, **paths)
 

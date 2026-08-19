@@ -80,7 +80,8 @@ async def implement(project: Project) -> ProgressReport:
         prompt=render_prompt(
             "iterate",
             current_task_path=str(project.current_task_toml),
-            plan_path=str(project.plan_md),
+            design_path=str(project.design_md),
+            tasks_path=str(project.tasks_toml),
             progress_path=str(project.progress_md),
             jj=project.jj,
             context_file=context_file(project.backend),
@@ -101,7 +102,8 @@ async def verify(project: Project) -> Result:
         prompt=render_prompt(
             "verify",
             current_task_path=str(project.current_task_toml),
-            plan_path=str(project.plan_md),
+            design_path=str(project.design_md),
+            tasks_path=str(project.tasks_toml),
             jj=project.jj,
         ),
         project=project,

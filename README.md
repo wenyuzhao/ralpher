@@ -1,8 +1,8 @@
 # Ralpher
 
-A CLI tool that orchestrates a coding agent for autonomous software development. Give it a prompt, and it generates a Project Plan, breaks it into tasks, then runs iterative development loops to implement each one. It can drive either [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (default) or [Google Antigravity](https://antigravity.google) — see [Backends](#backends).
+A CLI tool that orchestrates a coding agent for autonomous software development. Give it a prompt, and it generates a design document plus a task list, then runs iterative development loops to implement each task. It can drive either [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (default) or [Google Antigravity](https://antigravity.google) — see [Backends](#backends).
 
-Workflow: `User Prompt` ➔ `Project Plan` ➔ `Ralph Wiggum Loop⁠`
+Workflow: `User Prompt` ➔ `DESIGN.md` + `tasks.toml` ➔ `Ralph Wiggum Loop⁠`
 
 ## Install
 
@@ -13,10 +13,10 @@ pipx install ralpher
 ## Usage
 
 ```bash
-# 1. Generate a Project Plan
+# 1. Generate a design document and task list
 ralpher plan "Create a TODO app" --name todo-app
 
-# (Optional) Refine the plan
+# (Optional) Refine the design and tasks
 ralpher refine "Use MySQL"
 
 # 2. Run the Ralph-loop on an existing plan
@@ -47,7 +47,7 @@ backend = "antigravity"
 
 The `--backend` flag wins over the `backend` key in `settings.toml`, which in turn beats the `claude-code` default. Run `claude` or `agy` once to sign in before pointing ralpher at it; `agy models` lists the model names the antigravity backend accepts.
 
-You can also pin models in `.ralpher/settings.toml`, either as a single model for all tasks or per-kind (`plan`, `refine`, `loop`, `verify`, `extract-tasks`):
+You can also pin models in `.ralpher/settings.toml`, either as a single model for all tasks or per-kind (`plan`, `refine`, `loop`, `verify`):
 
 ```toml
 # .ralpher/settings.toml — use one model for all steps
@@ -88,10 +88,8 @@ There is no `--extra-args` CLI flag; this is settings.toml-only.
 
 ## How it works
 
-1. **Plan generation** -- Sends your prompt to Claude to produce a structured Project Plan with tasks, saved to `.ralpher/projects/{project_id}/PLAN.md`.
-2. **Run Ralph-loop**
-    1. Parses the plan into a structured JSON model (project, tasks with acceptance criteria and priorities).
-    2. Iteratively invokes `claude` to implement each task on a dedicated git branch (`ralph/{project_id}`), tracking progress and detecting completion.
+1. **Plan generation** -- Sends your prompt to the agent, which answers with both halves of the plan in one structured response: a design document, saved to `.ralpher/projects/{project_id}/DESIGN.md`, and the ordered task list (with acceptance criteria), saved to `.ralpher/projects/{project_id}/tasks.toml`. No separate extraction pass turns prose back into tasks.
+2. **Run Ralph-loop** -- Iteratively invokes the agent to implement each failing task on a dedicated git branch (`ralph/{project_id}`), passing it the design document and the task list, then verifies the result in a fresh session and records progress.
 
 ## [Notion](https://www.notion.so/) integration
 

@@ -1,10 +1,11 @@
-"""Fetch and resolve Notion comments scoped to the Project Plan section.
+"""Fetch and resolve Notion comments scoped to the plan sections.
 
 The ralpher Notion page is laid out by `ralpher/utils/hooks/notion.md` and
-includes a `# 📜 Project Plan` heading. This module finds that heading on the
-project's Notion page, collects every block-level comment under it (recursing
-into block children), and exposes helpers to render those comments as a
-refinement prompt and to mark them resolved when refinement is done.
+includes a `# 📐 Design` heading and a `# 📋 Task List` heading — the two halves
+`ralpher refine` rewrites. This module finds those headings on the project's
+Notion page, collects every block-level comment under them (recursing into
+block children), and exposes helpers to render those comments as a refinement
+prompt and to mark them resolved when refinement is done.
 """
 
 from __future__ import annotations
@@ -20,7 +21,11 @@ from znotion.models.comments import Comment
 
 from ralpher.models import Project
 
-PROJECT_PLAN_HEADING = "Project Plan"
+# Headings whose sections carry feedback for `refine`. Matched as substrings of
+# the heading text so the emoji prefixes in notion.md don't matter; "Task List"
+# rather than "Tasks" so the status checklist at the top of the page (`# 🔨
+# Tasks`) is not swept in with them.
+PLAN_SECTION_HEADINGS = ("Design", "Task List")
 
 
 async def _find_child_page(
@@ -81,16 +86,16 @@ def _heading_text(block: Any) -> str:
 async def _iter_section_blocks(
     client: NotionClient, page_id: str
 ) -> AsyncIterator[Any]:
-    """Yield every block under the `# Project Plan` heading until the next H1."""
+    """Yield every block under a plan section heading, up to the next H1.
+
+    Each H1 either opens one of `PLAN_SECTION_HEADINGS` or closes whichever one
+    was open, so the sections need not be adjacent on the page.
+    """
     in_section = False
     async for block in client.blocks.children(page_id):
         if isinstance(block, Heading1Block):
             title = _heading_text(block)
-            if PROJECT_PLAN_HEADING in title:
-                in_section = True
-                continue
-            if in_section:
-                return
+            in_section = any(h in title for h in PLAN_SECTION_HEADINGS)
             continue
         if in_section:
             yield block
@@ -123,8 +128,8 @@ def _comment_author(comment: Comment) -> str | None:
     return name if isinstance(name, str) and name else None
 
 
-async def fetch_project_plan_comments(project: Project) -> list[NotionComment]:
-    """Return every block-level comment under the Project Plan section.
+async def fetch_plan_comments(project: Project) -> list[NotionComment]:
+    """Return every block-level comment under the Design and Task List sections.
 
     Returns an empty list if Notion env vars are missing or the page can't be
     resolved, so callers can decide how to surface that to the user.
@@ -186,10 +191,10 @@ async def _resolve_one(client: NotionClient, comment: NotionComment) -> None:
 def render_comments_as_prompt(comments: list[NotionComment]) -> str:
     """Format a list of comments as a refinement prompt for the refine skill."""
     lines = [
-        "Refine the Project Plan to address the following comments left on the",
-        "Notion page. Each comment is shown alongside the surrounding text it",
-        "was attached to. Treat each comment as a concrete change request and",
-        "update the plan accordingly.",
+        "Refine the design document and task list to address the following",
+        "comments left on the Notion page. Each comment is shown alongside the",
+        "surrounding text it was attached to. Treat each comment as a concrete",
+        "change request and update the plan accordingly.",
         "",
     ]
     for i, c in enumerate(comments, start=1):

@@ -6,7 +6,7 @@ import pytest
 from ralpher.models import Project
 from ralpher.utils.notion_comments import (
     NotionComment,
-    fetch_project_plan_comments,
+    fetch_plan_comments,
     render_comments_as_prompt,
     resolve_comments,
 )
@@ -76,12 +76,12 @@ def _make_client(*, top_blocks, comments_by_block, child_blocks=None):
     return client
 
 
-class TestFetchProjectPlanComments:
+class TestFetchPlanComments:
     @pytest.mark.asyncio
     async def test_returns_empty_when_token_missing(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         monkeypatch.delenv("RALPHER_NOTION_TOKEN", raising=False)
-        result = await fetch_project_plan_comments(Project(id="proj"))
+        result = await fetch_plan_comments(Project(id="proj"))
         assert result == []
 
     @pytest.mark.asyncio
@@ -93,13 +93,11 @@ class TestFetchProjectPlanComments:
 
         client = _make_client(top_blocks=[], comments_by_block={})
         with patch("ralpher.utils.notion_comments.NotionClient", return_value=client):
-            result = await fetch_project_plan_comments(Project(id="proj"))
+            result = await fetch_plan_comments(Project(id="proj"))
         assert result == []
 
     @pytest.mark.asyncio
-    async def test_collects_only_comments_in_project_plan_section(
-        self, tmp_path, monkeypatch
-    ):
+    async def test_collects_only_comments_in_plan_sections(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         monkeypatch.setenv("RALPHER_NOTION_TOKEN", "t")
         monkeypatch.setenv("RALPHER_NOTION_PAGE_ID", "page-id")
@@ -109,7 +107,7 @@ class TestFetchProjectPlanComments:
         before = ParagraphBlock(id="b-before", paragraph={"rich_text": []})
         h1_plan = Heading1Block(
             id="h-plan",
-            heading_1={"rich_text": [{"plain_text": "📜 Project Plan"}]},
+            heading_1={"rich_text": [{"plain_text": "📐 Design"}]},
         )
         in_section = ParagraphBlock(
             id="b-in",
@@ -133,7 +131,7 @@ class TestFetchProjectPlanComments:
             },
         )
         with patch("ralpher.utils.notion_comments.NotionClient", return_value=client):
-            result = await fetch_project_plan_comments(Project(id="proj"))
+            result = await fetch_plan_comments(Project(id="proj"))
 
         assert len(result) == 1
         c = result[0]
@@ -141,6 +139,48 @@ class TestFetchProjectPlanComments:
         assert c.text == "Switch to MySQL"
         assert c.context == "Use Postgres for storage."
         assert c.author == "Alice"
+
+    @pytest.mark.asyncio
+    async def test_collects_from_both_design_and_task_list(self, tmp_path, monkeypatch):
+        """Both halves of the plan take feedback; the status checklist does not."""
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("RALPHER_NOTION_TOKEN", "t")
+        monkeypatch.setenv("RALPHER_NOTION_PAGE_ID", "page-id")
+
+        from znotion.models.blocks import Heading1Block, ParagraphBlock
+
+        def _h1(id_: str, text: str) -> Heading1Block:
+            return Heading1Block(
+                id=id_, heading_1={"rich_text": [{"plain_text": text}]}
+            )
+
+        def _p(id_: str, text: str) -> ParagraphBlock:
+            return ParagraphBlock(
+                id=id_, paragraph={"rich_text": [{"plain_text": text}]}
+            )
+
+        client = _make_client(
+            top_blocks=[
+                _h1("h-status", "🔨 Tasks"),
+                _p("b-status", "- [ ] T-001"),
+                _h1("h-design", "📐 Design"),
+                _p("b-design", "Use Postgres for storage."),
+                _h1("h-tasks", "📋 Task List"),
+                _p("b-tasks", "T-002 - Add the filter"),
+                _h1("h-prompt", "💬 User Prompt"),
+                _p("b-prompt", "after"),
+            ],
+            comments_by_block={
+                "b-status": [_comment("c0", "d0", "checklist comment")],
+                "b-design": [_comment("c1", "d1", "Switch to MySQL")],
+                "b-tasks": [_comment("c2", "d2", "Split this task")],
+                "b-prompt": [_comment("c3", "d3", "ignored")],
+            },
+        )
+        with patch("ralpher.utils.notion_comments.NotionClient", return_value=client):
+            result = await fetch_plan_comments(Project(id="proj"))
+
+        assert [c.id for c in result] == ["c1", "c2"]
 
     @pytest.mark.asyncio
     async def test_recurses_into_block_children(self, tmp_path, monkeypatch):
@@ -152,7 +192,7 @@ class TestFetchProjectPlanComments:
 
         h1 = Heading1Block(
             id="h-plan",
-            heading_1={"rich_text": [{"plain_text": "Project Plan"}]},
+            heading_1={"rich_text": [{"plain_text": "📐 Design"}]},
         )
         parent = ParagraphBlock(
             id="b-parent",
@@ -172,7 +212,7 @@ class TestFetchProjectPlanComments:
             child_blocks={"b-parent": [child]},
         )
         with patch("ralpher.utils.notion_comments.NotionClient", return_value=client):
-            result = await fetch_project_plan_comments(Project(id="proj"))
+            result = await fetch_plan_comments(Project(id="proj"))
 
         assert len(result) == 1
         assert result[0].context == "child text"

@@ -20,7 +20,7 @@ class TestRefinePlan:
             await refine_plan(project=Project(id="nonexistent-task"), prompt="add auth")
 
     @pytest.mark.asyncio
-    async def test_raises_when_plan_md_missing(self, tmp_path, monkeypatch):
+    async def test_raises_when_design_md_missing(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         project = Project(id="test-task")
         project.project_dir.mkdir(parents=True)
@@ -37,7 +37,7 @@ class TestRefinePlan:
         task_id = "refine-task"
         project = Project(id=task_id)
         project.project_dir.mkdir(parents=True)
-        project.plan_md.write_text("# Original Plan")
+        project.design_md.write_text("# Original Design")
         _write_config(project)
 
         result = await refine_plan(project=project, prompt="add user authentication")
@@ -46,18 +46,18 @@ class TestRefinePlan:
     @patch("ralpher.plan.refine.checkout_existing_branch")
     @patch("ralpher.plan.refine.run_agent_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_raises_when_plan_deleted_after_refine(
+    async def test_raises_when_design_deleted_after_refine(
         self, mock_run, mock_checkout, tmp_path, monkeypatch
     ):
         monkeypatch.chdir(tmp_path)
         task_id = "refine-delete"
         project = Project(id=task_id)
         project.project_dir.mkdir(parents=True)
-        project.plan_md.write_text("# Plan")
+        project.design_md.write_text("# Design")
         _write_config(project)
 
         async def side_effect(**kwargs):
-            project.plan_md.unlink()
+            project.design_md.unlink()
 
         mock_run.side_effect = side_effect
         with pytest.raises(SystemExit):
@@ -73,12 +73,12 @@ class TestRefinePlan:
         task_id = "refine-skill"
         project = Project(id=task_id)
         project.project_dir.mkdir(parents=True)
-        project.plan_md.write_text("# Plan")
+        project.design_md.write_text("# Design")
         _write_config(project)
 
         await refine_plan(project=project, prompt="add feature X")
         call_kwargs = mock_run.call_args[1]
-        # The rendered prompt references the project's PLAN.md path (which
+        # The rendered prompt references the project's DESIGN.md path (which
         # embeds the project id) and carries the refine-skill instructions.
         assert "Refine the Project Plan" in call_kwargs["prompt"]
         assert task_id in call_kwargs["prompt"]
@@ -96,7 +96,7 @@ class TestRefinePlanWithNotion:
         monkeypatch.delenv("RALPHER_NOTION_TOKEN", raising=False)
         project = Project(id="task")
         project.project_dir.mkdir(parents=True)
-        project.plan_md.write_text("# Plan")
+        project.design_md.write_text("# Design")
         _write_config(project)
         result = await refine_plan(project=project, prompt=None)
         assert result is None
@@ -105,7 +105,7 @@ class TestRefinePlanWithNotion:
     @patch("ralpher.plan.refine.checkout_existing_branch")
     @patch("ralpher.plan.refine.run_agent_plan_mode", new_callable=AsyncMock)
     @patch("ralpher.plan.refine.resolve_comments", new_callable=AsyncMock)
-    @patch("ralpher.plan.refine.fetch_project_plan_comments", new_callable=AsyncMock)
+    @patch("ralpher.plan.refine.fetch_plan_comments", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_skips_when_notion_configured_but_no_comments_and_no_prompt(
         self, mock_fetch, mock_resolve, mock_run, mock_checkout, tmp_path, monkeypatch
@@ -116,7 +116,7 @@ class TestRefinePlanWithNotion:
         mock_fetch.return_value = []
         project = Project(id="task")
         project.project_dir.mkdir(parents=True)
-        project.plan_md.write_text("# Plan")
+        project.design_md.write_text("# Design")
         _write_config(project)
         result = await refine_plan(project=project, prompt=None)
         assert result is None
@@ -126,7 +126,7 @@ class TestRefinePlanWithNotion:
     @patch("ralpher.plan.refine.checkout_existing_branch")
     @patch("ralpher.plan.refine.run_agent_plan_mode", new_callable=AsyncMock)
     @patch("ralpher.plan.refine.resolve_comments", new_callable=AsyncMock)
-    @patch("ralpher.plan.refine.fetch_project_plan_comments", new_callable=AsyncMock)
+    @patch("ralpher.plan.refine.fetch_plan_comments", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_fetches_and_resolves_when_notion_configured(
         self, mock_fetch, mock_resolve, mock_run, mock_checkout, tmp_path, monkeypatch
@@ -146,7 +146,7 @@ class TestRefinePlanWithNotion:
         mock_fetch.return_value = comments
         project = Project(id="task-notion")
         project.project_dir.mkdir(parents=True)
-        project.plan_md.write_text("# Plan")
+        project.design_md.write_text("# Design")
         _write_config(project)
 
         result = await refine_plan(project=project, prompt=None)
@@ -157,7 +157,7 @@ class TestRefinePlanWithNotion:
     @patch("ralpher.plan.refine.checkout_existing_branch")
     @patch("ralpher.plan.refine.run_agent_plan_mode", new_callable=AsyncMock)
     @patch("ralpher.plan.refine.resolve_comments", new_callable=AsyncMock)
-    @patch("ralpher.plan.refine.fetch_project_plan_comments", new_callable=AsyncMock)
+    @patch("ralpher.plan.refine.fetch_plan_comments", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_skips_resolve_when_no_comments_but_prompt_given(
         self, mock_fetch, mock_resolve, mock_run, mock_checkout, tmp_path, monkeypatch
@@ -168,7 +168,7 @@ class TestRefinePlanWithNotion:
         mock_fetch.return_value = []
         project = Project(id="task-no-comments")
         project.project_dir.mkdir(parents=True)
-        project.plan_md.write_text("# Plan")
+        project.design_md.write_text("# Design")
         _write_config(project)
 
         result = await refine_plan(project=project, prompt="add feature X")

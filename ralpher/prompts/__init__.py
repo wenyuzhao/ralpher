@@ -20,7 +20,8 @@ _env = Environment(
     autoescape=False,
 )
 
-# Content of the Project Plan structure reference doc. It ships inside this
+# Content of the plan-structure reference doc (design document sections +
+# task-list rules). It ships inside this
 # package; its full text is embedded directly into the plan/refine prompts so
 # the agent never has to read a file outside the run's workspace (the
 # antigravity backend confines file access to that workspace).

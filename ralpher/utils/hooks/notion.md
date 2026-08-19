@@ -22,12 +22,34 @@
 {{branch}}
 ```
 
-# 📜 Project Plan
+# 📐 Design
 
 <callout>
 <details>
 <summary>Click to Expand</summary>
-{{plan_md}}
+{{design_md}}
+</details>
+</callout>
+
+# 📋 Task List
+
+<callout>
+<details>
+<summary>Click to Expand</summary>
+{%- if tasks %}
+{%- for t in tasks %}
+### {{ t.id }} - {{ t.title }}
+
+{{ t.description }}
+
+**Acceptance Criteria:**
+{% for c in t.acceptance_criteria -%}
+- {{ c }}
+{% endfor %}
+{%- endfor %}
+{%- else %}
+*N/A*
+{%- endif %}
 </details>
 </callout>
 

@@ -18,7 +18,7 @@ from ralpher.backend import BACKENDS, get_backend
 from ralpher.backend.antigravity import AntigravityBackend
 from ralpher.backend.base import AgentResult, Backend
 from ralpher.backend.claude import READONLY_TOOLS, ClaudeBackend
-from ralpher.models import Project
+from ralpher.models import Project, Task, Tasks
 
 
 class Out(BaseModel):
@@ -91,20 +91,16 @@ class TestDefaultModels:
         backend = get_backend(_project(tmp_path, monkeypatch))
         assert backend._resolve_model("plan", None) == ("opus", None)
         assert backend._resolve_model("verify", None) == ("sonnet", None)
-        assert backend._resolve_model("extract-tasks", None) == ("sonnet", None)
+        assert backend._resolve_model("loop", None) == ("opus", None)
 
     def test_antigravity_defaults(self, tmp_path, monkeypatch):
         project = _project(tmp_path, monkeypatch, backend="antigravity")
         backend = get_backend(project)
         assert backend._resolve_model("plan", None) == ("gemini-3.7-flash", "high")
         assert backend._resolve_model("verify", None) == ("gemini-3.7-flash", "high")
-        assert backend._resolve_model("extract-tasks", None) == (
-            "gemini-3.7-flash",
-            "medium",
-        )
 
     def test_every_kind_has_a_default_on_both_backends(self):
-        kinds = {"plan", "refine", "loop", "verify", "extract-tasks"}
+        kinds = {"plan", "refine", "loop", "verify"}
         for cls in BACKENDS.values():
             assert kinds <= set(cls.default_models)
 
@@ -151,7 +147,7 @@ class TestDefaultModels:
                 "universal-model",
                 "low",
             )
-            assert backend._resolve_model("extract-tasks", None) == (
+            assert backend._resolve_model("loop", None) == (
                 "universal-model",
                 "low",
             )
@@ -578,16 +574,62 @@ class TestSpawn:
             await stub(lines=[line]).run(kind="verify", prompt="go", schema=Out)
 
 
+_PLANNED_TASK = {
+    "id": "T-001",
+    "title": "Login",
+    "description": "User can log in",
+    "acceptance_criteria": ["AC1"],
+}
+
+
 class TestRunPlanMode:
     @pytest.mark.asyncio
-    async def test_writes_plan_md(self, stub):
-        plan = {"plan_or_questions": {"markdown": "# Plan"}}
+    async def test_writes_design_md_and_tasks_toml(self, stub):
+        plan = {"plan_or_questions": {"markdown": "# Design", "tasks": [_PLANNED_TASK]}}
         backend = stub(
             lines=[json.dumps({"type": "result", "structured_output": plan})]
         )
         backend.project.project_dir.mkdir(parents=True, exist_ok=True)
         await backend.run_plan_mode(kind="plan", prompt="go")
-        assert backend.project.plan_md.read_text() == "# Plan"
+        assert backend.project.design_md.read_text() == "# Design"
+        tasks = backend.project.load_tasks()
+        assert tasks is not None
+        assert [t.id for t in tasks.tasks] == ["T-001"]
+        assert tasks.tasks[0].passes is False
+
+    @pytest.mark.asyncio
+    async def test_keeps_pass_state_of_surviving_tasks(self, stub):
+        plan = {
+            "plan_or_questions": {
+                "markdown": "# Design",
+                "tasks": [_PLANNED_TASK, {**_PLANNED_TASK, "id": "T-002"}],
+            }
+        }
+        backend = stub(
+            lines=[json.dumps({"type": "result", "structured_output": plan})]
+        )
+        backend.project.project_dir.mkdir(parents=True, exist_ok=True)
+        # A previous run already finished T-001; a refine must not undo that.
+        backend.project.save_tasks(
+            Tasks(
+                tasks=[
+                    Task(
+                        id="T-001",
+                        title="Login",
+                        description="User can log in",
+                        acceptance_criteria=["AC1"],
+                        passes=True,
+                    )
+                ]
+            )
+        )
+        await backend.run_plan_mode(kind="plan", prompt="go")
+        tasks = backend.project.load_tasks()
+        assert tasks is not None
+        assert [(t.id, t.passes) for t in tasks.tasks] == [
+            ("T-001", True),
+            ("T-002", False),
+        ]
 
     @pytest.mark.asyncio
     async def test_asks_questions_then_resumes(self, stub, monkeypatch):
@@ -602,7 +644,7 @@ class TestRunPlanMode:
                 ]
             }
         }
-        plan = {"plan_or_questions": {"markdown": "# Plan"}}
+        plan = {"plan_or_questions": {"markdown": "# Design", "tasks": [_PLANNED_TASK]}}
         # Turn 1 asks, turn 2 (after answers) returns the plan.
         backend = stub(
             lines=[json.dumps({"type": "result", "structured_output": questions})]
@@ -628,4 +670,4 @@ class TestRunPlanMode:
         await backend.run_plan_mode(kind="plan", prompt="go")
 
         assert turns == ["go", "answers"]
-        assert backend.project.plan_md.read_text() == "# Plan"
+        assert backend.project.design_md.read_text() == "# Design"

@@ -37,14 +37,6 @@ class Hooks:
         self.status = Status(status="error", label=message)
         await self.update()
 
-    async def on_extract_start(self):
-        self.status = Status(status="running", label="Extracting Project Plan")
-        await self.update()
-
-    async def on_extract_end(self):
-        self.status = Status(status="running", label="Extracted Project Plan")
-        await self.update()
-
     async def on_loop_start(self):
         self.status = Status(status="running", label="Loop Started")
         await self.update()
@@ -111,14 +103,6 @@ class HooksManager:
     async def on_error(self, message: str):
         for h in self.hooks:
             await h.on_error(message)
-
-    async def on_extract_start(self):
-        for h in self.hooks:
-            await h.on_extract_start()
-
-    async def on_extract_end(self):
-        for h in self.hooks:
-            await h.on_extract_end()
 
     async def on_loop_start(self):
         for h in self.hooks:

@@ -46,7 +46,6 @@ class AntigravityBackend(Backend):
         "refine": "gemini-3.7-flash:high",
         "loop": "gemini-3.7-flash:high",
         "verify": "gemini-3.7-flash:high",
-        "extract-tasks": "gemini-3.7-flash:medium",
     }
     effort_levels: ClassVar[tuple[str, ...]] = ("low", "medium", "high")
 

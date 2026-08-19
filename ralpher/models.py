@@ -72,8 +72,8 @@ def normalize_backend(value: str) -> BackendKind:
 
 
 class Settings(BaseModel):
-    # Per-kind model pins ("plan", "refine", "loop", "verify", "extract-tasks")
-    # or a single string applied to all kinds, overriding whichever backend is
+    # Per-kind model pins ("plan", "refine", "loop", "verify") or a single
+    # string applied to all kinds, overriding whichever backend is
     # active and its `default_models`. A pin may carry a ``:<level>``
     # reasoning-effort suffix; see `Backend.split_effort`.
     models: dict[str, str] | str = {}
@@ -137,11 +137,30 @@ def resolve_jj(cli_jj: bool | None) -> bool:
     return Settings.load().jj
 
 
-class Task(BaseModel):
-    id: str
-    title: str
-    description: str
-    acceptance_criteria: list[str]
+class PlannedTask(BaseModel):
+    """One unit of work as the planning agent hands it over.
+
+    Carries no run state: whether a task has passed is ralpher's bookkeeping,
+    not something the planner gets to assert. Keeping it off this model also
+    keeps `passes` out of the JSON schema the planning agent is given.
+    """
+
+    id: str = Field(
+        description="Unique identifier, numbered sequentially: T-001, T-002, …"
+    )
+    title: str = Field(description="Short descriptive name for the task.")
+    description: str = Field(
+        description="Clear, concise explanation of what needs to be done and why."
+    )
+    acceptance_criteria: list[str] = Field(
+        description=(
+            "Specific, verifiable conditions that must all hold for the task to "
+            "be considered complete."
+        )
+    )
+
+
+class Task(PlannedTask):
     passes: bool = False
 
 
@@ -258,8 +277,8 @@ class Project(BaseModel):
         return self.project_dir / "PROMPT.md"
 
     @property
-    def plan_md(self) -> Path:
-        return self.project_dir / "PLAN.md"
+    def design_md(self) -> Path:
+        return self.project_dir / "DESIGN.md"
 
     @property
     def progress_md(self) -> Path:
@@ -285,6 +304,26 @@ class Project(BaseModel):
 
     def save_tasks(self, tasks: Tasks) -> None:
         self.tasks_toml.write_text(tomli_w.dumps(tasks.model_dump()))
+
+    def save_planned_tasks(self, planned: list[PlannedTask]) -> None:
+        """Persist a task list straight from the planning agent.
+
+        `plan` writes tasks.toml for the first time, but `refine` rewrites it —
+        possibly partway through a run — so a task that already passed and kept
+        its id stays passed instead of being implemented all over again.
+        """
+        existing = self.load_tasks()
+        already_passed = (
+            {t.id for t in existing.tasks if t.passes} if existing else set()
+        )
+        self.save_tasks(
+            Tasks(
+                tasks=[
+                    Task(**t.model_dump(), passes=t.id in already_passed)
+                    for t in planned
+                ]
+            )
+        )
 
     def load_questions(self) -> Questions | None:
         if not self.questions_json.exists():
