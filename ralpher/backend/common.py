@@ -6,16 +6,13 @@ SDK produced them, so they live here rather than in any one backend. This lets
 the claude-code and antigravity backends stay independent of each other.
 """
 
-import html
 import json
 
 import rich
-from prompt_toolkit import PromptSession
-from prompt_toolkit.formatted_text import HTML, AnyFormattedText
-from prompt_toolkit.shortcuts.choice_input import ChoiceInput
 from pydantic import BaseModel, Field
 
 from ralpher.models import Questions
+from ralpher.utils.questions_ui import QuestionsPrompt
 
 
 class Plan(BaseModel):
@@ -37,59 +34,15 @@ class PlanOrQuestions(BaseModel):
 async def ask_user_questions(questions: Questions) -> str:
     """Prompt the user for answers to clarification questions.
 
-    Returns the answers as a JSON string suitable for feeding back to the
-    agent as the next turn's prompt.
+    The questions are rendered as a tabbed, mouse-clickable prompt (see
+    `QuestionsPrompt`); the answers come back as a JSON string suitable for
+    feeding back to the agent as the next turn's prompt.
     """
-    session = PromptSession()
+    results = await QuestionsPrompt(questions).run()
 
-    while True:
-        results: list[dict[str, str]] = []
-
-        rich.print("[bold blue]Please answer the following clarification questions:[/]")
-
-        for index, q in enumerate(questions.questions):
-            if not q.options:
-                continue
-
-            print()
-            header = q.header
-            choice_options: list[tuple[str, AnyFormattedText]] = [
-                (opt.label, f"{opt.label} - {opt.description}") for opt in q.options
-            ]
-            choice_options.append(
-                (
-                    "__other__",
-                    HTML(
-                        "Other - <style color='ansibrightblack'>[please specify]</style>"
-                    ),
-                )
-            )
-            result = await ChoiceInput(
-                message=HTML(
-                    f"<style color='ansimagenta'><b>[Q{index + 1}] <i>{html.escape(header)}:</i></b> {html.escape(q.question)}</style>"
-                ),
-                options=choice_options,
-            ).prompt_async()
-            if result == "__other__":
-                answer = await session.prompt_async(
-                    HTML("<b><i>Enter your answer: </i></b>")
-                )
-            else:
-                answer = result if result else choice_options[0][0]
-            results.append({"Q": q.question, "A": answer})
-
+    for result in results:
+        rich.print(f"[green]✓[/] {result['Q']} [bold]→ {result['A']}[/]")
+    if results:
         print()
 
-        confirmed = await ChoiceInput(
-            message=HTML(
-                "<style color='ansiblue'><b>Submit these answers?</b></style>"
-            ),
-            options=[
-                ("yes", "Yes - submit these answers"),
-                ("no", "No - answer the questions again"),
-            ],
-        ).prompt_async()
-        if confirmed == "yes":
-            print()
-            return json.dumps(results)
-        print()
+    return json.dumps(results)

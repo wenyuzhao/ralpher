@@ -25,34 +25,16 @@ def _make_questions(raw: list[dict]) -> Questions:
 
 
 class TestAskUserQuestions:
-    @pytest.mark.asyncio
-    @patch("ralpher.backend.common.ChoiceInput")
-    async def test_single_question_with_options(self, mock_choice_cls):
-        # First call: answer question; second call: confirm with "yes"
-        mock_choice_cls.return_value.prompt_async = AsyncMock(
-            side_effect=["REST", "yes"]
-        )
-        questions = _make_questions(
-            [
-                {
-                    "header": "API",
-                    "question": "API style",
-                    "options": [
-                        {"label": "REST", "description": "RESTful API"},
-                        {"label": "GraphQL", "description": "GraphQL API"},
-                    ],
-                }
-            ]
-        )
-        result = await ask_user_questions(questions)
-        assert json.loads(result) == [{"Q": "API style", "A": "REST"}]
+    """The tabbed prompt itself is covered by tests/test_questions_ui.py."""
 
     @pytest.mark.asyncio
-    @patch("ralpher.backend.common.ChoiceInput")
-    async def test_multiple_questions_with_options(self, mock_choice_cls):
-        # Two question answers, then confirm
-        mock_choice_cls.return_value.prompt_async = AsyncMock(
-            side_effect=["Yes", "Mobile", "yes"]
+    @patch("ralpher.backend.common.QuestionsPrompt")
+    async def test_serializes_answers_as_json(self, mock_prompt_cls):
+        mock_prompt_cls.return_value.run = AsyncMock(
+            return_value=[
+                {"Q": "Auth needed?", "A": "Yes"},
+                {"Q": "Platform", "A": "Mobile"},
+            ]
         )
         questions = _make_questions(
             [
@@ -75,37 +57,15 @@ class TestAskUserQuestions:
             ]
         )
         result = await ask_user_questions(questions)
+        assert mock_prompt_cls.call_args.args[0] is questions
         assert json.loads(result) == [
             {"Q": "Auth needed?", "A": "Yes"},
             {"Q": "Platform", "A": "Mobile"},
         ]
 
     @pytest.mark.asyncio
-    @patch("ralpher.backend.common.ChoiceInput")
-    async def test_question_with_options(self, mock_choice_cls):
-        mock_choice_cls.return_value.prompt_async = AsyncMock(
-            side_effect=["Monolith", "yes"]
-        )
-        questions = _make_questions(
-            [
-                {
-                    "header": "Architecture",
-                    "question": "Pick a pattern",
-                    "options": [
-                        {"label": "Monolith", "description": "Single deployable"},
-                        {"label": "Microservices", "description": "Distributed"},
-                    ],
-                }
-            ]
-        )
-        result = await ask_user_questions(questions)
-        assert json.loads(result) == [{"Q": "Pick a pattern", "A": "Monolith"}]
-
-    @pytest.mark.asyncio
-    @patch("ralpher.backend.common.ChoiceInput")
-    async def test_skips_questions_without_options(self, mock_choice_cls):
-        # Confirmation still happens even with no answerable questions
-        mock_choice_cls.return_value.prompt_async = AsyncMock(return_value="yes")
+    async def test_skips_questions_without_options(self):
+        # No answerable question means nothing is prompted at all.
         questions = _make_questions(
             [
                 {"header": "X", "question": "No options here", "options": []},
@@ -113,33 +73,6 @@ class TestAskUserQuestions:
         )
         result = await ask_user_questions(questions)
         assert json.loads(result) == []
-
-    @pytest.mark.asyncio
-    @patch("ralpher.backend.common.PromptSession")
-    @patch("ralpher.backend.common.ChoiceInput")
-    async def test_other_option_prompts_freeform(
-        self, mock_choice_cls, mock_session_cls
-    ):
-        # First call: select __other__; second call: confirm
-        mock_choice_cls.return_value.prompt_async = AsyncMock(
-            side_effect=["__other__", "yes"]
-        )
-        mock_session_cls.return_value.prompt_async = AsyncMock(
-            return_value="Custom answer"
-        )
-        questions = _make_questions(
-            [
-                {
-                    "header": "Style",
-                    "question": "Pick style",
-                    "options": [
-                        {"label": "A", "description": "Option A"},
-                    ],
-                }
-            ]
-        )
-        result = await ask_user_questions(questions)
-        assert json.loads(result) == [{"Q": "Pick style", "A": "Custom answer"}]
 
 
 class TestGeneratePlan:
