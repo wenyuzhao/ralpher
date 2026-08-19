@@ -88,17 +88,17 @@ class TestDefaultModels:
 
     def test_claude_defaults(self, tmp_path, monkeypatch):
         backend = get_backend(_project(tmp_path, monkeypatch))
-        assert backend._resolve_model("plan", None) == ("claude-opus-5[1m]", None)
-        assert backend._resolve_model("verify", None) == ("claude-sonnet-5", None)
-        assert backend._resolve_model("extract-tasks", None) == ("haiku", None)
+        assert backend._resolve_model("plan", None) == ("opus", None)
+        assert backend._resolve_model("verify", None) == ("sonnet", None)
+        assert backend._resolve_model("extract-tasks", None) == ("sonnet", None)
 
     def test_antigravity_defaults(self, tmp_path, monkeypatch):
         project = _project(tmp_path, monkeypatch, backend="antigravity")
         backend = get_backend(project)
-        assert backend._resolve_model("plan", None) == ("gemini-3.1-pro", "high")
-        assert backend._resolve_model("verify", None) == ("gemini-3.5-flash", "high")
+        assert backend._resolve_model("plan", None) == ("gemini-3.7-flash", "high")
+        assert backend._resolve_model("verify", None) == ("gemini-3.7-flash", "high")
         assert backend._resolve_model("extract-tasks", None) == (
-            "gemini-3.5-flash",
+            "gemini-3.7-flash",
             "medium",
         )
 
