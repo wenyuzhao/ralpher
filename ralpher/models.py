@@ -87,6 +87,11 @@ class Settings(BaseModel):
     # This checkout is managed with Jujutsu: the agent is told to drive `jj`
     # rather than `git`. Overridden per run by the --jj/--no-jj flag.
     jj: bool = False
+    # Extra CLI args appended verbatim to every backend invocation (e.g.
+    # ["--add-dir", "/extra/path"]). No CLI flag overrides this; it is
+    # settings.json-only. Applied by each backend's `build_command` via
+    # `Backend._extra_args`.
+    extra_args: list[str] = []
 
     @field_validator("backend", mode="before")
     @classmethod

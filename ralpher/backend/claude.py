@@ -15,6 +15,7 @@ Flags this backend relies on:
 - ``--settings <json>`` — inline settings keeping ``.ralpher`` read-only, plus
   the optional Bash sandbox
 - ``--resume <session_id>`` — plan-mode Q&A continuation
+- ``extra_args`` from settings.json — appended verbatim, before the prompt
 """
 
 import json
@@ -114,6 +115,7 @@ class ClaudeBackend(Backend):
             argv += [f"--tools={joined}", f"--allowed-tools={joined}"]
         if session_id:
             argv += ["--resume", session_id]
+        argv += self._extra_args()
 
         # The prompt is positional, so it goes last.
         argv.append(prompt)

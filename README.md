@@ -67,6 +67,19 @@ ralpher loop --jj
 
 The flag only changes what the agent is told: it commits with `jj commit`, inspects history with `jj log` / `jj diff` / `jj show`, and leaves bookmarks alone. Ralpher still creates and checks out the `ralph/{project_id}` branch with `git`, so the workspace must be **colocated** (`jj git init --colocate`) — `--jj` fails fast with an explanation if it isn't. `--no-jj` overrides the settings key for a single run.
 
+## Extra CLI args
+
+`extra_args` in `.ralpher/settings.json` is appended verbatim to every backend invocation (`claude` or `agy`), for flags ralpher doesn't expose itself:
+
+```jsonc
+// .ralpher/settings.json
+{
+  "extra_args": ["--add-dir", "/extra/path"]
+}
+```
+
+There is no `--extra-args` CLI flag; this is settings.json-only.
+
 ## How it works
 
 1. **Plan generation** -- Sends your prompt to Claude to produce a structured Project Plan with tasks, saved to `.ralpher/projects/{project_id}/PLAN.md`.

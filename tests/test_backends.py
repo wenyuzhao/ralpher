@@ -239,6 +239,19 @@ class TestClaudeCommand:
         argv = _build(get_backend(_project(tmp_path, monkeypatch)), session_id="sess-1")
         assert _flag(argv, "--resume") == "sess-1"
 
+    def test_extra_args_from_settings_precede_the_prompt(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        ralpher = tmp_path / ".ralpher"
+        ralpher.mkdir()
+        (ralpher / "settings.json").write_text(
+            json.dumps({"extra_args": ["--foo", "bar"]})
+        )
+        argv = _build(get_backend(Project(id="proj")))
+        assert "--foo" in argv
+        assert argv[argv.index("--foo") + 1] == "bar"
+        # The prompt is positional, so extra args must not land after it.
+        assert argv[-1] == "do the thing"
+
     def test_user_settings_are_loaded(self, tmp_path, monkeypatch):
         # Not hermetic: a sandbox.network allowlist in .claude/settings.json
         # must still apply on top of the inline settings.
@@ -330,6 +343,17 @@ class TestAntigravityCommand:
         on = _project(tmp_path, monkeypatch, backend="antigravity", sandbox=True)
         assert "--sandbox" not in _build(get_backend(off))
         assert "--sandbox" in _build(get_backend(on))
+
+    def test_extra_args_from_settings_are_appended(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        ralpher = tmp_path / ".ralpher"
+        ralpher.mkdir()
+        (ralpher / "settings.json").write_text(
+            json.dumps({"extra_args": ["--foo", "bar"]})
+        )
+        argv = _build(get_backend(Project(id="proj", backend="antigravity")))
+        assert "--foo" in argv
+        assert argv[argv.index("--foo") + 1] == "bar"
 
 
 # --- result parsing -------------------------------------------------------- #

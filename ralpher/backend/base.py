@@ -232,6 +232,14 @@ class Backend(abc.ABC):
         )
         return self.split_effort(spec) if spec else (None, None)
 
+    def _extra_args(self) -> list[str]:
+        """Extra CLI args from the ``extra_args`` list in settings.json.
+
+        Appended verbatim by each backend's `build_command`; there is no CLI
+        flag for these, so they always come from settings.json.
+        """
+        return Settings.load().extra_args
+
     def _start_log(self, kind: str, prompt: str) -> Path:
         """Create this run's log file, seeded with the initial prompt."""
         timestamp = datetime.now().astimezone().strftime("%Y-%m-%d-%H%M%S")
