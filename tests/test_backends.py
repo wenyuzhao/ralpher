@@ -137,6 +137,25 @@ class TestDefaultModels:
         backend = get_backend(Project(id="proj", backend="claude-code"))
         assert backend._resolve_model("plan", None) == ("some-model", None)
 
+    def test_settings_single_string_pin_applies_to_all_kinds(
+        self, tmp_path, monkeypatch
+    ):
+        monkeypatch.chdir(tmp_path)
+        ralpher = tmp_path / ".ralpher"
+        ralpher.mkdir()
+        (ralpher / "settings.toml").write_text('models = "universal-model:low"\n')
+        for kind in ("claude-code", "antigravity"):
+            backend = get_backend(Project(id="proj", backend=kind))
+            assert backend._resolve_model("plan", None) == ("universal-model", "low")
+            assert backend._resolve_model("verify", None) == (
+                "universal-model",
+                "low",
+            )
+            assert backend._resolve_model("extract-tasks", None) == (
+                "universal-model",
+                "low",
+            )
+
 
 class TestSplitEffort:
     def test_peels_a_known_suffix(self):

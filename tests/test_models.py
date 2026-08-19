@@ -1,4 +1,4 @@
-from ralpher.models import Task, Tasks
+from ralpher.models import Project, ProjectConfig, Settings, Task, Tasks
 
 
 class TestTask:
@@ -66,3 +66,57 @@ class TestTasks:
         tasks = Tasks.model_validate(data)
         assert len(tasks.tasks) == 1
         assert tasks.tasks[0].passes is False
+
+
+class TestSettingsModels:
+    def test_default_empty_dict(self):
+        settings = Settings()
+        assert settings.models == {}
+        assert settings.get_model("plan") is None
+
+    def test_dict_models(self):
+        settings = Settings(models={"plan": "opus", "verify": "sonnet"})
+        assert settings.get_model("plan") == "opus"
+        assert settings.get_model("verify") == "sonnet"
+        assert settings.get_model("loop") is None
+
+    def test_string_models(self):
+        settings = Settings(models="haiku:low")
+        assert settings.get_model("plan") == "haiku:low"
+        assert settings.get_model("verify") == "haiku:low"
+        assert settings.get_model("extract-tasks") == "haiku:low"
+
+    def test_load_string_models_from_toml(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        ralpher = tmp_path / ".ralpher"
+        ralpher.mkdir()
+        (ralpher / "settings.toml").write_text('models = "universal-model:medium"\n')
+        settings = Settings.load()
+        assert settings.models == "universal-model:medium"
+        assert settings.get_model("plan") == "universal-model:medium"
+        assert settings.get_model("loop") == "universal-model:medium"
+
+
+class TestProjectConfig:
+    def test_config_toml_path(self):
+        project = Project(id="proj")
+        assert project.config_toml == project.project_dir / "config.toml"
+
+    def test_load_config_missing(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        project = Project(id="proj")
+        assert project.load_config() is None
+
+    def test_save_and_load_config(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        project = Project(id="proj")
+        project.project_dir.mkdir(parents=True, exist_ok=True)
+        config = ProjectConfig(base_branch="main", target_branch="ralph/proj")
+        project.save_config(config)
+
+        assert project.config_toml.exists()
+        loaded = project.load_config()
+        assert loaded is not None
+        assert loaded == config
+        assert loaded.base_branch == "main"
+        assert loaded.target_branch == "ralph/proj"

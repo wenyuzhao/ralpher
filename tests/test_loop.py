@@ -38,7 +38,7 @@ def _make_project(task_id: str, max_iterations: int = 5) -> Project:
 
 
 def _write_config(project: Project) -> None:
-    """Write a default config.json so prepare() can load it."""
+    """Write a default config.toml so prepare() can load it."""
     config = ProjectConfig(base_branch="main", target_branch=f"ralph/{project.id}")
     project.save_config(config)
 

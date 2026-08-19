@@ -227,9 +227,7 @@ class Backend(abc.ABC):
         ``:<level>`` suffix is peeled off into the effort; a spec without one
         leaves the effort unset, so the CLI applies its own default.
         """
-        spec = (
-            model or Settings.load().models.get(kind) or self.default_models.get(kind)
-        )
+        spec = model or Settings.load().get_model(kind) or self.default_models.get(kind)
         return self.split_effort(spec) if spec else (None, None)
 
     def _extra_args(self) -> list[str]:

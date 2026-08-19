@@ -47,6 +47,18 @@ backend = "antigravity"
 
 The `--backend` flag wins over the `backend` key in `settings.toml`, which in turn beats the `claude-code` default. Run `claude` or `agy` once to sign in before pointing ralpher at it; `agy models` lists the model names the antigravity backend accepts.
 
+You can also pin models in `.ralpher/settings.toml`, either as a single model for all tasks or per-kind (`plan`, `refine`, `loop`, `verify`, `extract-tasks`):
+
+```toml
+# .ralpher/settings.toml — use one model for all steps
+models = "claude-3-7-sonnet"
+
+# or per-kind:
+# [models]
+# plan = "claude-3-7-sonnet"
+# verify = "claude-3-5-haiku"
+```
+
 ## Jujutsu (`jj`)
 
 If your repo is managed with [Jujutsu](https://jj-vcs.github.io/jj/), pass `--jj` so the agent commits with `jj` instead of `git`:

@@ -4,6 +4,7 @@ import tomllib
 from pathlib import Path
 from typing import Literal
 
+import tomli_w
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -71,10 +72,11 @@ def normalize_backend(value: str) -> BackendKind:
 
 
 class Settings(BaseModel):
-    # Per-kind model pins ("plan", "refine", "loop", "verify", "extract-tasks"),
-    # overriding whichever backend is active and its `default_models`. A pin may
-    # carry a ``:<level>`` reasoning-effort suffix; see `Backend.split_effort`.
-    models: dict[str, str] = {}
+    # Per-kind model pins ("plan", "refine", "loop", "verify", "extract-tasks")
+    # or a single string applied to all kinds, overriding whichever backend is
+    # active and its `default_models`. A pin may carry a ``:<level>``
+    # reasoning-effort suffix; see `Backend.split_effort`.
+    models: dict[str, str] | str = {}
     # Default coding-agent backend for this checkout. Unset, it is detected from
     # which CLI is installed (see `detect_default_backend`). Overridden per run
     # by the ``--backend`` CLI flag. Accepts aliases (e.g. "cc", "agy") via the
@@ -93,6 +95,11 @@ class Settings(BaseModel):
     # settings.toml-only. Applied by each backend's `build_command` via
     # `Backend._extra_args`.
     extra_args: list[str] = []
+
+    def get_model(self, kind: str) -> str | None:
+        if isinstance(self.models, str):
+            return self.models
+        return self.models.get(kind)
 
     @field_validator("backend", mode="before")
     @classmethod
@@ -234,16 +241,17 @@ class Project(BaseModel):
         return self.ralpher_dir / "projects" / self.id
 
     @property
-    def config_json(self) -> Path:
-        return self.project_dir / "config.json"
+    def config_toml(self) -> Path:
+        return self.project_dir / "config.toml"
 
     def load_config(self) -> ProjectConfig | None:
-        if not self.config_json.exists():
+        if not self.config_toml.exists():
             return None
-        return ProjectConfig.model_validate(json.loads(self.config_json.read_text()))
+        with self.config_toml.open("rb") as f:
+            return ProjectConfig.model_validate(tomllib.load(f))
 
     def save_config(self, config: ProjectConfig) -> None:
-        self.config_json.write_text(config.model_dump_json(indent=2))
+        self.config_toml.write_text(tomli_w.dumps(config.model_dump(exclude_none=True)))
 
     @property
     def prompt_md(self) -> Path:
