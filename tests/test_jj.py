@@ -19,30 +19,30 @@ class TestJjDefaults:
 
 
 class TestResolveJj:
-    """--jj/--no-jj wins over the 'jj' key in settings.json."""
+    """--jj/--no-jj wins over the 'jj' key in settings.toml."""
 
-    def _write_settings(self, tmp_path, payload):
+    def _write_settings(self, tmp_path, content: str):
         ralpher = tmp_path / ".ralpher"
         ralpher.mkdir()
-        (ralpher / "settings.json").write_text(json.dumps(payload))
+        (ralpher / "settings.toml").write_text(content)
 
-    def test_reads_jj_true_from_settings_json(self, tmp_path, monkeypatch):
+    def test_reads_jj_true_from_settings(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        self._write_settings(tmp_path, {"jj": True})
+        self._write_settings(tmp_path, "jj = true\n")
         assert resolve_jj(None) is True
 
-    def test_defaults_false_when_settings_json_absent(self, tmp_path, monkeypatch):
+    def test_defaults_false_when_settings_absent(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         assert resolve_jj(None) is False
 
     def test_defaults_false_when_key_missing(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        self._write_settings(tmp_path, {"models": {}})
+        self._write_settings(tmp_path, "[models]\n")
         assert resolve_jj(None) is False
 
     def test_flag_overrides_settings(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
-        self._write_settings(tmp_path, {"jj": True})
+        self._write_settings(tmp_path, "jj = true\n")
         assert resolve_jj(False) is False
 
     def test_flag_wins_without_settings(self, tmp_path, monkeypatch):

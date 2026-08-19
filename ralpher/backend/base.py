@@ -66,7 +66,7 @@ class Backend(abc.ABC):
     install_hint: ClassVar[str]
     #: Per-kind default model specs for this CLI, keyed by the `kind` passed to
     #: `run` ("plan", "refine", "loop", "verify", "extract-tasks"). A `models`
-    #: pin in settings.json overrides these. A trailing ``:<level>`` suffix on a
+    #: pin in settings.toml overrides these. A trailing ``:<level>`` suffix on a
     #: spec sets the reasoning effort; a bare name leaves the CLI's own default.
     default_models: ClassVar[dict[str, str]]
     #: Reasoning-effort levels this CLI accepts as ``--effort``. Only these are
@@ -222,7 +222,7 @@ class Backend(abc.ABC):
     ) -> tuple[str | None, str | None]:
         """Model name and reasoning effort for `kind`.
 
-        An explicitly passed `model` wins, else a `models` pin in settings.json,
+        An explicitly passed `model` wins, else a `models` pin in settings.toml,
         else this backend's `default_models`. Whichever it is, a trailing
         ``:<level>`` suffix is peeled off into the effort; a spec without one
         leaves the effort unset, so the CLI applies its own default.
@@ -233,10 +233,10 @@ class Backend(abc.ABC):
         return self.split_effort(spec) if spec else (None, None)
 
     def _extra_args(self) -> list[str]:
-        """Extra CLI args from the ``extra_args`` list in settings.json.
+        """Extra CLI args from the ``extra_args`` list in settings.toml.
 
         Appended verbatim by each backend's `build_command`; there is no CLI
-        flag for these, so they always come from settings.json.
+        flag for these, so they always come from settings.toml.
         """
         return Settings.load().extra_args
 

@@ -1,4 +1,3 @@
-import json
 import shutil
 
 import pytest
@@ -74,19 +73,19 @@ class TestSettingsBackend:
         installed("claude", "agy")
         assert Settings().backend == "claude-code"
 
-    def test_reads_backend_from_settings_json(self, tmp_path, monkeypatch):
+    def test_reads_backend_from_settings(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         ralpher = tmp_path / ".ralpher"
         ralpher.mkdir()
-        (ralpher / "settings.json").write_text(json.dumps({"backend": "agy"}))
+        (ralpher / "settings.toml").write_text('backend = "agy"\n')
         # Alias is normalized at load time.
         assert Settings.load().backend == "antigravity"
 
-    def test_canonical_value_in_settings_json(self, tmp_path, monkeypatch):
+    def test_canonical_value_in_settings(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         ralpher = tmp_path / ".ralpher"
         ralpher.mkdir()
-        (ralpher / "settings.json").write_text(json.dumps({"backend": "antigravity"}))
+        (ralpher / "settings.toml").write_text('backend = "antigravity"\n')
         assert Settings.load().backend == "antigravity"
 
     def test_invalid_backend_in_settings_rejected(self):
@@ -98,7 +97,7 @@ class TestSettingsBackend:
         monkeypatch.chdir(tmp_path)
         ralpher = tmp_path / ".ralpher"
         ralpher.mkdir()
-        (ralpher / "settings.json").write_text(json.dumps({"models": {}}))
+        (ralpher / "settings.toml").write_text("[models]\n")
         assert Settings.load().backend == "claude-code"
 
 
@@ -107,7 +106,7 @@ class TestResolveBackend:
         monkeypatch.chdir(tmp_path)
         ralpher = tmp_path / ".ralpher"
         ralpher.mkdir()
-        (ralpher / "settings.json").write_text(json.dumps({"backend": "antigravity"}))
+        (ralpher / "settings.toml").write_text('backend = "antigravity"\n')
         # CLI flag overrides the settings default.
         assert resolve_backend("cc") == "claude-code"
 
@@ -115,7 +114,7 @@ class TestResolveBackend:
         monkeypatch.chdir(tmp_path)
         ralpher = tmp_path / ".ralpher"
         ralpher.mkdir()
-        (ralpher / "settings.json").write_text(json.dumps({"backend": "agy"}))
+        (ralpher / "settings.toml").write_text('backend = "agy"\n')
         assert resolve_backend(None) == "antigravity"
 
     def test_defaults_to_detected_backend(self, tmp_path, monkeypatch, installed):

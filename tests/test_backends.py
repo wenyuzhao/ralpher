@@ -27,6 +27,7 @@ class Out(BaseModel):
 
 def _project(tmp_path, monkeypatch, **kwargs) -> Project:
     monkeypatch.chdir(tmp_path)
+    kwargs.setdefault("backend", "claude-code")
     return Project(id="proj", **kwargs)
 
 
@@ -122,9 +123,7 @@ class TestDefaultModels:
         monkeypatch.chdir(tmp_path)
         ralpher = tmp_path / ".ralpher"
         ralpher.mkdir()
-        (ralpher / "settings.json").write_text(
-            json.dumps({"models": {"plan": "some-model:medium"}})
-        )
+        (ralpher / "settings.toml").write_text('[models]\nplan = "some-model:medium"\n')
         # The pin applies whichever backend is active.
         for kind in ("claude-code", "antigravity"):
             backend = get_backend(Project(id="proj", backend=kind))
@@ -134,10 +133,8 @@ class TestDefaultModels:
         monkeypatch.chdir(tmp_path)
         ralpher = tmp_path / ".ralpher"
         ralpher.mkdir()
-        (ralpher / "settings.json").write_text(
-            json.dumps({"models": {"plan": "some-model"}})
-        )
-        backend = get_backend(Project(id="proj"))
+        (ralpher / "settings.toml").write_text('[models]\nplan = "some-model"\n')
+        backend = get_backend(Project(id="proj", backend="claude-code"))
         assert backend._resolve_model("plan", None) == ("some-model", None)
 
 
@@ -243,10 +240,8 @@ class TestClaudeCommand:
         monkeypatch.chdir(tmp_path)
         ralpher = tmp_path / ".ralpher"
         ralpher.mkdir()
-        (ralpher / "settings.json").write_text(
-            json.dumps({"extra_args": ["--foo", "bar"]})
-        )
-        argv = _build(get_backend(Project(id="proj")))
+        (ralpher / "settings.toml").write_text('extra_args = ["--foo", "bar"]\n')
+        argv = _build(get_backend(Project(id="proj", backend="claude-code")))
         assert "--foo" in argv
         assert argv[argv.index("--foo") + 1] == "bar"
         # The prompt is positional, so extra args must not land after it.
@@ -293,6 +288,7 @@ class TestAntigravityCommand:
         argv = _build(get_backend(project))
         assert argv[0] == "agy"
         assert _flag(argv, "--print") == "do the thing"
+        assert _flag(argv, "--print-timeout") == "1h"
         assert _flag(argv, "--output-format") == "stream-json"
 
     def test_workspace_is_cwd(self, tmp_path, monkeypatch):
@@ -348,9 +344,7 @@ class TestAntigravityCommand:
         monkeypatch.chdir(tmp_path)
         ralpher = tmp_path / ".ralpher"
         ralpher.mkdir()
-        (ralpher / "settings.json").write_text(
-            json.dumps({"extra_args": ["--foo", "bar"]})
-        )
+        (ralpher / "settings.toml").write_text('extra_args = ["--foo", "bar"]\n')
         argv = _build(get_backend(Project(id="proj", backend="antigravity")))
         assert "--foo" in argv
         assert argv[argv.index("--foo") + 1] == "bar"

@@ -15,7 +15,7 @@ Flags this backend relies on:
 - ``--settings <json>`` — inline settings keeping ``.ralpher`` read-only, plus
   the optional Bash sandbox
 - ``--resume <session_id>`` — plan-mode Q&A continuation
-- ``extra_args`` from settings.json — appended verbatim, before the prompt
+- ``extra_args`` from settings.toml — appended verbatim, before the prompt
 """
 
 import json
@@ -59,7 +59,7 @@ class ClaudeBackend(Backend):
     install_hint = "Install it first: https://docs.anthropic.com/en/docs/claude-code"
 
     # None of these carry a ``:<level>`` suffix, so they run at the CLI's own
-    # default effort (``high``). Pin a model per kind in settings.json to
+    # default effort (``high``). Pin a model per kind in settings.toml to
     # override, with or without a suffix.
     default_models: ClassVar[dict[str, str]] = {
         "plan": "opus",

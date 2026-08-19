@@ -49,7 +49,7 @@ def _sync_to_notion(project: Project) -> None:
 
 
 def _resolve_backend_or_fail(cli_backend: str | None) -> BackendKind:
-    """Resolve the backend (CLI flag, else settings.json), failing on bad input."""
+    """Resolve the backend (CLI flag, else settings.toml), failing on bad input."""
     try:
         return resolve_backend(cli_backend)
     except ValueError as e:
@@ -63,7 +63,7 @@ BackendOption = Annotated[
         "-b",
         help=(
             "Coding agent backend: claude-code (cc) or antigravity (agy). "
-            "Defaults to the 'backend' key in .ralpher/settings.json, else "
+            "Defaults to the 'backend' key in .ralpher/settings.toml, else "
             "whichever CLI is installed (claude, else agy)."
         ),
     ),
@@ -77,14 +77,14 @@ JjOption = Annotated[
         help=(
             "Tell the agent this repo is managed with Jujutsu, so it drives 'jj' "
             "instead of 'git'. Requires a git-colocated jj workspace. Defaults to "
-            "the 'jj' key in .ralpher/settings.json, else off."
+            "the 'jj' key in .ralpher/settings.toml, else off."
         ),
     ),
 ]
 
 
 def _resolve_jj_or_fail(cli_jj: bool | None) -> bool:
-    """Resolve the VCS (CLI flag, else settings.json), checking jj is usable here."""
+    """Resolve the VCS (CLI flag, else settings.toml), checking jj is usable here."""
     enabled = resolve_jj(cli_jj)
     if enabled:
         check_jj_prerequisites()
@@ -275,7 +275,7 @@ def loop(
     if not project_id:
         project_id = _get_latest_project_id()
 
-    # CLI flag wins when given; otherwise honor .ralpher/settings.json (default on).
+    # CLI flag wins when given; otherwise honor .ralpher/settings.toml (default on).
     sandbox_enabled = sandbox if sandbox is not None else Settings.load().sandbox
 
     rich.print(f"[bold blue]Running project: [i]{project_id}[/][/]\n")

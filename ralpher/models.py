@@ -25,7 +25,7 @@ def ralpher_root() -> Path:
 BackendKind = Literal["claude-code", "antigravity"]
 
 # CLI / settings aliases accepted for each backend. ``--backend`` and the
-# ``backend`` key in settings.json both flow through ``normalize_backend``.
+# ``backend`` key in settings.toml both flow through ``normalize_backend``.
 _BACKEND_ALIASES: dict[str, BackendKind] = {
     "claude-code": "claude-code",
     "claude": "claude-code",
@@ -35,7 +35,7 @@ _BACKEND_ALIASES: dict[str, BackendKind] = {
 }
 
 # Order in which backends are auto-detected when neither --backend nor the
-# settings.json `backend` key says otherwise: the first one whose CLI is on
+# settings.toml `backend` key says otherwise: the first one whose CLI is on
 # PATH wins, and the first entry is also the fallback when none is installed
 # (so the resulting `check_prerequisites` error names the preferred CLI).
 _BACKEND_PREFERENCE: tuple[BackendKind, ...] = ("claude-code", "antigravity")
@@ -90,7 +90,7 @@ class Settings(BaseModel):
     jj: bool = False
     # Extra CLI args appended verbatim to every backend invocation (e.g.
     # ["--add-dir", "/extra/path"]). No CLI flag overrides this; it is
-    # settings.json-only. Applied by each backend's `build_command` via
+    # settings.toml-only. Applied by each backend's `build_command` via
     # `Backend._extra_args`.
     extra_args: list[str] = []
 
@@ -111,7 +111,7 @@ class Settings(BaseModel):
 
 
 def resolve_backend(cli_backend: str | None) -> BackendKind:
-    """Resolve the backend for a run: the ``--backend`` flag wins, else settings.json.
+    """Resolve the backend for a run: the ``--backend`` flag wins, else settings.toml.
 
     Mirrors how ``--sandbox`` falls back to ``Settings.sandbox``.
     """
@@ -121,7 +121,7 @@ def resolve_backend(cli_backend: str | None) -> BackendKind:
 
 
 def resolve_jj(cli_jj: bool | None) -> bool:
-    """Resolve the VCS for a run: the ``--jj/--no-jj`` flag wins, else settings.json.
+    """Resolve the VCS for a run: the ``--jj/--no-jj`` flag wins, else settings.toml.
 
     Mirrors how ``--sandbox`` falls back to ``Settings.sandbox``.
     """

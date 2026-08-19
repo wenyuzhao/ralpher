@@ -13,7 +13,7 @@ the shared driver in `ralpher.backend.base`. The `agy` CLI is close to
 - There is no per-tool flag. Read-only turns use ``--mode plan`` instead, which
   soft-denies every file write even under ``--dangerously-skip-permissions``.
 - Reasoning effort is ``low|medium|high`` (claude also has ``xhigh``/``max``).
-- ``extra_args`` from settings.json is appended verbatim, same as claude.
+- ``extra_args`` from settings.toml is appended verbatim, same as claude.
 
 Known gap: the `.ralpher` state directory can't be made read-only for this
 backend. `agy` has no inline-settings flag (claude's ``--settings``) to carry

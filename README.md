@@ -25,7 +25,7 @@ ralpher loop
 
 ## Backends
 
-Ralpher can drive either coding agent backend. Pick one per command with `--backend` / `-b`, or set a default in `.ralpher/settings.json`:
+Ralpher can drive either coding agent backend. Pick one per command with `--backend` / `-b`, or set a default in `.ralpher/settings.toml`:
 
 Both backends are the vendor's own CLI, driven as a subprocess — ralpher bundles no agent SDK and reads no API keys, so each CLI's existing login is what authenticates a run.
 
@@ -40,14 +40,12 @@ ralpher plan "Create a TODO app" --name todo-app --backend agy
 ralpher loop -b agy
 ```
 
-```jsonc
-// .ralpher/settings.json — set a default backend for this checkout
-{
-  "backend": "antigravity"
-}
+```toml
+# .ralpher/settings.toml — set a default backend for this checkout
+backend = "antigravity"
 ```
 
-The `--backend` flag wins over the `backend` key in `settings.json`, which in turn beats the `claude-code` default. Run `claude` or `agy` once to sign in before pointing ralpher at it; `agy models` lists the model names the antigravity backend accepts.
+The `--backend` flag wins over the `backend` key in `settings.toml`, which in turn beats the `claude-code` default. Run `claude` or `agy` once to sign in before pointing ralpher at it; `agy models` lists the model names the antigravity backend accepts.
 
 ## Jujutsu (`jj`)
 
@@ -58,27 +56,23 @@ ralpher plan "Create a TODO app" --name todo-app --jj
 ralpher loop --jj
 ```
 
-```jsonc
-// .ralpher/settings.json — make it the default for this checkout
-{
-  "jj": true
-}
+```toml
+# .ralpher/settings.toml — make it the default for this checkout
+jj = true
 ```
 
 The flag only changes what the agent is told: it commits with `jj commit`, inspects history with `jj log` / `jj diff` / `jj show`, and leaves bookmarks alone. Ralpher still creates and checks out the `ralph/{project_id}` branch with `git`, so the workspace must be **colocated** (`jj git init --colocate`) — `--jj` fails fast with an explanation if it isn't. `--no-jj` overrides the settings key for a single run.
 
 ## Extra CLI args
 
-`extra_args` in `.ralpher/settings.json` is appended verbatim to every backend invocation (`claude` or `agy`), for flags ralpher doesn't expose itself:
+`extra_args` in `.ralpher/settings.toml` is appended verbatim to every backend invocation (`claude` or `agy`), for flags ralpher doesn't expose itself:
 
-```jsonc
-// .ralpher/settings.json
-{
-  "extra_args": ["--add-dir", "/extra/path"]
-}
+```toml
+# .ralpher/settings.toml
+extra_args = ["--add-dir", "/extra/path"]
 ```
 
-There is no `--extra-args` CLI flag; this is settings.json-only.
+There is no `--extra-args` CLI flag; this is settings.toml-only.
 
 ## How it works
 

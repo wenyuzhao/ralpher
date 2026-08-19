@@ -1,5 +1,3 @@
-import json
-
 from ralpher.models import Project, Settings
 
 
@@ -14,16 +12,16 @@ class TestSandboxDefaults:
 
 
 class TestSettingsSandboxFromFile:
-    """The --sandbox flag falls back to the 'sandbox' key in settings.json."""
+    """The --sandbox flag falls back to the 'sandbox' key in settings.toml."""
 
-    def test_reads_sandbox_false_from_settings_json(self, tmp_path, monkeypatch):
+    def test_reads_sandbox_false_from_settings(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         ralpher = tmp_path / ".ralpher"
         ralpher.mkdir()
-        (ralpher / "settings.json").write_text(json.dumps({"sandbox": False}))
+        (ralpher / "settings.toml").write_text("sandbox = false\n")
         assert Settings.load().sandbox is False
 
-    def test_defaults_true_when_settings_json_absent(self, tmp_path, monkeypatch):
+    def test_defaults_true_when_settings_absent(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         assert Settings.load().sandbox is True
 
@@ -31,5 +29,5 @@ class TestSettingsSandboxFromFile:
         monkeypatch.chdir(tmp_path)
         ralpher = tmp_path / ".ralpher"
         ralpher.mkdir()
-        (ralpher / "settings.json").write_text(json.dumps({"models": {}}))
+        (ralpher / "settings.toml").write_text("[models]\n")
         assert Settings.load().sandbox is True
