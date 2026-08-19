@@ -37,6 +37,7 @@ class AntigravityBackend(Backend):
         "Install the Antigravity CLI and sign in with `agy` — "
         "see https://antigravity.google."
     )
+    context_file = "GEMINI.md"
 
     # ``agy models`` lists the names this backend accepts. Unlike the claude
     # defaults, these pin an effort explicitly via the ``:<level>`` suffix.

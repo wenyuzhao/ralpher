@@ -57,6 +57,7 @@ class ClaudeBackend(Backend):
     kind = "claude-code"
     executable = "claude"
     install_hint = "Install it first: https://docs.anthropic.com/en/docs/claude-code"
+    context_file = "CLAUDE.md"
 
     # None of these carry a ``:<level>`` suffix, so they run at the CLI's own
     # default effort (``high``). Pin a model per kind in settings.toml to

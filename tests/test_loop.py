@@ -193,6 +193,38 @@ class TestIterate:
         assert task_id in verify_kwargs["prompt"]
         assert verify_kwargs["schema"] is Result
 
+    @pytest.mark.parametrize(
+        ("backend", "expected", "other"),
+        [
+            ("claude-code", "CLAUDE.md", "GEMINI.md"),
+            ("antigravity", "GEMINI.md", "CLAUDE.md"),
+        ],
+    )
+    @patch("ralpher.loop.iterate.run_agent", new_callable=AsyncMock)
+    @pytest.mark.asyncio
+    async def test_prompt_names_the_backends_context_file(
+        self, mock_run, backend, expected, other, tmp_path, monkeypatch
+    ):
+        monkeypatch.chdir(tmp_path)
+        project = _make_project(f"iter-ctx-{backend}")
+        project.backend = backend
+        project.project_dir.mkdir(parents=True)
+        project.current_iteration = 0
+        project.current_task_id = "T-001"
+
+        project.tasks_json.write_text(json.dumps(_make_tasks_data()))
+        project.progress_md.write_text("# Progress\n")
+
+        mock_run.side_effect = [
+            ProgressReport(notes="did the thing"),
+            Result(task_passed=False),
+        ]
+        await iterate(project, HooksManager([]))
+
+        prompt = mock_run.call_args_list[0][1]["prompt"]
+        assert f"## Update {expected} Files" in prompt
+        assert other not in prompt
+
 
 class TestLoop:
     @patch("ralpher.loop.prepare.extract_tasks", new_callable=AsyncMock)

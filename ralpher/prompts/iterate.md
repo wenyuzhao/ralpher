@@ -9,7 +9,7 @@ You are an autonomous coding agent working on a task of a software project.
 3. Read the progress log at `{{ progress_path }}` (start with the learnings earlier iterations recorded). It is **read-only** — never edit it.
 4. Implement that single task
 5. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
-6. Update CLAUDE.md files if you discover reusable patterns (see below)
+6. Update {{ context_file }} files if you discover reusable patterns (see below)
 7. **Always** commit ALL changes at the end of the iteration, regardless of whether the quality checks passed. Use the message format: `feat: [Task Title]`. e.g. `feat: Add notifications table to database`.
    * The prefix "feat" can be any of: feat/fix/docs/style/refactor/test/chore/perf/ci/build/revert
    * Do NOT prepend the task ID (or any `[T-XXX]` marker) to the commit message.
@@ -41,7 +41,7 @@ Read-only `git` commands (e.g. `git log` for history that predates the jj worksp
 
 The task list is scaffolding for this run only — it will NOT exist for anyone reading the project later. The **only** place a task ID or task reference may appear is the progress notes you return as structured output.
 
-Everywhere else — source code, comments, docstrings, tests, README and other docs, CLAUDE.md files, config files, commit messages, and any file you create or edit in the project — write as if the task list never existed:
+Everywhere else — source code, comments, docstrings, tests, README and other docs, {{ context_file }} files, config files, commit messages, and any file you create or edit in the project — write as if the task list never existed:
 
 - No task IDs (`T-001`, `[T-042]`, etc.).
 - No references to "the current task", "this task", "the Project Plan", task titles, iterations, or acceptance criteria.
@@ -71,12 +71,12 @@ The learnings section is critical - it helps future iterations avoid repeating m
 
 ---
 
-## Update CLAUDE.md Files
+## Update {{ context_file }} Files
 
-Before committing, check if any edited files have learnings worth preserving in nearby CLAUDE.md files:
+Before committing, check if any edited files have learnings worth preserving in nearby {{ context_file }} files:
 
 1. **Identify directories with edited files** - Look at which directories you modified
-2. **Check for existing CLAUDE.md** - Look for CLAUDE.md in those directories or parent directories
+2. **Check for existing {{ context_file }}** - Look for {{ context_file }} in those directories or parent directories
 3. **Add valuable learnings** - If you discovered something future developers/agents should know:
    - API patterns or conventions specific to that module
    - Gotchas or non-obvious requirements
@@ -84,7 +84,7 @@ Before committing, check if any edited files have learnings worth preserving in 
    - Testing approaches for that area
    - Configuration or environment requirements
 
-**Examples of good CLAUDE.md additions:**
+**Examples of good {{ context_file }} additions:**
 - "When modifying X, also update Y to keep them in sync"
 - "This module uses pattern Z for all API calls"
 - "Tests require the dev server running on PORT 3000"
@@ -95,7 +95,7 @@ Before committing, check if any edited files have learnings worth preserving in 
 - Task IDs or references to the current task / Project Plan
 - Temporary debugging notes
 - Information already in the progress report
-Only update CLAUDE.md if you have **genuinely reusable knowledge** that would help future work in that directory.
+Only update {{ context_file }} if you have **genuinely reusable knowledge** that would help future work in that directory.
 
 ---
 

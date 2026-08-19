@@ -28,6 +28,7 @@ __all__ = [
     "AgentResult",
     "Backend",
     "check_prerequisites",
+    "context_file",
     "get_backend",
     "run_agent",
     "run_agent_plan_mode",
@@ -42,6 +43,11 @@ BACKENDS: dict[BackendKind, type[Backend]] = {
 def get_backend(project: Project) -> Backend:
     """The backend instance driving `project`'s run."""
     return BACKENDS[project.backend](project)
+
+
+def context_file(kind: BackendKind) -> str:
+    """Name of the context file `kind`'s CLI reads (`CLAUDE.md`, `GEMINI.md`, …)."""
+    return BACKENDS[kind].context_file
 
 
 def check_prerequisites(kind: BackendKind) -> None:

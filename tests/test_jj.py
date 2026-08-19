@@ -91,6 +91,7 @@ class TestJjPrompts:
             plan_path="/tmp/PLAN.md",
             progress_path="/tmp/progress.md",
             jj=jj,
+            context_file="CLAUDE.md",
         )
 
     def _verify(self, *, jj: bool) -> str:

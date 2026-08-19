@@ -4,7 +4,7 @@ from pathlib import Path
 import rich
 from pydantic import BaseModel, Field
 
-from ..backend import run_agent
+from ..backend import context_file, run_agent
 from ..models import Project
 from ..prompts import render_prompt
 from ..utils.hooks import HooksManager
@@ -83,6 +83,7 @@ async def implement(project: Project) -> ProgressReport:
             plan_path=str(project.plan_md),
             progress_path=str(project.progress_md),
             jj=project.jj,
+            context_file=context_file(project.backend),
         ),
         project=project,
         schema=ProgressReport,

@@ -64,6 +64,10 @@ class Backend(abc.ABC):
     executable: ClassVar[str]
     #: Appended to the "not found on PATH" error, telling the user how to fix it.
     install_hint: ClassVar[str]
+    #: Name of the per-directory context file this CLI reads for project
+    #: conventions ("CLAUDE.md", "GEMINI.md", …). Prompts refer to it by this
+    #: name so the agent updates the file its own CLI will pick up later.
+    context_file: ClassVar[str]
     #: Per-kind default model specs for this CLI, keyed by the `kind` passed to
     #: `run` ("plan", "refine", "loop", "verify", "extract-tasks"). A `models`
     #: pin in settings.toml overrides these. A trailing ``:<level>`` suffix on a
