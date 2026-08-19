@@ -110,7 +110,7 @@ The `.ralpher` directory is kept read-only to the `claude` subprocess via `permi
 
 ### Antigravity backend — [ralpher/backend/antigravity.py](ralpher/backend/antigravity.py)
 `AntigravityBackend` shells out to `agy`, whose CLI is close enough to `claude`'s that most flags map one-to-one (`--output-format stream-json`, `--json-schema`, `--model`, `--effort`, `--dangerously-skip-permissions`). Where they differ:
-- The prompt is the **value of `--print`**, not a positional argument.
+- The prompt is the **value of `--print`**, not a positional argument; `--print-timeout 1h` is passed so long agent turns do not hit `agy`'s 5-minute default timeout.
 - The conversation handle is `--conversation <id>` (claude: `--resume`), and it arrives as `conversation_id` on the result record.
 - The stream-json envelope is `{"event": "result", "result": {…}}` rather than a flat `{"type": "result", …}`; success is `status == "SUCCESS"`.
 - There is no per-tool flag, so `readonly=True` becomes `--mode plan`, which soft-denies every file write *even under* `--dangerously-skip-permissions` (verified). The `tools` argument is accepted for signature parity and ignored.

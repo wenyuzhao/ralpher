@@ -4,6 +4,8 @@ The counterpart of `ralpher.backend.claude`; both are thin argv builders over
 the shared driver in `ralpher.backend.base`. The `agy` CLI is close to
 `claude`'s in shape, so most flags map one-to-one. Where they differ:
 
+- The prompt is passed via ``--print`` (not positional), paired with
+  ``--print-timeout 1h`` to override agy's 5-minute default timeout.
 - The conversation handle is ``--conversation <id>`` (claude: ``--resume``),
   and it arrives on the result record as ``conversation_id``.
 - The stream-json envelope is ``{"event": "result", "result": {...}}`` rather
@@ -68,6 +70,8 @@ class AntigravityBackend(Backend):
             self.executable,
             "--print",
             prompt,
+            "--print-timeout",
+            "1h",
             "--output-format",
             "stream-json",
             # Unattended runs must never block on a permission prompt. In
