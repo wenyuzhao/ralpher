@@ -11,11 +11,11 @@ You are an autonomous coding agent working on a task of a software project.
 5. Implement that single task
 6. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
 7. Update {{ context_file }} files if you discover reusable patterns (see below)
-8. **Always** commit ALL changes at the end of the iteration, regardless of whether the quality checks passed. Use the message format: `feat: [Task Title]`. e.g. `feat: Add notifications table to database`.
+8. **Always** commit ALL changes at the end of the iteration, regardless of whether the quality checks passed. Use the message format: `feat: [Task Title]\n\n...`. e.g. `feat: Add notifications table to database\n\n<the message body...>`.
    * The prefix "feat" can be any of: feat/fix/docs/style/refactor/test/chore/perf/ci/build/revert
    * Do NOT prepend the task ID (or any `[T-XXX]` marker) to the commit message.
    * Try your best to fix any failing checks before committing, but if you cannot get them green, still commit so the verifier and the next iteration can see the current state.
-   * If checks fail, append `[WIP]` to the commit message subject (e.g. `feat: Add notifications table to database [WIP]`) so the failing state is obvious in `{% if jj %}jj log{% else %}git log{% endif %}`.
+   * If checks fail, append `[wip]` to the commit message title (e.g. `feat[wip]: Add notifications table to database`) so the failing state is obvious in `{% if jj %}jj log{% else %}git log{% endif %}`.
 {%- if jj %}
    * This repo is managed with Jujutsu — commit with `jj commit -m "<message>"`, never `git commit`. See "Version Control" below.
 {%- endif %}
@@ -103,7 +103,7 @@ Only update {{ context_file }} if you have **genuinely reusable knowledge** that
 ## Quality Requirements
 
 - Try to make every commit pass the project's quality checks (typecheck, lint, test).
-- If you cannot get checks to pass within this iteration, still commit the current state, mark the commit subject with `[WIP]`, and clearly document the remaining failures in your progress notes.
+- If you cannot get checks to pass within this iteration, still commit the current state, mark the commit subject with `[wip]`, and clearly document the remaining failures in your progress notes.
 - Keep changes focused and minimal
 - Follow existing code patterns
 
