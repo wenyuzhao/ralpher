@@ -133,6 +133,7 @@ class TestJjPrompts:
                 "design_path": "/tmp/design.md",
                 "tasks_path": "/tmp/tasks.toml",
                 "input_path": "/tmp/in.md",
+                "completed_tasks": [],
             }
         assert "Jujutsu" in render_prompt(name, jj=True, **paths)
         assert "Jujutsu" not in render_prompt(name, jj=False, **paths)

@@ -80,6 +80,7 @@ Return the tasks as structured data, not as markdown. Each task has:
 - `acceptance_criteria`: List of verifiable criteria defining what "done" means
 
 **Important:**
+- **Task ids must match their position in the list.** The first task is `T-001`, the second `T-002`, the third `T-003`, and so on — always three digits, always incrementing by exactly one, never out of order, never with a gap, and never more than 999 tasks in a plan. A plan whose ids don't line up is rejected and handed back to you to renumber.
 - Each task must be small and fine-grained enough to implement in one focused session. See **task size** below.
 - Tasks must be ordered. See **task ordering** below.
 - Acceptance criteria must be verifiable, not vague. "Works correctly" is bad. "Button shows confirmation dialog before deleting" is good. See **acceptance criteria** below.

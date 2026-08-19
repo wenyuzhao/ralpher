@@ -146,7 +146,7 @@ class PlannedTask(BaseModel):
     """
 
     id: str = Field(
-        description="Unique identifier, numbered sequentially: T-001, T-002, …"
+        description="Unique identifier, numbered sequentially in list order with no gaps: the first task is T-001, the second T-002, the third T-003, and so on. Always three digits; at most 999 tasks."
     )
     title: str = Field(description="Short descriptive name for the task.")
     description: str = Field(

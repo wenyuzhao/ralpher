@@ -14,6 +14,7 @@ Anything shared above that layer (the plan-mode schema, the clarification
 question UX) lives in :mod:`ralpher.backend.common`.
 """
 
+from collections.abc import Callable
 from typing import overload
 
 from pydantic import BaseModel
@@ -23,10 +24,12 @@ from ralpher.models import BackendKind, Project
 from .antigravity import AntigravityBackend
 from .base import AgentResult, Backend
 from .claude import ClaudeBackend
+from .common import Plan
 
 __all__ = [
     "AgentResult",
     "Backend",
+    "Plan",
     "check_prerequisites",
     "context_file",
     "get_backend",
@@ -103,7 +106,18 @@ async def run_agent[T: BaseModel](
 
 
 async def run_agent_plan_mode(
-    *, kind: str, prompt: str, project: Project, model: str | None = None
+    *,
+    kind: str,
+    prompt: str,
+    project: Project,
+    model: str | None = None,
+    validate: Callable[[Plan], str | None] | None = None,
 ) -> None:
-    """Run the project's selected agent with a Q&A loop for plan generation."""
-    await get_backend(project).run_plan_mode(kind=kind, prompt=prompt, model=model)
+    """Run the project's selected agent with a Q&A loop for plan generation.
+
+    `validate` (see `Backend.run_plan_mode`) vets the returned plan before it is
+    written; returning a message sends the agent back to fix it.
+    """
+    await get_backend(project).run_plan_mode(
+        kind=kind, prompt=prompt, model=model, validate=validate
+    )

@@ -16,9 +16,10 @@ from pydantic import BaseModel
 
 from ralpher.backend import BACKENDS, get_backend
 from ralpher.backend.antigravity import AntigravityBackend
-from ralpher.backend.base import AgentResult, Backend
+from ralpher.backend.base import MAX_PLAN_CORRECTIONS, AgentResult, Backend
 from ralpher.backend.claude import READONLY_TOOLS, ClaudeBackend
-from ralpher.models import Project, Task, Tasks
+from ralpher.backend.common import MAX_TASKS, Plan, check_task_ids
+from ralpher.models import PlannedTask, Project, Task, Tasks
 
 
 class Out(BaseModel):
@@ -582,6 +583,59 @@ _PLANNED_TASK = {
 }
 
 
+def _plan_with_ids(*ids: str) -> Plan:
+    return Plan(
+        markdown="# Design",
+        tasks=[
+            PlannedTask(
+                id=task_id,
+                title="Login",
+                description="User can log in",
+                acceptance_criteria=["AC1"],
+            )
+            for task_id in ids
+        ],
+    )
+
+
+class TestCheckTaskIds:
+    def test_accepts_a_sequentially_numbered_list(self):
+        assert check_task_ids(_plan_with_ids("T-001", "T-002", "T-003")) is None
+
+    def test_accepts_an_empty_list(self):
+        assert check_task_ids(_plan_with_ids()) is None
+
+    def test_accepts_the_maximum_number_of_tasks(self):
+        ids = [f"T-{n:03d}" for n in range(1, MAX_TASKS + 1)]
+        assert check_task_ids(_plan_with_ids(*ids)) is None
+
+    def test_rejects_ids_out_of_order(self):
+        problem = check_task_ids(_plan_with_ids("T-002", "T-001"))
+        assert problem is not None
+        assert "task #1 has id `T-002`; it must be `T-001`." in problem
+        assert "task #2 has id `T-001`; it must be `T-002`." in problem
+
+    def test_rejects_a_gap_in_the_numbering(self):
+        problem = check_task_ids(_plan_with_ids("T-001", "T-003"))
+        assert problem is not None
+        assert "task #2 has id `T-003`; it must be `T-002`." in problem
+
+    def test_rejects_numbering_that_does_not_start_at_one(self):
+        problem = check_task_ids(_plan_with_ids("T-002", "T-003"))
+        assert problem is not None
+        assert "task #1 has id `T-002`; it must be `T-001`." in problem
+
+    @pytest.mark.parametrize("bad_id", ["T-1", "T-01", "T-0001", "1", "task-001"])
+    def test_rejects_a_malformed_id(self, bad_id):
+        assert check_task_ids(_plan_with_ids(bad_id)) is not None
+
+    def test_rejects_more_than_the_maximum_number_of_tasks(self):
+        ids = [f"T-{n:03d}" for n in range(1, MAX_TASKS + 2)]
+        problem = check_task_ids(_plan_with_ids(*ids))
+        assert problem is not None
+        assert f"at most {MAX_TASKS}" in problem
+
+
 class TestRunPlanMode:
     @pytest.mark.asyncio
     async def test_writes_design_md_and_tasks_toml(self, stub):
@@ -630,6 +684,166 @@ class TestRunPlanMode:
             ("T-001", True),
             ("T-002", False),
         ]
+
+    @pytest.mark.asyncio
+    async def test_rejected_plan_is_handed_back_for_correction(self, stub, monkeypatch):
+        bad = {"plan_or_questions": {"markdown": "# Bad", "tasks": []}}
+        good = {
+            "plan_or_questions": {"markdown": "# Good", "tasks": [_PLANNED_TASK]},
+        }
+        backend = stub(lines=[json.dumps({"type": "result", "structured_output": bad})])
+        backend.project.project_dir.mkdir(parents=True, exist_ok=True)
+
+        turns: list[str] = []
+        original = backend._spawn
+
+        async def _spawn(argv, prompt, log_file):
+            turns.append(prompt)
+            if len(turns) == 1:
+                return await original(argv, prompt, log_file)
+            return AgentResult(session_id="s1", structured_output=good)
+
+        monkeypatch.setattr(backend, "_spawn", _spawn)
+        await backend.run_plan_mode(
+            kind="refine",
+            prompt="go",
+            validate=lambda plan: "restore the tasks" if not plan.tasks else None,
+        )
+
+        # The rejection message is the next turn's prompt, and only the plan
+        # that finally validated is written out.
+        assert turns == ["go", "restore the tasks"]
+        assert backend.project.design_md.read_text() == "# Good"
+
+    @pytest.mark.asyncio
+    async def test_misnumbered_tasks_are_handed_back_without_a_validator(
+        self, stub, monkeypatch
+    ):
+        misnumbered = {
+            "plan_or_questions": {
+                "markdown": "# Bad",
+                "tasks": [{**_PLANNED_TASK, "id": "T-007"}],
+            }
+        }
+        good = {"plan_or_questions": {"markdown": "# Good", "tasks": [_PLANNED_TASK]}}
+        backend = stub(
+            lines=[json.dumps({"type": "result", "structured_output": misnumbered})]
+        )
+        backend.project.project_dir.mkdir(parents=True, exist_ok=True)
+
+        turns: list[str] = []
+        original = backend._spawn
+
+        async def _spawn(argv, prompt, log_file):
+            turns.append(prompt)
+            if len(turns) == 1:
+                return await original(argv, prompt, log_file)
+            return AgentResult(session_id="s1", structured_output=good)
+
+        monkeypatch.setattr(backend, "_spawn", _spawn)
+        # The id invariant holds for every plan, so no `validate` is needed.
+        await backend.run_plan_mode(kind="plan", prompt="go")
+
+        assert len(turns) == 2
+        assert "must be `T-001`" in turns[1]
+        assert backend.project.design_md.read_text() == "# Good"
+
+    @pytest.mark.asyncio
+    async def test_both_rejections_are_sent_together(self, stub, monkeypatch):
+        misnumbered = {
+            "plan_or_questions": {
+                "markdown": "# Bad",
+                "tasks": [{**_PLANNED_TASK, "id": "T-002"}],
+            }
+        }
+        good = {"plan_or_questions": {"markdown": "# Good", "tasks": [_PLANNED_TASK]}}
+        backend = stub(
+            lines=[json.dumps({"type": "result", "structured_output": misnumbered})]
+        )
+        backend.project.project_dir.mkdir(parents=True, exist_ok=True)
+
+        turns: list[str] = []
+        original = backend._spawn
+
+        async def _spawn(argv, prompt, log_file):
+            turns.append(prompt)
+            if len(turns) == 1:
+                return await original(argv, prompt, log_file)
+            return AgentResult(session_id="s1", structured_output=good)
+
+        monkeypatch.setattr(backend, "_spawn", _spawn)
+        await backend.run_plan_mode(
+            kind="refine",
+            prompt="go",
+            validate=lambda plan: (
+                None
+                if any(t.id == "T-001" for t in plan.tasks)
+                else "and restore T-001"
+            ),
+        )
+
+        # Fixing one complaint can break the other, so the agent sees both.
+        assert "must be `T-001`" in turns[1]
+        assert "and restore T-001" in turns[1]
+
+    @pytest.mark.asyncio
+    async def test_correction_turn_cannot_ask_questions(self, stub, monkeypatch):
+        bad = {"plan_or_questions": {"markdown": "# Bad", "tasks": []}}
+        good = {"plan_or_questions": {"markdown": "# Good", "tasks": [_PLANNED_TASK]}}
+        backend = stub(lines=[json.dumps({"type": "result", "structured_output": bad})])
+        backend.project.project_dir.mkdir(parents=True, exist_ok=True)
+
+        schemas: list[dict] = []
+        build = backend.build_command
+
+        def _build(**kwargs):
+            schemas.append(kwargs["schema"])
+            return build(**kwargs)
+
+        original = backend._spawn
+
+        async def _spawn(argv, prompt, log_file):
+            if not schemas[:-1]:
+                return await original(argv, prompt, log_file)
+            return AgentResult(session_id="s1", structured_output=good)
+
+        monkeypatch.setattr(backend, "build_command", _build)
+        monkeypatch.setattr(backend, "_spawn", _spawn)
+        await backend.run_plan_mode(
+            kind="refine",
+            prompt="go",
+            validate=lambda plan: "restore the tasks" if not plan.tasks else None,
+        )
+
+        # The opening turn may ask the user; the correction turn may only
+        # return a fixed plan.
+        assert len(schemas) == 2
+        assert {"Plan", "Questions"} <= set(schemas[0]["$defs"])
+        assert "Plan" in schemas[1]["$defs"]
+        assert "Questions" not in schemas[1]["$defs"]
+
+    @pytest.mark.asyncio
+    async def test_persistently_rejected_plan_fails(self, stub, monkeypatch):
+        bad = {"plan_or_questions": {"markdown": "# Bad", "tasks": []}}
+        backend = stub(lines=[json.dumps({"type": "result", "structured_output": bad})])
+        backend.project.project_dir.mkdir(parents=True, exist_ok=True)
+
+        turns: list[str] = []
+        original = backend._spawn
+
+        async def _spawn(argv, prompt, log_file):
+            turns.append(prompt)
+            return await original(argv, prompt, log_file)
+
+        monkeypatch.setattr(backend, "_spawn", _spawn)
+        with pytest.raises(SystemExit, match="restore the tasks"):
+            await backend.run_plan_mode(
+                kind="refine", prompt="go", validate=lambda plan: "restore the tasks"
+            )
+
+        # The first turn plus MAX_PLAN_CORRECTIONS retries, and nothing written.
+        assert len(turns) == 1 + MAX_PLAN_CORRECTIONS
+        assert not backend.project.design_md.exists()
 
     @pytest.mark.asyncio
     async def test_asks_questions_then_resumes(self, stub, monkeypatch):

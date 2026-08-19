@@ -5,7 +5,7 @@ from pathlib import Path
 import rich
 from rich.console import Console
 
-from ralpher.models import Project
+from ralpher.models import Project, Task
 from ralpher.prompts import render_prompt
 from ralpher.utils.git import checkout_existing_branch
 from ralpher.utils.notion_comments import (
@@ -14,10 +14,60 @@ from ralpher.utils.notion_comments import (
     resolve_comments,
 )
 
-from ..backend import run_agent_plan_mode
+from ..backend import Plan, run_agent_plan_mode
 from ..utils.error import fail
 
 console = Console()
+
+# Task fields a completed task must bring back unchanged. `id` is matched
+# separately (it is the key), and `passes` is ralpher's own bookkeeping — the
+# planning agent never sees or returns it.
+_FROZEN_FIELDS = ("title", "description", "acceptance_criteria")
+
+
+def check_completed_tasks(completed: list[Task], plan: Plan) -> str | None:
+    """Error message if a refined plan changed an already-passing task, else None.
+
+    A refine can land partway through a run, so the tasks that already passed
+    are frozen: only the not-yet-passed ones may be re-planned. A completed task
+    that comes back edited (or does not come back at all) either loses work
+    already in the repo or gets implemented a second time — `save_planned_tasks`
+    only carries `passes` across for an id that survived, so a renumbered task
+    silently reverts to pending.
+
+    The message is written as an instruction to the agent: `run_plan_mode` feeds
+    it back as the next turn's prompt so the agent can fix its own output.
+    """
+    by_id = {task.id: task for task in plan.tasks}
+    problems: list[str] = []
+    for task in completed:
+        planned = by_id.get(task.id)
+        if planned is None:
+            problems.append(f"- `{task.id}` ({task.title}) is missing from the list.")
+            continue
+        changed = [f for f in _FROZEN_FIELDS if getattr(planned, f) != getattr(task, f)]
+        if changed:
+            problems.append(
+                f"- `{task.id}` ({task.title}) came back with a different "
+                f"{', '.join(changed)}."
+            )
+
+    if not problems:
+        return None
+
+    return (
+        "The task list you returned changed tasks that are already implemented "
+        "and verified. Those tasks are frozen — each one must come back exactly "
+        "as it appears in the original task list, with the same id, title, "
+        "description, and acceptance criteria:\n\n"
+        + "\n".join(problems)
+        + "\n\nIf the refined design changes what one of those tasks built, "
+        "leave the completed task untouched and add a NEW task, with a new "
+        "unused id and placed after the completed ones, that adjusts or "
+        "re-implements the affected code.\n\n"
+        "Return the complete plan again — the full design document markdown and "
+        "the full task list — with the completed tasks restored."
+    )
 
 
 def _notion_configured() -> bool:
@@ -58,6 +108,16 @@ async def refine_plan(*, project: Project, prompt: str | None) -> str | None:
         rich.print("[yellow]Nothing to refine. Skipping.[/]")
         return None
 
+    # Tasks that already passed are off limits to this refinement: the agent is
+    # told to return them verbatim, and the plan is rejected if it doesn't.
+    tasks = project.load_tasks()
+    completed = [t for t in tasks.tasks if t.passes] if tasks else []
+    if completed:
+        rich.print(
+            f"[bold blue]{len(completed)} task(s) already completed; "
+            "refining only the remaining work.[/]\n"
+        )
+
     # Checkout the project branch before refinement
     config = project.load_config()
     assert config is not None, "Project config should exist at this point."
@@ -75,8 +135,10 @@ async def refine_plan(*, project: Project, prompt: str | None) -> str | None:
                 tasks_path=str(project.tasks_toml),
                 input_path=str(tmp_path),
                 jj=project.jj,
+                completed_tasks=completed,
             ),
             project=project,
+            validate=lambda plan: check_completed_tasks(completed, plan),
         )
 
     if not (project.design_md).exists():

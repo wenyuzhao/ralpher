@@ -27,6 +27,25 @@ The original plan is in two files. Read both before making any changes:
 - The task list: `{{ tasks_path }}`
 
 The task list is TOML. Each task has an `id`, `title`, `description`, `acceptance_criteria`, and a `passes` flag recording whether it has already been implemented and verified.
+{%- if completed_tasks %}
+
+---
+
+## Already-Completed Tasks — Frozen
+
+These tasks have `passes = true`: they are already implemented, verified, and committed to the repo.
+{% for task in completed_tasks %}
+- `{{ task.id }}` — {{ task.title }}
+{%- endfor %}
+
+They are **frozen**. The new task list you return MUST contain every one of them exactly as it appears in the original task list: same `id`, same `title`, same `description`, same `acceptance_criteria`, and in the same relative order. Do not edit, reword, split, merge, renumber, reorder, or drop them. A plan that changes any of them is rejected and handed straight back to you.
+
+Re-plan **only** the tasks that have not passed yet. Those you may freely rewrite, add to, reorder, or delete.
+
+If the refinement changes something a completed task already built, do **not** edit that task. Add a **new** task — placed after the completed ones — that adjusts or re-implements the affected code, written as a change to code that already exists rather than as a fresh implementation.
+
+Because the completed tasks keep their ids and the list must stay numbered `T-001`, `T-002`, … in order, keep them at the front of the list, in their original order, and number everything that follows on from them.
+{%- endif %}
 
 ---
 
@@ -78,7 +97,17 @@ Strictly follow the user's instructions, and don't change unrelated parts.
 
 You may need to add, update, remove, or reorder tasks to fit the new plan.
 
-**Keeping task IDs stable matters.** A task that already has `passes = true` in the original task list has been implemented and verified. Keep its `id` unchanged if the work it describes still stands, so it is not implemented a second time. Give a genuinely new task the next unused ID, and change an existing task's ID only when its work has changed enough that it must be redone.
+**Keeping task IDs stable matters.** A task that already has `passes = true` in the original task list has been implemented and verified. Keep its `id` unchanged, so it is not implemented a second time.
+
+**The ids must still be sequential when you are done.** Whatever you add, remove, or reorder, the list you return must be numbered `T-001`, `T-002`, `T-003`, … in order, with no gaps — so after adding or dropping tasks, renumber the not-yet-passed ones to close up the sequence, and give new tasks the ids that follow the last one you kept.
+{%- if completed_tasks %}
+
+**The completed tasks listed above are frozen.** Carry each of them into the new task list verbatim, and re-plan only the tasks that have not passed. Never fold new work into a completed task; new work always goes into a new task.
+
+**The design document must describe the intended final state — including where that differs from what is already built.** You may change the design of something a completed task implemented; the design document is the durable reference, not a record of what was done. But whenever you do, the difference must be covered by a new, not-yet-passed task. A design change to already-implemented code with no task planning its re-implementation will never be built, and the repo will silently disagree with the design document.
+
+Before you finish, walk the design document section by section and ask, for each part that a completed task already built: did I change it? If so, is there a new task that re-implements it? Every changed part needs one.
+{%- endif %}
 
 You can do step-2 multiple times to ask more questions before making the plan.
 
@@ -100,7 +129,13 @@ Before outputing the new plan:
 - [ ] Incorporated the user's instructions
 - [ ] (Optional) Asked clarifying questions and incorporated user's answers
 - [ ] Did not change unrelated parts of the plan
+{%- if completed_tasks %}
+- [ ] Returned every already-completed task verbatim: {% for task in completed_tasks %}`{{ task.id }}`{{ ", " if not loop.last }}{% endfor %}
+- [ ] Re-planned only the tasks that have not passed
+- [ ] Every design change to already-implemented code is covered by a new, not-yet-passed task
+{%- else %}
 - [ ] Kept the IDs of already-passing tasks whose work is unchanged
+{%- endif %}
 - [ ] The design document follows the required structure and includes all required sections
 - [ ] The design document contains no task list, task IDs, or work breakdown
 - [ ] Output: Use the structured output tool to return `{"plan_or_questions": {"markdown": "...", "tasks": [...]}}` containing the complete design document markdown and the full task list (or `{"plan_or_questions": {"questions": [...]}}` if asking questions). Do NOT write to any files or create any artifacts.

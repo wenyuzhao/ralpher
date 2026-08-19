@@ -18,18 +18,26 @@ import abc
 import asyncio
 import json
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, ClassVar, overload
 
+import rich
 from pydantic import BaseModel
 
 from ralpher.models import BackendKind, Project, Settings
 from ralpher.utils.error import fail
 from ralpher.utils.spinner import Spinner
 
-from .common import Plan, PlanOrQuestions, ask_user_questions
+from .common import (
+    Plan,
+    PlanOnly,
+    PlanOrQuestions,
+    ask_user_questions,
+    check_task_ids,
+)
 
 # A single JSONL record can carry a whole assistant message, which is routinely
 # larger than asyncio's 64 KiB default line limit — hence a generous one here.
@@ -38,6 +46,11 @@ STREAM_LINE_LIMIT = 32 * 1024 * 1024
 # Placeholder written to the log in place of the prompt argv element, which is
 # already logged in full on the log's first line.
 _PROMPT_PLACEHOLDER = "<prompt>"
+
+# How many times a plan rejected by the caller's `validate` hook is handed back
+# to the agent to fix before the run gives up. Each retry costs a full turn, so
+# keep this small.
+MAX_PLAN_CORRECTIONS = 4
 
 
 @dataclass(frozen=True)
@@ -178,7 +191,12 @@ class Backend(abc.ABC):
         return schema.model_validate(result.structured_output)
 
     async def run_plan_mode(
-        self, *, kind: str, prompt: str, model: str | None = None
+        self,
+        *,
+        kind: str,
+        prompt: str,
+        model: str | None = None,
+        validate: Callable[[Plan], str | None] | None = None,
     ) -> None:
         """Run a Q&A loop until the agent returns a plan, then write it out.
 
@@ -190,20 +208,35 @@ class Backend(abc.ABC):
         clarification questions to put to the user. Answers are fed back as the
         next turn's prompt on the same conversation (the backend's `--resume` /
         `--conversation` handle), so the agent keeps its context.
+
+        Two checks stand between a returned plan and the files. `check_task_ids`
+        always runs: a plan's ids must be `T-001`, `T-002`, … in list order, and
+        there may be at most `MAX_TASKS` of them. `validate` is the caller's own
+        check on top of that (refine uses it to freeze the tasks that already
+        passed). Either one returning a message rejects the plan, and that
+        message becomes the next turn's prompt so the agent can correct itself
+        with its context intact — both messages together when both fire. After
+        `MAX_PLAN_CORRECTIONS` rejections the run fails with it instead —
+        nothing is written for a plan that never validated. A correction turn is
+        given the narrower `PlanOnly` schema: it is answering a rejection of its
+        own output, so its only move is to return a fixed plan, never to put a
+        question to the user.
         """
         log_file = self._start_log(kind, prompt)
         model_name, effort = self._resolve_model(kind, model)
         schema = PlanOrQuestions.model_json_schema()
+        correction_schema = PlanOnly.model_json_schema()
 
         session_id: str | None = None
         current_prompt = prompt
+        corrections = 0
 
         while True:
             argv = self.build_command(
                 prompt=current_prompt,
                 model=model_name,
                 effort=effort,
-                schema=schema,
+                schema=correction_schema if corrections else schema,
                 readonly=True,
                 tools=None,
                 session_id=session_id,
@@ -218,9 +251,32 @@ class Backend(abc.ABC):
             output = PlanOrQuestions.model_validate(result.structured_output)
             if isinstance(output.plan_or_questions, Plan):
                 plan = output.plan_or_questions
-                self.project.design_md.write_text(plan.markdown)
-                self.project.save_planned_tasks(plan.tasks)
-                return
+                # Both checks run on every plan, and their complaints are sent
+                # back together: fixing one can break the other (renumbering vs.
+                # refine's frozen ids), so the agent needs to see both at once.
+                problems = [
+                    message
+                    for message in (
+                        check_task_ids(plan),
+                        validate(plan) if validate else None,
+                    )
+                    if message
+                ]
+                if not problems:
+                    self.project.design_md.write_text(plan.markdown)
+                    self.project.save_planned_tasks(plan.tasks)
+                    return
+                problem = "\n\n".join(problems)
+                _append_log(log_file, {"rejected_plan": problem})
+                corrections += 1
+                if corrections > MAX_PLAN_CORRECTIONS:
+                    fail(problem)
+                rich.print(
+                    f"[yellow]The returned plan was rejected; asking the agent to fix it "
+                    f"({corrections}/{MAX_PLAN_CORRECTIONS}).[/]"
+                )
+                current_prompt = problem
+                continue
 
             current_prompt = await ask_user_questions(output.plan_or_questions)
             _append_log(log_file, {"answers": current_prompt})
