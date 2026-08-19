@@ -1,15 +1,30 @@
 import json
+import shutil
 
 import pytest
 from pydantic import ValidationError
 
 from ralpher.models import (
-    DEFAULT_BACKEND,
     Project,
     Settings,
+    detect_default_backend,
     normalize_backend,
     resolve_backend,
 )
+
+
+@pytest.fixture
+def installed(monkeypatch):
+    """Pretend exactly the named CLIs are on PATH, for backend auto-detection."""
+
+    def _installed(*executables: str):
+        monkeypatch.setattr(
+            shutil,
+            "which",
+            lambda name, *a, **kw: f"/usr/bin/{name}" if name in executables else None,
+        )
+
+    return _installed
 
 
 class TestNormalizeBackend:
@@ -34,10 +49,30 @@ class TestNormalizeBackend:
             normalize_backend("gemini")
 
 
+class TestDetectDefaultBackend:
+    def test_prefers_claude_code_when_both_installed(self, installed):
+        installed("claude", "agy")
+        assert detect_default_backend() == "claude-code"
+
+    def test_antigravity_when_only_agy_installed(self, installed):
+        installed("agy")
+        assert detect_default_backend() == "antigravity"
+
+    def test_claude_code_when_only_claude_installed(self, installed):
+        installed("claude")
+        assert detect_default_backend() == "claude-code"
+
+    def test_falls_back_to_claude_code_when_neither_installed(self, installed):
+        installed()
+        assert detect_default_backend() == "claude-code"
+
+
 class TestSettingsBackend:
-    def test_default_is_claude_code(self):
+    def test_default_is_the_detected_backend(self, installed):
+        installed("agy")
+        assert Settings().backend == "antigravity"
+        installed("claude", "agy")
         assert Settings().backend == "claude-code"
-        assert DEFAULT_BACKEND == "claude-code"
 
     def test_reads_backend_from_settings_json(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -58,7 +93,8 @@ class TestSettingsBackend:
         with pytest.raises(ValidationError):
             Settings.model_validate({"backend": "nope"})
 
-    def test_defaults_when_key_missing(self, tmp_path, monkeypatch):
+    def test_defaults_when_key_missing(self, tmp_path, monkeypatch, installed):
+        installed("claude", "agy")
         monkeypatch.chdir(tmp_path)
         ralpher = tmp_path / ".ralpher"
         ralpher.mkdir()
@@ -82,9 +118,12 @@ class TestResolveBackend:
         (ralpher / "settings.json").write_text(json.dumps({"backend": "agy"}))
         assert resolve_backend(None) == "antigravity"
 
-    def test_defaults_to_claude_code(self, tmp_path, monkeypatch):
+    def test_defaults_to_detected_backend(self, tmp_path, monkeypatch, installed):
         monkeypatch.chdir(tmp_path)
+        installed("claude", "agy")
         assert resolve_backend(None) == "claude-code"
+        installed("agy")
+        assert resolve_backend(None) == "antigravity"
 
     def test_cli_alias_normalized(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -97,7 +136,8 @@ class TestResolveBackend:
 
 
 class TestProjectBackend:
-    def test_default_backend(self):
+    def test_default_backend(self, installed):
+        installed("claude", "agy")
         assert Project(id="x").backend == "claude-code"
 
     def test_explicit_backend(self):

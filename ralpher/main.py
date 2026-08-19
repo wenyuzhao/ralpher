@@ -63,7 +63,8 @@ BackendOption = Annotated[
         "-b",
         help=(
             "Coding agent backend: claude-code (cc) or antigravity (agy). "
-            "Defaults to the 'backend' key in .ralpher/settings.json, else claude-code."
+            "Defaults to the 'backend' key in .ralpher/settings.json, else "
+            "whichever CLI is installed (claude, else agy)."
         ),
     ),
 ]

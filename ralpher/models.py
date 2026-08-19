@@ -1,4 +1,5 @@
 import json
+import shutil
 from pathlib import Path
 from typing import Literal
 
@@ -32,7 +33,27 @@ _BACKEND_ALIASES: dict[str, BackendKind] = {
     "agy": "antigravity",
 }
 
-DEFAULT_BACKEND: BackendKind = "claude-code"
+# Order in which backends are auto-detected when neither --backend nor the
+# settings.json `backend` key says otherwise: the first one whose CLI is on
+# PATH wins, and the first entry is also the fallback when none is installed
+# (so the resulting `check_prerequisites` error names the preferred CLI).
+_BACKEND_PREFERENCE: tuple[BackendKind, ...] = ("claude-code", "antigravity")
+
+
+def detect_default_backend() -> BackendKind:
+    """The default backend for this machine: the first installed CLI, in preference order.
+
+    Looks each backend's executable up on PATH (``claude``, then ``agy``) via the
+    backend registry, so the executable name stays owned by the backend class.
+    Falls back to the first preference when neither CLI is installed.
+    """
+    # Imported lazily: ralpher.backend imports this module.
+    from ralpher.backend import BACKENDS
+
+    for kind in _BACKEND_PREFERENCE:
+        if shutil.which(BACKENDS[kind].executable):
+            return kind
+    return _BACKEND_PREFERENCE[0]
 
 
 def normalize_backend(value: str) -> BackendKind:
@@ -53,10 +74,11 @@ class Settings(BaseModel):
     # overriding whichever backend is active and its `default_models`. A pin may
     # carry a ``:<level>`` reasoning-effort suffix; see `Backend.split_effort`.
     models: dict[str, str] = {}
-    # Default coding-agent backend for this checkout. Overridden per run by the
-    # ``--backend`` CLI flag. Accepts aliases (e.g. "cc", "agy") via the
+    # Default coding-agent backend for this checkout. Unset, it is detected from
+    # which CLI is installed (see `detect_default_backend`). Overridden per run
+    # by the ``--backend`` CLI flag. Accepts aliases (e.g. "cc", "agy") via the
     # validator below, which stores the canonical BackendKind.
-    backend: BackendKind = DEFAULT_BACKEND
+    backend: BackendKind = Field(default_factory=detect_default_backend)
     # Run the agent's shell tool in an OS sandbox: for claude-code so the
     # read-only .ralpher deny rule is enforced against shell writes too, for
     # antigravity as `agy --sandbox`. Enabled by default; the loop's
@@ -184,7 +206,7 @@ class Project(BaseModel):
     # Coding-agent backend for this run. Resolved once by each command (CLI
     # --backend flag, else Settings.backend) and read by run_agent /
     # run_agent_plan_mode to dispatch to the right SDK.
-    backend: BackendKind = DEFAULT_BACKEND
+    backend: BackendKind = Field(default_factory=detect_default_backend)
     # Whether the agent subprocess runs with OS-level shell sandboxing for this
     # run. Resolved once by the loop command (CLI flag, else Settings.sandbox)
     # and read by the backend when building its argv.
