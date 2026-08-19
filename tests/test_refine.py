@@ -13,21 +13,21 @@ def _write_config(project: Project) -> None:
     project.save_config(config)
 
 
-def _task(task_id: str, *, passes: bool = False, title: str = "Login") -> Task:
+def _task(task_id: str, *, passed: bool = False, title: str = "Login") -> Task:
     return Task(
         id=task_id,
         title=title,
         description=f"Do {task_id}",
         acceptance_criteria=["Tests pass"],
-        passes=passes,
+        passed=passed,
     )
 
 
 def _plan(*tasks: Task) -> Plan:
-    """The plan an agent would return for `tasks` (no `passes` in plan output)."""
+    """The plan an agent would return for `tasks` (no `passed` in plan output)."""
     return Plan(
         markdown="# Design",
-        tasks=[PlannedTask(**t.model_dump(exclude={"passes"})) for t in tasks],
+        tasks=[PlannedTask(**t.model_dump(exclude={"passed"})) for t in tasks],
     )
 
 
@@ -106,7 +106,7 @@ class TestRefinePlan:
 
 class TestCheckCompletedTasks:
     def test_accepts_completed_tasks_returned_verbatim(self):
-        done = _task("T-001", passes=True)
+        done = _task("T-001", passed=True)
         plan = _plan(done, _task("T-002"), _task("T-003"))
         assert check_completed_tasks([done], plan) is None
 
@@ -114,7 +114,7 @@ class TestCheckCompletedTasks:
         assert check_completed_tasks([], _plan(_task("T-009"))) is None
 
     def test_accepts_reordered_and_rewritten_pending_tasks(self):
-        done = _task("T-001", passes=True)
+        done = _task("T-001", passed=True)
         rewritten = Task(
             id="T-002",
             title="Totally different",
@@ -124,14 +124,14 @@ class TestCheckCompletedTasks:
         assert check_completed_tasks([done], _plan(rewritten, done)) is None
 
     def test_rejects_a_dropped_completed_task(self):
-        done = _task("T-001", passes=True)
+        done = _task("T-001", passed=True)
         problem = check_completed_tasks([done], _plan(_task("T-002")))
         assert problem is not None
         assert "T-001" in problem
         assert "missing" in problem
 
     def test_rejects_a_renumbered_completed_task(self):
-        done = _task("T-001", passes=True)
+        done = _task("T-001", passed=True)
         renumbered = _task("T-007", title=done.title)
         problem = check_completed_tasks([done], _plan(renumbered))
         assert problem is not None
@@ -146,15 +146,15 @@ class TestCheckCompletedTasks:
         ],
     )
     def test_rejects_an_edited_completed_task(self, field, value):
-        done = _task("T-001", passes=True)
+        done = _task("T-001", passed=True)
         edited = done.model_copy(update={field: value})
         problem = check_completed_tasks([done], _plan(edited))
         assert problem is not None
         assert field in problem
 
     def test_reports_every_offending_task(self):
-        first = _task("T-001", passes=True)
-        second = _task("T-002", passes=True, title="Signup")
+        first = _task("T-001", passed=True)
+        second = _task("T-002", passed=True, title="Signup")
         problem = check_completed_tasks([first, second], _plan())
         assert problem is not None
         assert "T-001" in problem
@@ -175,8 +175,8 @@ class TestRefinePlanWithCompletedTasks:
         project.save_tasks(
             Tasks(
                 tasks=[
-                    _task("T-001", passes=True),
-                    _task("T-002", passes=True, title="Signup"),
+                    _task("T-001", passed=True),
+                    _task("T-002", passed=True, title="Signup"),
                     _task("T-003"),
                 ]
             )
@@ -208,7 +208,7 @@ class TestRefinePlanWithCompletedTasks:
         project = Project(id="refine-validate")
         project.project_dir.mkdir(parents=True)
         project.design_md.write_text("# Design")
-        done = _task("T-001", passes=True)
+        done = _task("T-001", passed=True)
         project.save_tasks(Tasks(tasks=[done, _task("T-002")]))
         _write_config(project)
 

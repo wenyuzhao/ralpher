@@ -56,7 +56,7 @@ class Hooks:
         task = tasks.get_task_by_id(task_id)
         label = f"Iteration {index} / {self.project.max_iterations}"
         if task:
-            result = "PASSED" if task.passes else "FAILED"
+            result = "PASSED" if task.passed else "FAILED"
             label += f": *{task.id}* - {task.title} ({result})"
         self.status = Status(status="running", label=label, active_task=None)
         await self.update()

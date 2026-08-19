@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Literal
 
 import tomli_w
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator
 
 
 def ralpher_root() -> Path:
@@ -142,7 +142,7 @@ class PlannedTask(BaseModel):
 
     Carries no run state: whether a task has passed is ralpher's bookkeeping,
     not something the planner gets to assert. Keeping it off this model also
-    keeps `passes` out of the JSON schema the planning agent is given.
+    keeps `passed` out of the JSON schema the planning agent is given.
     """
 
     id: str = Field(
@@ -161,14 +161,19 @@ class PlannedTask(BaseModel):
 
 
 class Task(PlannedTask):
-    passes: bool = False
+    # A record of a past verification, not a live property: the verifier ran
+    # once, on one commit, and said yes. The `passes` alias reads task lists
+    # written before the field was renamed.
+    passed: bool = Field(
+        default=False, validation_alias=AliasChoices("passed", "passes")
+    )
 
 
 class Tasks(BaseModel):
     tasks: list[Task]
 
     def failed_tasks(self) -> list[Task]:
-        return [t for t in self.tasks if not t.passes]
+        return [t for t in self.tasks if not t.passed]
 
     def get_task_by_id(self, task_id: str) -> Task | None:
         for t in self.tasks:
@@ -182,16 +187,16 @@ class Tasks(BaseModel):
         A derived view of `tasks.toml`, rewritten from scratch on every save —
         nothing ever reads it back, so it carries no state the TOML doesn't.
         """
-        done = sum(1 for t in self.tasks if t.passes)
+        done = sum(1 for t in self.tasks if t.passed)
         lines = ["# Tasks", "", f"{done} of {len(self.tasks)} complete.", ""]
         for t in self.tasks:
-            lines.append(f"- [{'x' if t.passes else ' '}] **{t.id}** — {t.title}")
+            lines.append(f"- [{'x' if t.passed else ' '}] **{t.id}** — {t.title}")
         for t in self.tasks:
             lines += [
                 "",
                 f"## {t.id} — {t.title}",
                 "",
-                f"**Status:** {'✅ passed' if t.passes else '⬜ pending'}",
+                f"**Status:** {'✅ passed' if t.passed else '⬜ pending'}",
                 "",
                 t.description,
                 "",
@@ -346,12 +351,12 @@ class Project(BaseModel):
         """
         existing = self.load_tasks()
         already_passed = (
-            {t.id for t in existing.tasks if t.passes} if existing else set()
+            {t.id for t in existing.tasks if t.passed} if existing else set()
         )
         self.save_tasks(
             Tasks(
                 tasks=[
-                    Task(**t.model_dump(), passes=t.id in already_passed)
+                    Task(**t.model_dump(), passed=t.id in already_passed)
                     for t in planned
                 ]
             )
@@ -364,7 +369,7 @@ class Project(BaseModel):
 
     def save_current_task(self, task: Task) -> None:
         self.current_task_toml.write_text(
-            tomli_w.dumps(task.model_dump(exclude={"passes"}))
+            tomli_w.dumps(task.model_dump(exclude={"passed"}))
         )
 
     def remove_current_task(self) -> None:

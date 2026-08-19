@@ -16,7 +16,7 @@ class TestTask:
             description="User can log in",
             acceptance_criteria=["Can enter email"],
         )
-        assert task.passes is False
+        assert task.passed is False
 
     def test_all_fields(self):
         task = Task(
@@ -24,9 +24,30 @@ class TestTask:
             title="Signup",
             description="User can sign up",
             acceptance_criteria=["Email", "Password"],
-            passes=True,
+            passed=True,
         )
-        assert task.passes is True
+        assert task.passed is True
+
+    def test_reads_the_legacy_passes_field(self):
+        """A tasks.toml written before `passes` was renamed still loads."""
+        task = Task.model_validate(
+            {
+                "id": "T-003",
+                "title": "Logout",
+                "description": "User can log out",
+                "acceptance_criteria": [],
+                "passes": True,
+            }
+        )
+        assert task.passed is True
+        # It is written back out under the new name only.
+        assert task.model_dump() == {
+            "id": "T-003",
+            "title": "Logout",
+            "description": "User can log out",
+            "acceptance_criteria": [],
+            "passed": True,
+        }
 
 
 class TestTasks:
@@ -39,7 +60,7 @@ class TestTasks:
                 title=f"Task {i}",
                 description=f"Desc {i}",
                 acceptance_criteria=[],
-                passes=p,
+                passed=p,
             )
             for i, p in enumerate(tasks_pass)
         ]
@@ -49,7 +70,7 @@ class TestTasks:
         tasks = self._make_tasks([True, False, True, False])
         failed = tasks.failed_tasks()
         assert len(failed) == 2
-        assert all(not t.passes for t in failed)
+        assert all(not t.passed for t in failed)
 
     def test_failed_tasks_all_pass(self):
         tasks = self._make_tasks([True, True, True])
@@ -72,7 +93,7 @@ class TestTasks:
         }
         tasks = Tasks.model_validate(data)
         assert len(tasks.tasks) == 1
-        assert tasks.tasks[0].passes is False
+        assert tasks.tasks[0].passed is False
 
 
 class TestTasksMarkdown:
@@ -84,7 +105,7 @@ class TestTasksMarkdown:
                     title="Login",
                     description="User can log in",
                     acceptance_criteria=["Can enter email", "Session persists"],
-                    passes=True,
+                    passed=True,
                 ),
                 Task(
                     id="T-002",
@@ -127,7 +148,7 @@ class TestTasksMarkdown:
         project.save_tasks(self._tasks())
 
         tasks = self._tasks()
-        tasks.tasks[1].passes = True
+        tasks.tasks[1].passed = True
         project.save_tasks(tasks)
 
         md = project.tasks_md.read_text()

@@ -20,7 +20,7 @@ from ..utils.error import fail
 console = Console()
 
 # Task fields a completed task must bring back unchanged. `id` is matched
-# separately (it is the key), and `passes` is ralpher's own bookkeeping — the
+# separately (it is the key), and `passed` is ralpher's own bookkeeping — the
 # planning agent never sees or returns it.
 _FROZEN_FIELDS = ("title", "description", "acceptance_criteria")
 
@@ -32,7 +32,7 @@ def check_completed_tasks(completed: list[Task], plan: Plan) -> str | None:
     are frozen: only the not-yet-passed ones may be re-planned. A completed task
     that comes back edited (or does not come back at all) either loses work
     already in the repo or gets implemented a second time — `save_planned_tasks`
-    only carries `passes` across for an id that survived, so a renumbered task
+    only carries `passed` across for an id that survived, so a renumbered task
     silently reverts to pending.
 
     The message is written as an instruction to the agent: `run_plan_mode` feeds
@@ -111,7 +111,7 @@ async def refine_plan(*, project: Project, prompt: str | None) -> str | None:
     # Tasks that already passed are off limits to this refinement: the agent is
     # told to return them verbatim, and the plan is rejected if it doesn't.
     tasks = project.load_tasks()
-    completed = [t for t in tasks.tasks if t.passes] if tasks else []
+    completed = [t for t in tasks.tasks if t.passed] if tasks else []
     if completed:
         rich.print(
             f"[bold blue]{len(completed)} task(s) already completed; "

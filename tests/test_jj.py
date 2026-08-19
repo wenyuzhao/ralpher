@@ -161,7 +161,7 @@ class TestIteratePassesJj:
                             "title": "Do the thing",
                             "description": "…",
                             "acceptance_criteria": ["it works"],
-                            "passes": False,
+                            "passed": False,
                         }
                     ]
                 }

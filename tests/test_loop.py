@@ -19,7 +19,7 @@ def _make_tasks_data(tasks: list[dict] | None = None) -> dict:
                 "title": "Login",
                 "description": "User can log in",
                 "acceptance_criteria": ["AC1"],
-                "passes": False,
+                "passed": False,
             }
         ]
     return {"tasks": tasks}
@@ -106,7 +106,7 @@ class TestIterate:
 
         with project.tasks_toml.open("rb") as f:
             updated = Tasks.model_validate(tomllib.load(f))
-        assert updated.tasks[0].passes is True
+        assert updated.tasks[0].passed is True
 
         # The implementer never touches progress.md; ralpher records its report.
         assert "did the thing" in project.progress_md.read_text()
@@ -319,7 +319,7 @@ class TestLoop:
                     "title": "Done",
                     "description": "Already done",
                     "acceptance_criteria": [],
-                    "passes": True,
+                    "passed": True,
                 }
             ]
         )

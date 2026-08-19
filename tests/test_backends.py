@@ -649,7 +649,7 @@ class TestRunPlanMode:
         tasks = backend.project.load_tasks()
         assert tasks is not None
         assert [t.id for t in tasks.tasks] == ["T-001"]
-        assert tasks.tasks[0].passes is False
+        assert tasks.tasks[0].passed is False
 
     @pytest.mark.asyncio
     async def test_keeps_pass_state_of_surviving_tasks(self, stub):
@@ -672,7 +672,7 @@ class TestRunPlanMode:
                         title="Login",
                         description="User can log in",
                         acceptance_criteria=["AC1"],
-                        passes=True,
+                        passed=True,
                     )
                 ]
             )
@@ -680,7 +680,7 @@ class TestRunPlanMode:
         await backend.run_plan_mode(kind="plan", prompt="go")
         tasks = backend.project.load_tasks()
         assert tasks is not None
-        assert [(t.id, t.passes) for t in tasks.tasks] == [
+        assert [(t.id, t.passed) for t in tasks.tasks] == [
             ("T-001", True),
             ("T-002", False),
         ]

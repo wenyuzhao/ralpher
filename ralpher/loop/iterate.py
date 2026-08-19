@@ -149,7 +149,7 @@ async def iterate(project: Project, hooks: HooksManager) -> None:
         # Update the corresponding task in tasks.toml
         for t in tasks.tasks:
             if t.id == task.id:
-                t.passes = True
+                t.passed = True
                 break
         project.save_tasks(tasks)
 

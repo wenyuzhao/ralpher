@@ -26,14 +26,14 @@ The original plan is in two files. Read both before making any changes:
 - The design document: `{{ design_path }}`
 - The task list: `{{ tasks_path }}`
 
-The task list is TOML. Each task has an `id`, `title`, `description`, `acceptance_criteria`, and a `passes` flag recording whether it has already been implemented and verified.
+The task list is TOML. Each task has an `id`, `title`, `description`, `acceptance_criteria`, and a `passed` flag recording whether it has already been implemented and verified.
 {%- if completed_tasks %}
 
 ---
 
 ## Already-Completed Tasks — Frozen
 
-These tasks have `passes = true`: they are already implemented, verified, and committed to the repo.
+These tasks have `passed = true`: they are already implemented, verified, and committed to the repo.
 {% for task in completed_tasks %}
 - `{{ task.id }}` — {{ task.title }}
 {%- endfor %}
@@ -97,7 +97,7 @@ Strictly follow the user's instructions, and don't change unrelated parts.
 
 You may need to add, update, remove, or reorder tasks to fit the new plan.
 
-**Keeping task IDs stable matters.** A task that already has `passes = true` in the original task list has been implemented and verified. Keep its `id` unchanged, so it is not implemented a second time.
+**Keeping task IDs stable matters.** A task that already has `passed = true` in the original task list has been implemented and verified. Keep its `id` unchanged, so it is not implemented a second time.
 
 **The ids must still be sequential when you are done.** Whatever you add, remove, or reorder, the list you return must be numbered `T-001`, `T-002`, `T-003`, … in order, with no gaps — so after adding or dropping tasks, renumber the not-yet-passed ones to close up the sequence, and give new tasks the ids that follow the last one you kept.
 {%- if completed_tasks %}
@@ -117,7 +117,7 @@ You can do step-2 multiple times to ask more questions before making the plan.
 - The structured output must be an object containing `plan_or_questions` formatted as a `Plan` object: `{"plan_or_questions": {"markdown": "<full markdown content of the design document>", "tasks": [{"id": "T-001", "title": "...", "description": "...", "acceptance_criteria": ["..."]}, ...]}}`.
 - Do NOT put a summary, message, or file path in `markdown` -- it must contain the entire, complete markdown text of the design document.
 - The design document in `markdown` must NOT contain the task list. Tasks go in `tasks` and nowhere else.
-- Do NOT include a `passes` field on a task; that is tracked outside the plan.
+- Do NOT include a `passed` field on a task; that is tracked outside the plan.
 
 ---
 
