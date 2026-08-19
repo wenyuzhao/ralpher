@@ -28,6 +28,10 @@ Read the user-provided feature description from the file `{{ prompt_path }}` bef
 ## Step 1: Review the current repo
 
 The repo has been checked out to ther target branch of this project for you. Carefully review the current repo and understand the context before making a plan.
+{%- if jj %}
+
+This repository is managed with [Jujutsu](https://jj-vcs.github.io/jj/): inspect its history with `jj log` / `jj diff` / `jj show` rather than `git`, and write the plan for an implementer that commits with `jj`, not `git`.
+{%- endif %}
 
 ---
 

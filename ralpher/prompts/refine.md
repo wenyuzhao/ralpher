@@ -34,6 +34,10 @@ The user's refinement instruction is in the file `{{ input_path }}`. Read it.
 ## Step 1: Review the current repo and the original Project Plan
 
 The repo has been checked out to ther target branch of this project for you. Carefully review the current repo and understand the context.
+{%- if jj %}
+
+This repository is managed with [Jujutsu](https://jj-vcs.github.io/jj/): inspect its history with `jj log` / `jj diff` / `jj show` rather than `git`, and write the plan for an implementer that commits with `jj`, not `git`.
+{%- endif %}
 
 The original Project Plan is provided above. Review it carefully, and understand the current plan before making any changes.
 

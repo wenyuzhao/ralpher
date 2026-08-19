@@ -73,6 +73,7 @@ async def refine_plan(*, project: Project, prompt: str | None) -> str | None:
                 "refine",
                 plan_path=str(project.plan_md),
                 input_path=str(tmp_path),
+                jj=project.jj,
             ),
             project=project,
         )

@@ -49,6 +49,24 @@ ralpher loop -b agy
 
 The `--backend` flag wins over the `backend` key in `settings.json`, which in turn beats the `claude-code` default. Run `claude` or `agy` once to sign in before pointing ralpher at it; `agy models` lists the model names the antigravity backend accepts.
 
+## Jujutsu (`jj`)
+
+If your repo is managed with [Jujutsu](https://jj-vcs.github.io/jj/), pass `--jj` so the agent commits with `jj` instead of `git`:
+
+```bash
+ralpher plan "Create a TODO app" --name todo-app --jj
+ralpher loop --jj
+```
+
+```jsonc
+// .ralpher/settings.json — make it the default for this checkout
+{
+  "jj": true
+}
+```
+
+The flag only changes what the agent is told: it commits with `jj commit`, inspects history with `jj log` / `jj diff` / `jj show`, and leaves bookmarks alone. Ralpher still creates and checks out the `ralph/{project_id}` branch with `git`, so the workspace must be **colocated** (`jj git init --colocate`) — `--jj` fails fast with an explanation if it isn't. `--no-jj` overrides the settings key for a single run.
+
 ## How it works
 
 1. **Plan generation** -- Sends your prompt to Claude to produce a structured Project Plan with tasks, saved to `.ralpher/projects/{project_id}/PLAN.md`.

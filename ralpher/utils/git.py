@@ -1,3 +1,4 @@
+import shutil
 import subprocess
 from pathlib import Path
 from subprocess import DEVNULL
@@ -106,6 +107,41 @@ def checkout_branch(target_branch: str, base_branch: str) -> None:
 
     if ret != 0:
         fail(f"Failed to checkout branch '{target_branch}' from '{base_branch}'.")
+
+
+def jj_root() -> str | None:
+    """Return the root of the jj workspace containing CWD, or None if there is none."""
+    try:
+        return subprocess.check_output(["jj", "root"], stderr=DEVNULL).decode().strip()
+    except subprocess.CalledProcessError, OSError:
+        return None
+
+
+def check_jj_prerequisites() -> None:
+    """Exit with an error unless `--jj` can actually work in this checkout.
+
+    Only the *agent* is switched to `jj`; ralpher keeps doing its own branch
+    bookkeeping with `git` (see `checkout_branch`). So the workspace has to be
+    colocated — in a jj-only repo there is no `.git` at the root and
+    `_ensure_repo` would happily `git init` a second, empty repository inside
+    it.
+    """
+    if not shutil.which("jj"):
+        fail(
+            "'jj' CLI not found on PATH. Install Jujutsu (https://jj-vcs.github.io/jj/), "
+            "or drop --jj to let the agent use git."
+        )
+
+    root = jj_root()
+    if root is None:
+        fail("--jj was given but the current directory is not inside a jj repository.")
+
+    if not (Path(root) / ".git").exists():
+        fail(
+            f"The jj repository at '{root}' is not colocated with git, and ralpher "
+            "manages its own branches with git. Re-create it with "
+            "[i]jj git init --colocate[/], or drop --jj."
+        )
 
 
 def resolve_default_base_branch() -> str:

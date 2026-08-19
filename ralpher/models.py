@@ -62,6 +62,9 @@ class Settings(BaseModel):
     # antigravity as `agy --sandbox`. Enabled by default; the loop's
     # --sandbox/--no-sandbox flag overrides this per run.
     sandbox: bool = True
+    # This checkout is managed with Jujutsu: the agent is told to drive `jj`
+    # rather than `git`. Overridden per run by the --jj/--no-jj flag.
+    jj: bool = False
 
     @field_validator("backend", mode="before")
     @classmethod
@@ -86,6 +89,16 @@ def resolve_backend(cli_backend: str | None) -> BackendKind:
     if cli_backend is not None:
         return normalize_backend(cli_backend)
     return Settings.load().backend
+
+
+def resolve_jj(cli_jj: bool | None) -> bool:
+    """Resolve the VCS for a run: the ``--jj/--no-jj`` flag wins, else settings.json.
+
+    Mirrors how ``--sandbox`` falls back to ``Settings.sandbox``.
+    """
+    if cli_jj is not None:
+        return cli_jj
+    return Settings.load().jj
 
 
 class Task(BaseModel):
@@ -168,6 +181,12 @@ class Project(BaseModel):
     # run. Resolved once by the loop command (CLI flag, else Settings.sandbox)
     # and read by the backend when building its argv.
     sandbox: bool = False
+    # Whether the agent is told to use Jujutsu (`jj`) instead of `git` for this
+    # run. Resolved once by each command (CLI --jj/--no-jj flag, else
+    # Settings.jj) and rendered into the prompts as the `jj` template variable.
+    # Ralpher's own branch bookkeeping stays on git either way, which is why a
+    # jj run must be colocated (see `check_jj_prerequisites`).
+    jj: bool = False
 
     @property
     def ralpher_dir(self) -> Path:

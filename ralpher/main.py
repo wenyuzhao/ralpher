@@ -12,12 +12,20 @@ from typer.core import TyperGroup
 
 from ralpher.backend import check_prerequisites
 from ralpher.loop import run_ralph_loop
-from ralpher.models import BackendKind, Project, Settings, ralpher_root, resolve_backend
+from ralpher.models import (
+    BackendKind,
+    Project,
+    Settings,
+    ralpher_root,
+    resolve_backend,
+    resolve_jj,
+)
 from ralpher.plan.extract import extract_tasks
 from ralpher.plan.plan import generate_plan
 from ralpher.plan.refine import refine_plan
 
 from .utils.error import fail
+from .utils.git import check_jj_prerequisites
 from .utils.hooks import HooksManager
 from .utils.hooks.notion import update_notion_page
 
@@ -59,6 +67,27 @@ BackendOption = Annotated[
         ),
     ),
 ]
+
+
+JjOption = Annotated[
+    bool | None,
+    typer.Option(
+        "--jj/--no-jj",
+        help=(
+            "Tell the agent this repo is managed with Jujutsu, so it drives 'jj' "
+            "instead of 'git'. Requires a git-colocated jj workspace. Defaults to "
+            "the 'jj' key in .ralpher/settings.json, else off."
+        ),
+    ),
+]
+
+
+def _resolve_jj_or_fail(cli_jj: bool | None) -> bool:
+    """Resolve the VCS (CLI flag, else settings.json), checking jj is usable here."""
+    enabled = resolve_jj(cli_jj)
+    if enabled:
+        check_jj_prerequisites()
+    return enabled
 
 
 class DefaultCommandGroup(TyperGroup):
@@ -105,17 +134,19 @@ def plan(
         ),
     ] = None,
     backend: BackendOption = None,
+    jj: JjOption = None,
 ) -> None:
     """Generate a Project Plan."""
     load_dotenv(find_dotenv(usecwd=True))
     backend_kind = _resolve_backend_or_fail(backend)
     check_prerequisites(backend_kind)
+    jj_enabled = _resolve_jj_or_fail(jj)
     if Path(prompt).is_file():
         prompt = Path(prompt).read_text()
     project_id = _gen_project_id(name)
 
     rich.print(f"[bold blue]Generating plan for new project: [i]{project_id}[/][/]\n")
-    project = Project(id=project_id, backend=backend_kind)
+    project = Project(id=project_id, backend=backend_kind, jj=jj_enabled)
     asyncio.run(
         generate_plan(
             project=project,
@@ -159,6 +190,7 @@ def refine(
         ),
     ] = None,
     backend: BackendOption = None,
+    jj: JjOption = None,
 ) -> None:
     """Refine an existing Project Plan.
 
@@ -169,11 +201,12 @@ def refine(
     load_dotenv(find_dotenv(usecwd=True))
     backend_kind = _resolve_backend_or_fail(backend)
     check_prerequisites(backend_kind)
+    jj_enabled = _resolve_jj_or_fail(jj)
     if not project_id:
         # Default to the latest project if no project_id is provided
         project_id = _get_latest_project_id()
     rich.print(f"[bold blue]Refining plan for project: [i]{project_id}[/][/]\n")
-    project = Project(id=project_id, backend=backend_kind)
+    project = Project(id=project_id, backend=backend_kind, jj=jj_enabled)
     if prompt and Path(prompt).is_file():
         prompt = Path(prompt).read_text()
     result = asyncio.run(refine_plan(project=project, prompt=prompt))
@@ -229,12 +262,14 @@ def loop(
         ),
     ] = None,
     backend: BackendOption = None,
+    jj: JjOption = None,
 ) -> None:
     """Run the coding agent in a loop until tasks are complete or max iterations reached."""
     load_dotenv(find_dotenv(usecwd=True))
 
     backend_kind = _resolve_backend_or_fail(backend)
     check_prerequisites(backend_kind)
+    jj_enabled = _resolve_jj_or_fail(jj)
 
     if not project_id:
         project_id = _get_latest_project_id()
@@ -251,6 +286,7 @@ def loop(
             backend=backend_kind,
             max_iterations=max_iterations if max_iterations > 0 else None,
             sandbox=sandbox_enabled,
+            jj=jj_enabled,
         )
         await hooks.init(project)
         try:

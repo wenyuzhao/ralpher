@@ -19,7 +19,7 @@ async def generate_plan(
 
     await run_agent_plan_mode(
         kind="plan",
-        prompt=render_prompt("plan", prompt_path=str(project.prompt_md)),
+        prompt=render_prompt("plan", prompt_path=str(project.prompt_md), jj=project.jj),
         project=project,
     )
 
