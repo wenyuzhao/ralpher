@@ -75,7 +75,7 @@ class TestAskUserQuestions:
 
 
 class TestGeneratePlan:
-    """`generate_plan` writes both halves of the plan: DESIGN.md and tasks.toml.
+    """`generate_plan` writes both halves of the plan: design.md and tasks.toml.
 
     The agent-side split (structured output → files) lives in the backend's
     plan-mode driver, so it is covered by tests/test_backends.py; here the
@@ -151,7 +151,7 @@ class TestGeneratePlan:
         mock_run.side_effect = self._plan_written(project)
         await generate_plan(project=project, prompt="Implement SSO login")
         call_kwargs = mock_run.call_args[1]
-        # The rendered prompt references the project's PROMPT.md path, which
+        # The rendered prompt references the project's prompt.md path, which
         # embeds the project id, and carries the plan-skill instructions.
         assert task_id in call_kwargs["prompt"]
         assert "Create Project Plan" in call_kwargs["prompt"]

@@ -157,7 +157,7 @@ def plan(
     )
     rich.print(
         f"[green]✔ Plan generated at .ralpher/projects/{project.id}/"
-        "{DESIGN.md,tasks.toml}[/]"
+        "{design.md,tasks.toml,tasks.md}[/]"
     )
     _sync_to_notion(project)
 
@@ -215,7 +215,7 @@ def refine(
         return
     rich.print(
         f"[green]✔ Plan refined at .ralpher/projects/{project_id}/"
-        "{DESIGN.md,tasks.toml}[/]"
+        "{design.md,tasks.toml,tasks.md}[/]"
     )
     _sync_to_notion(project)
 

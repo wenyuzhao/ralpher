@@ -176,6 +176,31 @@ class Tasks(BaseModel):
                 return t
         return None
 
+    def to_markdown(self) -> str:
+        """Render the task list as human-readable markdown.
+
+        A derived view of `tasks.toml`, rewritten from scratch on every save —
+        nothing ever reads it back, so it carries no state the TOML doesn't.
+        """
+        done = sum(1 for t in self.tasks if t.passes)
+        lines = ["# Tasks", "", f"{done} of {len(self.tasks)} complete.", ""]
+        for t in self.tasks:
+            lines.append(f"- [{'x' if t.passes else ' '}] **{t.id}** — {t.title}")
+        for t in self.tasks:
+            lines += [
+                "",
+                f"## {t.id} — {t.title}",
+                "",
+                f"**Status:** {'✅ passed' if t.passes else '⬜ pending'}",
+                "",
+                t.description,
+                "",
+                "**Acceptance criteria:**",
+                "",
+            ]
+            lines += [f"- {c}" for c in t.acceptance_criteria]
+        return "\n".join(lines) + "\n"
+
 
 class Status(BaseModel):
     status: Literal["running", "idle", "error", "completed", "starting"]
@@ -274,11 +299,11 @@ class Project(BaseModel):
 
     @property
     def prompt_md(self) -> Path:
-        return self.project_dir / "PROMPT.md"
+        return self.project_dir / "prompt.md"
 
     @property
     def design_md(self) -> Path:
-        return self.project_dir / "DESIGN.md"
+        return self.project_dir / "design.md"
 
     @property
     def progress_md(self) -> Path:
@@ -287,6 +312,10 @@ class Project(BaseModel):
     @property
     def tasks_toml(self) -> Path:
         return self.project_dir / "tasks.toml"
+
+    @property
+    def tasks_md(self) -> Path:
+        return self.project_dir / "tasks.md"
 
     @property
     def questions_json(self) -> Path:
@@ -304,6 +333,9 @@ class Project(BaseModel):
 
     def save_tasks(self, tasks: Tasks) -> None:
         self.tasks_toml.write_text(tomli_w.dumps(tasks.model_dump()))
+        # tasks.md is a read-only mirror for humans; every writer goes through
+        # here, so the two files can never drift.
+        self.tasks_md.write_text(tasks.to_markdown())
 
     def save_planned_tasks(self, planned: list[PlannedTask]) -> None:
         """Persist a task list straight from the planning agent.

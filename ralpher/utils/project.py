@@ -63,5 +63,5 @@ def init_project(
 
     _init_project_config(project, base_branch, target_branch)
 
-    # Save the prompt to PROMPT.md
+    # Save the prompt to prompt.md
     project.prompt_md.write_text(prompt)

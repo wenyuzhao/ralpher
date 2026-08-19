@@ -1,4 +1,11 @@
-from ralpher.models import Project, ProjectConfig, Settings, Task, Tasks
+from ralpher.models import (
+    PlannedTask,
+    Project,
+    ProjectConfig,
+    Settings,
+    Task,
+    Tasks,
+)
 
 
 class TestTask:
@@ -66,6 +73,82 @@ class TestTasks:
         tasks = Tasks.model_validate(data)
         assert len(tasks.tasks) == 1
         assert tasks.tasks[0].passes is False
+
+
+class TestTasksMarkdown:
+    def _tasks(self) -> Tasks:
+        return Tasks(
+            tasks=[
+                Task(
+                    id="T-001",
+                    title="Login",
+                    description="User can log in",
+                    acceptance_criteria=["Can enter email", "Session persists"],
+                    passes=True,
+                ),
+                Task(
+                    id="T-002",
+                    title="Signup",
+                    description="User can sign up",
+                    acceptance_criteria=["Email is validated"],
+                ),
+            ]
+        )
+
+    def test_renders_checklist_and_details(self):
+        md = self._tasks().to_markdown()
+        assert "1 of 2 complete." in md
+        assert "- [x] **T-001** — Login" in md
+        assert "- [ ] **T-002** — Signup" in md
+        assert "## T-001 — Login" in md
+        assert "**Status:** ✅ passed" in md
+        assert "**Status:** ⬜ pending" in md
+        assert "- Session persists" in md
+        assert md.endswith("\n")
+
+    def test_renders_empty_task_list(self):
+        md = Tasks(tasks=[]).to_markdown()
+        assert "0 of 0 complete." in md
+
+    def test_save_tasks_writes_markdown_mirror(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        project = Project(id="proj")
+        project.project_dir.mkdir(parents=True, exist_ok=True)
+        tasks = self._tasks()
+        project.save_tasks(tasks)
+
+        assert project.tasks_md == project.project_dir / "tasks.md"
+        assert project.tasks_md.read_text() == tasks.to_markdown()
+
+    def test_save_tasks_rewrites_markdown_mirror(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        project = Project(id="proj")
+        project.project_dir.mkdir(parents=True, exist_ok=True)
+        project.save_tasks(self._tasks())
+
+        tasks = self._tasks()
+        tasks.tasks[1].passes = True
+        project.save_tasks(tasks)
+
+        md = project.tasks_md.read_text()
+        assert "2 of 2 complete." in md
+        assert "- [ ]" not in md
+
+    def test_save_planned_tasks_writes_markdown_mirror(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        project = Project(id="proj")
+        project.project_dir.mkdir(parents=True, exist_ok=True)
+        project.save_planned_tasks(
+            [
+                PlannedTask(
+                    id="T-001",
+                    title="Login",
+                    description="User can log in",
+                    acceptance_criteria=["Can enter email"],
+                )
+            ]
+        )
+        assert "- [ ] **T-001** — Login" in project.tasks_md.read_text()
 
 
 class TestSettingsModels:

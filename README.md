@@ -2,7 +2,7 @@
 
 A CLI tool that orchestrates a coding agent for autonomous software development. Give it a prompt, and it generates a design document plus a task list, then runs iterative development loops to implement each task. It can drive either [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (default) or [Google Antigravity](https://antigravity.google) — see [Backends](#backends).
 
-Workflow: `User Prompt` ➔ `DESIGN.md` + `tasks.toml` ➔ `Ralph Wiggum Loop⁠`
+Workflow: `User Prompt` ➔ `design.md` + `tasks.toml` ➔ `Ralph Wiggum Loop⁠`
 
 ## Install
 
@@ -88,7 +88,7 @@ There is no `--extra-args` CLI flag; this is settings.toml-only.
 
 ## How it works
 
-1. **Plan generation** -- Sends your prompt to the agent, which answers with both halves of the plan in one structured response: a design document, saved to `.ralpher/projects/{project_id}/DESIGN.md`, and the ordered task list (with acceptance criteria), saved to `.ralpher/projects/{project_id}/tasks.toml`. No separate extraction pass turns prose back into tasks.
+1. **Plan generation** -- Sends your prompt to the agent, which answers with both halves of the plan in one structured response: a design document, saved to `.ralpher/projects/{project_id}/design.md`, and the ordered task list (with acceptance criteria), saved to `.ralpher/projects/{project_id}/tasks.toml`. No separate extraction pass turns prose back into tasks. A human-readable `tasks.md` is rendered next to `tasks.toml` and kept in sync on every update.
 2. **Run Ralph-loop** -- Iteratively invokes the agent to implement each failing task on a dedicated git branch (`ralph/{project_id}`), passing it the design document and the task list, then verifies the result in a fresh session and records progress.
 
 ## [Notion](https://www.notion.so/) integration

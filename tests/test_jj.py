@@ -88,7 +88,7 @@ class TestJjPrompts:
         return render_prompt(
             "iterate",
             current_task_path="/tmp/current_task.toml",
-            design_path="/tmp/DESIGN.md",
+            design_path="/tmp/design.md",
             tasks_path="/tmp/tasks.toml",
             progress_path="/tmp/progress.md",
             jj=jj,
@@ -99,7 +99,7 @@ class TestJjPrompts:
         return render_prompt(
             "verify",
             current_task_path="/tmp/current_task.toml",
-            design_path="/tmp/DESIGN.md",
+            design_path="/tmp/design.md",
             tasks_path="/tmp/tasks.toml",
             jj=jj,
         )
@@ -127,10 +127,10 @@ class TestJjPrompts:
 
     @pytest.mark.parametrize("name", ["plan", "refine"])
     def test_plan_prompts_mention_jj_only_when_enabled(self, name):
-        paths = {"prompt_path": "/tmp/PROMPT.md"}
+        paths = {"prompt_path": "/tmp/prompt.md"}
         if name == "refine":
             paths = {
-                "design_path": "/tmp/DESIGN.md",
+                "design_path": "/tmp/design.md",
                 "tasks_path": "/tmp/tasks.toml",
                 "input_path": "/tmp/in.md",
             }

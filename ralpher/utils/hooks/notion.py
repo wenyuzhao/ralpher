@@ -106,7 +106,7 @@ async def update_notion_page(project: Project, status: Status | None) -> str | N
     design_md_file = project.design_md
     design_md = design_md_file.read_text() if design_md_file.exists() else "*N/A*"
 
-    promot_md_file = project_dir / "PROMPT.md"
+    promot_md_file = project.prompt_md
     prompt_md = promot_md_file.read_text() if promot_md_file.exists() else "*N/A*"
 
     progress_md_file = project_dir / "progress.md"

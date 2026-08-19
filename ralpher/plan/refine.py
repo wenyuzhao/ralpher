@@ -28,7 +28,7 @@ def _notion_configured() -> bool:
 
 
 async def refine_plan(*, project: Project, prompt: str | None) -> str | None:
-    """Run a coding-agent session to refine DESIGN.md and tasks.toml.
+    """Run a coding-agent session to refine design.md and tasks.toml.
 
     `prompt` is the user-supplied refinement instruction. If Notion is
     configured (see `_notion_configured`), any unresolved comments under the

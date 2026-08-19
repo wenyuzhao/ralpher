@@ -183,7 +183,7 @@ class Backend(abc.ABC):
         """Run a Q&A loop until the agent returns a plan, then write it out.
 
         The plan arrives in two halves — the design document, written to
-        DESIGN.md, and the structured task list, written to tasks.toml — so no
+        design.md, and the structured task list, written to tasks.toml — so no
         separate extraction pass is needed to turn prose back into tasks.
 
         Each turn asks for a `PlanOrQuestions`: either the finished plan, or

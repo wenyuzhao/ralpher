@@ -18,7 +18,7 @@ from ralpher.utils.questions_ui import QuestionsPrompt
 class Plan(BaseModel):
     """Returned when the plan is complete: the design document plus its tasks.
 
-    The two halves are kept apart on purpose — the markdown becomes DESIGN.md
+    The two halves are kept apart on purpose — the markdown becomes design.md
     (durable documentation of *what* is being built and how) while the tasks
     become tasks.toml (scaffolding for this run only), so the design document
     must not restate the task list.
