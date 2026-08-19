@@ -1,5 +1,6 @@
 import json
 import shutil
+import tomllib
 from pathlib import Path
 from typing import Literal
 
@@ -102,10 +103,11 @@ class Settings(BaseModel):
 
     @classmethod
     def load(cls) -> Settings:
-        path = ralpher_root() / "settings.json"
+        path = ralpher_root() / "settings.toml"
         if not path.exists():
             return cls()
-        return cls.model_validate(json.loads(path.read_text()))
+        with path.open("rb") as f:
+            return cls.model_validate(tomllib.load(f))
 
 
 def resolve_backend(cli_backend: str | None) -> BackendKind:
