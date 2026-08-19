@@ -1,7 +1,7 @@
-import json
 from unittest.mock import AsyncMock, patch
 
 import pytest
+import tomli_w
 
 from ralpher.loop.iterate import ProgressReport, Result, iterate
 from ralpher.models import Project, Settings, resolve_jj
@@ -87,7 +87,7 @@ class TestJjPrompts:
     def _iterate(self, *, jj: bool) -> str:
         return render_prompt(
             "iterate",
-            current_task_path="/tmp/current_task.json",
+            current_task_path="/tmp/current_task.toml",
             plan_path="/tmp/PLAN.md",
             progress_path="/tmp/progress.md",
             jj=jj,
@@ -97,7 +97,7 @@ class TestJjPrompts:
     def _verify(self, *, jj: bool) -> str:
         return render_prompt(
             "verify",
-            current_task_path="/tmp/current_task.json",
+            current_task_path="/tmp/current_task.toml",
             plan_path="/tmp/PLAN.md",
             jj=jj,
         )
@@ -145,8 +145,8 @@ class TestIteratePassesJj:
         project.project_dir.mkdir(parents=True)
         project.current_iteration = 0
         project.current_task_id = "T-001"
-        project.tasks_json.write_text(
-            json.dumps(
+        project.tasks_toml.write_text(
+            tomli_w.dumps(
                 {
                     "tasks": [
                         {

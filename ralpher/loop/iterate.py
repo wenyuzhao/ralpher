@@ -79,7 +79,7 @@ async def implement(project: Project) -> ProgressReport:
         kind="loop",
         prompt=render_prompt(
             "iterate",
-            current_task_path=str(project.current_task_json),
+            current_task_path=str(project.current_task_toml),
             plan_path=str(project.plan_md),
             progress_path=str(project.progress_md),
             jj=project.jj,
@@ -100,7 +100,7 @@ async def verify(project: Project) -> Result:
         kind="verify",
         prompt=render_prompt(
             "verify",
-            current_task_path=str(project.current_task_json),
+            current_task_path=str(project.current_task_toml),
             plan_path=str(project.plan_md),
             jj=project.jj,
         ),
@@ -124,7 +124,7 @@ async def iterate(project: Project, hooks: HooksManager) -> None:
     )
     await hooks.on_iteration_start(i, task.id)
 
-    # save to current_task.json for claude to read
+    # save to current_task.toml for claude to read
     project.save_current_task(task)
 
     # Implement the task in one session, then verify in a fresh session so the
@@ -140,11 +140,11 @@ async def iterate(project: Project, hooks: HooksManager) -> None:
         project.progress_md, task.id, result.task_passed, result.notes
     )
 
-    # Propagate changes to tasks.json if updated
+    # Propagate changes to tasks.toml if updated
     tasks = project.load_tasks()
     assert tasks is not None
     if result.task_passed:
-        # Update the corresponding task in tasks.json
+        # Update the corresponding task in tasks.toml
         for t in tasks.tasks:
             if t.id == task.id:
                 t.passes = True

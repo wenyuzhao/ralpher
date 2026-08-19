@@ -18,16 +18,16 @@ async def prepare(project: Project, hooks: HooksManager) -> bool:
     if not project.plan_md.exists():
         fail(f"{project.plan_md} not found.")
 
-    # Extract tasks.json from PLAN.md if it doesn't exist
-    if not project.tasks_json.exists():
-        rich.print("[bold blue]Extracting tasks.json from PLAN.md[/]\n")
+    # Extract tasks.toml from PLAN.md if it doesn't exist
+    if not project.tasks_toml.exists():
+        rich.print("[bold blue]Extracting tasks.toml from PLAN.md[/]\n")
         await hooks.on_extract_start()
         try:
             await extract_tasks(project)
         except Exception as e:  # noqa: BLE001 - any extraction failure is funnelled to fail()
-            fail(f"Failed to extract tasks.json: {e!s}")
-        if not project.tasks_json.exists():
-            fail(f"{project.tasks_json} still not found after extraction.")
+            fail(f"Failed to extract tasks.toml: {e!s}")
+        if not project.tasks_toml.exists():
+            fail(f"{project.tasks_toml} still not found after extraction.")
         await hooks.on_extract_end()
 
     # Create logs directory

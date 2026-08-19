@@ -266,24 +266,25 @@ class Project(BaseModel):
         return self.project_dir / "progress.md"
 
     @property
-    def tasks_json(self) -> Path:
-        return self.project_dir / "tasks.json"
+    def tasks_toml(self) -> Path:
+        return self.project_dir / "tasks.toml"
 
     @property
     def questions_json(self) -> Path:
         return self.project_dir / "questions.json"
 
     @property
-    def current_task_json(self) -> Path:
-        return self.project_dir / "current_task.json"
+    def current_task_toml(self) -> Path:
+        return self.project_dir / "current_task.toml"
 
     def load_tasks(self) -> Tasks | None:
-        if not self.tasks_json.exists():
+        if not self.tasks_toml.exists():
             return None
-        return Tasks.model_validate(json.loads(self.tasks_json.read_text()))
+        with self.tasks_toml.open("rb") as f:
+            return Tasks.model_validate(tomllib.load(f))
 
     def save_tasks(self, tasks: Tasks) -> None:
-        self.tasks_json.write_text(tasks.model_dump_json(indent=2))
+        self.tasks_toml.write_text(tomli_w.dumps(tasks.model_dump()))
 
     def load_questions(self) -> Questions | None:
         if not self.questions_json.exists():
@@ -291,10 +292,10 @@ class Project(BaseModel):
         return Questions.model_validate(json.loads(self.questions_json.read_text()))
 
     def save_current_task(self, task: Task) -> None:
-        self.current_task_json.write_text(
-            task.model_dump_json(indent=2, exclude={"passes"})
+        self.current_task_toml.write_text(
+            tomli_w.dumps(task.model_dump(exclude={"passes"}))
         )
 
     def remove_current_task(self) -> None:
-        if self.current_task_json.exists():
-            self.current_task_json.unlink()
+        if self.current_task_toml.exists():
+            self.current_task_toml.unlink()

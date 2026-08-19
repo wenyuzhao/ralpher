@@ -191,7 +191,7 @@ class TestExtractTasks:
         await extract_tasks(project)
         call_kwargs = mock_run.call_args[1]
         assert call_kwargs["kind"] == "extract-tasks"
-        assert project.tasks_json.exists()
+        assert project.tasks_toml.exists()
 
     @patch("ralpher.plan.extract.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
@@ -207,7 +207,7 @@ class TestExtractTasks:
 
     @patch("ralpher.plan.extract.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_raises_when_tasks_json_not_created(
+    async def test_raises_when_tasks_toml_not_created(
         self, mock_run, tmp_path, monkeypatch
     ):
         monkeypatch.chdir(tmp_path)
@@ -236,7 +236,7 @@ class TestExtractTasks:
 
     @patch("ralpher.plan.extract.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_retries_on_invalid_tasks_json(self, mock_run, tmp_path, monkeypatch):
+    async def test_retries_on_invalid_tasks_toml(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         project = Project(id="retry-task")
         project.project_dir.mkdir(parents=True)

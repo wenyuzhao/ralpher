@@ -1,12 +1,12 @@
 # Extract Tasks from a Project Plan
 
-Extract all the tasks from an existing Project Plan to the tasks.json format that Ralph uses for autonomous execution.
+Extract all the tasks from an existing Project Plan to the task list format that Ralph uses for autonomous execution.
 
 ---
 
 ## The Job
 
-Take a Project Plan (markdown file or text) and convert it a list of tasks in the specified JSON format.
+Take a Project Plan (markdown file or text) and convert it a list of tasks in the specified structured format.
 
 ---
 
@@ -29,9 +29,9 @@ Each task should have the following fields:
 
 ## Conversion Rules
 
-1. **Each task becomes one JSON entry**
+1. **Each task becomes one entry**
 2. **IDs**: Sequential (T-001, T-002, etc.)
-3. **Sequential Order**: The task order in the Project Plan should be preserved in the tasks.json (no reordering)
+3. **Sequential Order**: The task order in the Project Plan should be preserved in the task list (no reordering)
 4. **All tasks**: `passes: false`
 
 ---

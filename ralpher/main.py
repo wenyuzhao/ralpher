@@ -224,21 +224,21 @@ def extract(
     project_id: Annotated[
         str | None,
         typer.Argument(
-            help="The project ID to extract JSON from. Defaults to the latest project.",
+            help="The project ID to extract tasks from. Defaults to the latest project.",
         ),
     ] = None,
     backend: BackendOption = None,
 ) -> None:
-    """Extract tasks.json for a given project ID."""
+    """Extract tasks.toml for a given project ID."""
     load_dotenv(find_dotenv(usecwd=True))
     backend_kind = _resolve_backend_or_fail(backend)
     check_prerequisites(backend_kind)
     if not project_id:
         project_id = _get_latest_project_id()
-    rich.print(f"[bold blue]Extracting tasks.json for project: [i]{project_id}[/][/]\n")
+    rich.print(f"[bold blue]Extracting tasks.toml for project: [i]{project_id}[/][/]\n")
     project = Project(id=project_id, backend=backend_kind)
     asyncio.run(extract_tasks(project=project))
-    rich.print(f"[green]✔ Extracted to .ralpher/projects/{project_id}/tasks.json[/]")
+    rich.print(f"[green]✔ Extracted to .ralpher/projects/{project_id}/tasks.toml[/]")
 
 
 @app.command()

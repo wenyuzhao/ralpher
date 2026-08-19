@@ -1,7 +1,8 @@
-import json
+import tomllib
 from unittest.mock import AsyncMock, patch
 
 import pytest
+import tomli_w
 
 from ralpher.loop.iterate import ProgressReport, Result, _append_progress, iterate
 from ralpher.loop.loop import run_ralph_loop
@@ -93,7 +94,7 @@ class TestIterate:
         project.current_task_id = "T-001"
 
         tasks_data = _make_tasks_data()
-        project.tasks_json.write_text(json.dumps(tasks_data))
+        project.tasks_toml.write_text(tomli_w.dumps(tasks_data))
         project.progress_md.write_text("# Progress\n")
 
         # implement() returns a ProgressReport; verify() returns a Result.
@@ -103,7 +104,8 @@ class TestIterate:
         ]
         await iterate(project, HooksManager([]))
 
-        updated = Tasks.model_validate(json.loads(project.tasks_json.read_text()))
+        with project.tasks_toml.open("rb") as f:
+            updated = Tasks.model_validate(tomllib.load(f))
         assert updated.tasks[0].passes is True
 
         # The implementer never touches progress.md; ralpher records its report.
@@ -119,7 +121,7 @@ class TestIterate:
         project.current_task_id = "T-001"
 
         tasks_data = _make_tasks_data()
-        project.tasks_json.write_text(json.dumps(tasks_data))
+        project.tasks_toml.write_text(tomli_w.dumps(tasks_data))
         project.progress_md.write_text("# Progress\n")
 
         mock_run.side_effect = SystemExit("Claude process returned an error.")
@@ -137,7 +139,7 @@ class TestIterate:
         project.current_task_id = "T-001"
 
         tasks_data = _make_tasks_data()
-        project.tasks_json.write_text(json.dumps(tasks_data))
+        project.tasks_toml.write_text(tomli_w.dumps(tasks_data))
         project.progress_md.write_text("# Progress\n")
 
         written_task: dict | None = None
@@ -146,7 +148,8 @@ class TestIterate:
             nonlocal written_task
             if written_task is None:
                 # First call is the implement() session — capture the file then.
-                written_task = json.loads(project.current_task_json.read_text())
+                with project.current_task_toml.open("rb") as f:
+                    written_task = tomllib.load(f)
                 return ProgressReport(notes="did the thing")
             return Result(task_passed=False)
 
@@ -168,7 +171,7 @@ class TestIterate:
         project.current_task_id = "T-001"
 
         tasks_data = _make_tasks_data()
-        project.tasks_json.write_text(json.dumps(tasks_data))
+        project.tasks_toml.write_text(tomli_w.dumps(tasks_data))
         project.progress_md.write_text("# Progress\n")
 
         mock_run.side_effect = [
@@ -212,7 +215,7 @@ class TestIterate:
         project.current_iteration = 0
         project.current_task_id = "T-001"
 
-        project.tasks_json.write_text(json.dumps(_make_tasks_data()))
+        project.tasks_toml.write_text(tomli_w.dumps(_make_tasks_data()))
         project.progress_md.write_text("# Progress\n")
 
         mock_run.side_effect = [
@@ -252,7 +255,7 @@ class TestLoop:
 
         tasks_data = _make_tasks_data()
         project.plan_md.write_text("# Plan")
-        project.tasks_json.write_text(json.dumps(tasks_data))
+        project.tasks_toml.write_text(tomli_w.dumps(tasks_data))
 
         # Each iteration: implement() returns a ProgressReport, verify() a Result.
         mock_run.side_effect = [
@@ -276,7 +279,7 @@ class TestLoop:
 
         tasks_data = _make_tasks_data()
         project.plan_md.write_text("# Plan")
-        project.tasks_json.write_text(json.dumps(tasks_data))
+        project.tasks_toml.write_text(tomli_w.dumps(tasks_data))
 
         # Two iterations × (implement + verify) == 4 run_agent calls.
         mock_run.side_effect = [
@@ -316,6 +319,6 @@ class TestLoop:
             ]
         )
         project.plan_md.write_text("# Plan")
-        project.tasks_json.write_text(json.dumps(tasks_data))
+        project.tasks_toml.write_text(tomli_w.dumps(tasks_data))
 
         await run_ralph_loop(project=project, hooks=HooksManager([]))
