@@ -65,13 +65,16 @@ async def iterate(project: Project, hooks: HooksManager) -> None:
     # Propagate changes to tasks.toml if updated
     tasks = project.load_tasks()
     assert tasks is not None
-    if result.task_passed:
-        # Update the corresponding task in tasks.toml
-        for t in tasks.tasks:
-            if t.id == task.id:
+    # Record this verdict on the corresponding task in tasks.toml: a pass flips
+    # `passed`, a failure bumps that task's running failure count.
+    for t in tasks.tasks:
+        if t.id == task.id:
+            if result.task_passed:
                 t.passed = True
-                break
-        project.save_tasks(tasks)
+            else:
+                t.failures += 1
+            break
+    project.save_tasks(tasks)
 
     # Finish iteration
     project.remove_current_task()

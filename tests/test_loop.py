@@ -114,6 +114,57 @@ class TestIterate:
 
     @patch("ralpher.agents.base.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
+    async def test_counts_verification_failures(self, mock_run, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        project = _make_project("iter-failures")
+        project.project_dir.mkdir(parents=True)
+        project.current_iteration = 0
+        project.current_task_id = "T-001"
+
+        project.tasks_toml.write_text(tomli_w.dumps(_make_tasks_data()))
+        project.progress_md.write_text("# Progress\n")
+
+        mock_run.side_effect = [
+            ProgressReport(notes="attempt one"),
+            Result(task_passed=False, notes="AC1 unmet"),
+            ProgressReport(notes="attempt two"),
+            Result(task_passed=False, notes="AC1 still unmet"),
+        ]
+        await iterate(project, HooksManager([]))
+        await iterate(project, HooksManager([]))
+
+        tasks = project.load_tasks()
+        assert tasks is not None
+        assert tasks.tasks[0].passed is False
+        assert tasks.tasks[0].failures == 2
+        assert "failures = 2" in project.tasks_toml.read_text()
+        assert "**Verification failures:** 2" in project.tasks_md.read_text()
+
+    @patch("ralpher.agents.base.run_agent", new_callable=AsyncMock)
+    @pytest.mark.asyncio
+    async def test_passing_task_records_no_failure_count(
+        self, mock_run, tmp_path, monkeypatch
+    ):
+        monkeypatch.chdir(tmp_path)
+        project = _make_project("iter-clean")
+        project.project_dir.mkdir(parents=True)
+        project.current_iteration = 0
+        project.current_task_id = "T-001"
+
+        project.tasks_toml.write_text(tomli_w.dumps(_make_tasks_data()))
+        project.progress_md.write_text("# Progress\n")
+
+        mock_run.side_effect = [
+            ProgressReport(notes="did the thing"),
+            Result(task_passed=True),
+        ]
+        await iterate(project, HooksManager([]))
+
+        assert "failures" not in project.tasks_toml.read_text()
+        assert "**Verification failures:**" not in project.tasks_md.read_text()
+
+    @patch("ralpher.agents.base.run_agent", new_callable=AsyncMock)
+    @pytest.mark.asyncio
     async def test_raises_on_claude_error(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         project = _make_project("iter-fail")

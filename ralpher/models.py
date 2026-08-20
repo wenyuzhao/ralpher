@@ -204,6 +204,12 @@ class Task(PlannedTask):
     passed: bool = Field(
         default=False, validation_alias=AliasChoices("passed", "passes")
     )
+    # How many times the verifier has failed this task, incremented once per
+    # iteration that ends in a FAILED verdict. `exclude_if` drops it from every
+    # dump while it is still zero, so a task nobody has failed serializes
+    # exactly as it did before the counter existed — no `failures` key in
+    # tasks.toml, and no failure line in tasks.md (see `Tasks.to_markdown`).
+    failures: int = Field(default=0, exclude_if=lambda v: v == 0)
 
 
 class Tasks(BaseModel):
@@ -235,6 +241,11 @@ class Tasks(BaseModel):
                 "",
                 f"**Status:** {'✅ passed' if t.passed else '⬜ pending'}",
                 "",
+            ]
+            # Only a task the verifier has actually rejected gets a count.
+            if t.failures:
+                lines += [f"**Verification failures:** {t.failures}", ""]
+            lines += [
                 t.description,
                 "",
                 "**Acceptance criteria:**",
@@ -387,13 +398,21 @@ class Project(BaseModel):
         its id stays passed instead of being implemented all over again.
         """
         existing = self.load_tasks()
-        already_passed = (
-            {t.id for t in existing.tasks if t.passed} if existing else set()
+        # Frozen tasks come back byte-identical (the refiner's `validate`
+        # enforces it), so their verification history carries over with them.
+        # A pending task may have been re-planned into different work under the
+        # same positional id, so its counter starts over.
+        passed_failures = (
+            {t.id: t.failures for t in existing.tasks if t.passed} if existing else {}
         )
         self.save_tasks(
             Tasks(
                 tasks=[
-                    Task(**t.model_dump(), passed=t.id in already_passed)
+                    Task(
+                        **t.model_dump(),
+                        passed=t.id in passed_failures,
+                        failures=passed_failures.get(t.id, 0),
+                    )
                     for t in planned
                 ]
             )
@@ -406,7 +425,7 @@ class Project(BaseModel):
 
     def save_current_task(self, task: Task) -> None:
         self.current_task_toml.write_text(
-            tomli_w.dumps(task.model_dump(exclude={"passed"}))
+            tomli_w.dumps(task.model_dump(exclude={"passed", "failures"}))
         )
 
     def remove_current_task(self) -> None:

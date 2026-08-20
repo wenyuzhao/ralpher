@@ -54,6 +54,15 @@ class TestTask:
             "passed": True,
         }
 
+    def test_failures_defaults_to_zero(self):
+        task = Task(
+            id="T-004",
+            title="Reset",
+            description="User can reset their password",
+            acceptance_criteria=[],
+        )
+        assert task.failures == 0
+
 
 class TestTasks:
     def _make_tasks(self, tasks_pass: list[bool] | None = None) -> Tasks:
@@ -99,6 +108,15 @@ class TestTasks:
         tasks = Tasks.model_validate(data)
         assert len(tasks.tasks) == 1
         assert tasks.tasks[0].passed is False
+        assert tasks.tasks[0].failures == 0
+
+    def test_dump_omits_untouched_failure_counts(self):
+        tasks = self._make_tasks([False, False])
+        tasks.tasks[1].failures = 3
+
+        dumped = tasks.model_dump()
+        assert "failures" not in dumped["tasks"][0]
+        assert dumped["tasks"][1]["failures"] == 3
 
 
 class TestTasksMarkdown:
@@ -131,6 +149,16 @@ class TestTasksMarkdown:
         assert "**Status:** ⬜ pending" in md
         assert "- Session persists" in md
         assert md.endswith("\n")
+
+    def test_renders_failure_count_only_when_non_zero(self):
+        tasks = self._tasks()
+        assert "**Verification failures:**" not in tasks.to_markdown()
+
+        tasks.tasks[1].failures = 2
+        md = tasks.to_markdown()
+        assert "**Verification failures:** 2" in md
+        # Still only on the task that has one.
+        assert md.count("**Verification failures:**") == 1
 
     def test_renders_empty_task_list(self):
         md = Tasks(tasks=[]).to_markdown()
