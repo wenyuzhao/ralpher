@@ -47,17 +47,42 @@ backend = "antigravity"
 
 The `--backend` flag wins over the `backend` key in `settings.toml`, which in turn beats the `claude-code` default. Run `claude` or `agy` once to sign in before pointing ralpher at it; `agy models` lists the model names the antigravity backend accepts.
 
-You can also pin models in `.ralpher/settings.toml`, either as a single model for all tasks or per-kind (`plan`, `refine`, `loop`, `verify`):
+You can also pin the model in `.ralpher/settings.toml`:
 
 ```toml
-# .ralpher/settings.toml — use one model for all steps
-models = "claude-3-7-sonnet"
-
-# or per-kind:
-# [models]
-# plan = "claude-3-7-sonnet"
-# verify = "claude-3-5-haiku"
+# .ralpher/settings.toml — use one model for every agent
+model = "claude-3-7-sonnet"
 ```
+
+## Agents
+
+Ralpher runs four agents, each with its own job:
+
+| Role | What it does |
+| --- | --- |
+| `planner` | Turns your prompt into `design.md` + `tasks.toml`. |
+| `refiner` | Re-plans the unfinished tasks; the completed ones are frozen. |
+| `worker` | Implements one task per loop iteration and commits it. |
+| `verifier` | Independently decides whether that task passed. |
+
+Each writes its own `{role}-{timestamp}.log` under `.ralpher/projects/{project_id}/logs/`, and each can be configured on its own in `.ralpher/settings.toml`:
+
+```toml
+# .ralpher/settings.toml
+model = "claude-3-7-sonnet"        # every agent, unless overridden below
+
+[agents.verifier]
+model = "claude-3-5-haiku"         # a cheaper second opinion
+tools = ["Read", "Grep", "Bash"]   # tool allowlist for this agent
+
+[agents.worker]
+extra_args = ["--add-dir", "/extra/path"]
+
+[agents.planner]
+max_corrections = 2                # tries before a rejected plan gives up
+```
+
+Every key is optional; unset means the agent's own default. `model` beats the global `model`, which beats the backend's default for that role. The other keys are `readonly` (deny the agent every write — on by default for `planner` and `refiner`) and, for those two only, `max_corrections`.
 
 ## Jujutsu (`jj`)
 
@@ -84,7 +109,7 @@ The flag only changes what the agent is told: it commits with `jj commit`, inspe
 extra_args = ["--add-dir", "/extra/path"]
 ```
 
-There is no `--extra-args` CLI flag; this is settings.toml-only.
+These apply to every agent; an `[agents.<role>].extra_args` list is appended after them for that agent only. There is no `--extra-args` CLI flag; this is settings.toml-only.
 
 ## How it works
 

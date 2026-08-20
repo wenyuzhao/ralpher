@@ -27,6 +27,8 @@ import json
 from pathlib import Path
 from typing import Any, ClassVar
 
+from ralpher.models import AgentRole
+
 from .base import AgentResult, Backend
 
 
@@ -41,11 +43,11 @@ class AntigravityBackend(Backend):
 
     # ``agy models`` lists the names this backend accepts. Unlike the claude
     # defaults, these pin an effort explicitly via the ``:<level>`` suffix.
-    default_models: ClassVar[dict[str, str]] = {
-        "plan": "gemini-3.7-flash:high",
-        "refine": "gemini-3.7-flash:high",
-        "loop": "gemini-3.7-flash:high",
-        "verify": "gemini-3.7-flash:high",
+    default_models: ClassVar[dict[AgentRole, str]] = {
+        "planner": "gemini-3.7-flash:high",
+        "refiner": "gemini-3.7-flash:high",
+        "worker": "gemini-3.7-flash:high",
+        "verifier": "gemini-3.7-flash:high",
     }
     effort_levels: ClassVar[tuple[str, ...]] = ("low", "medium", "high")
 
@@ -59,6 +61,7 @@ class AntigravityBackend(Backend):
         readonly: bool,
         tools: list[str] | None,
         session_id: str | None,
+        extra_args: list[str],
     ) -> list[str]:
         """Argv for one `agy` turn.
 
@@ -94,7 +97,7 @@ class AntigravityBackend(Backend):
             argv += ["--json-schema", json.dumps(schema)]
         if session_id:
             argv += ["--conversation", session_id]
-        argv += self._extra_args()
+        argv += extra_args
         return argv
 
     def read_result(self, record: dict[str, Any]) -> AgentResult | None:

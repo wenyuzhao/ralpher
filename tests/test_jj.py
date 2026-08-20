@@ -3,7 +3,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 import tomli_w
 
-from ralpher.loop.iterate import ProgressReport, Result, iterate
+from ralpher.agents import ProgressReport, Result
+from ralpher.loop.iterate import iterate
 from ralpher.models import Project, Settings, resolve_jj
 from ralpher.prompts import render_prompt
 from ralpher.utils.git import check_jj_prerequisites
@@ -142,7 +143,7 @@ class TestJjPrompts:
 class TestIteratePassesJj:
     """`Project.jj` reaches the implementation and verification prompts."""
 
-    @patch("ralpher.loop.iterate.run_agent", new_callable=AsyncMock)
+    @patch("ralpher.agents.base.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_prompts_are_rendered_with_project_jj(
         self, mock_run, tmp_path, monkeypatch

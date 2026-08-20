@@ -22,7 +22,7 @@ import json
 from pathlib import Path
 from typing import Any, ClassVar
 
-from ralpher.models import ralpher_root
+from ralpher.models import AgentRole, ralpher_root
 
 from .base import AgentResult, Backend
 
@@ -60,13 +60,13 @@ class ClaudeBackend(Backend):
     context_file = "CLAUDE.md"
 
     # None of these carry a ``:<level>`` suffix, so they run at the CLI's own
-    # default effort (``high``). Pin a model per kind in settings.toml to
+    # default effort (``high``). Pin a model per role in settings.toml to
     # override, with or without a suffix.
-    default_models: ClassVar[dict[str, str]] = {
-        "plan": "opus",
-        "refine": "opus",
-        "loop": "opus",
-        "verify": "sonnet",
+    default_models: ClassVar[dict[AgentRole, str]] = {
+        "planner": "opus",
+        "refiner": "opus",
+        "worker": "opus",
+        "verifier": "sonnet",
     }
     effort_levels: ClassVar[tuple[str, ...]] = ("low", "medium", "high", "xhigh", "max")
 
@@ -80,6 +80,7 @@ class ClaudeBackend(Backend):
         readonly: bool,
         tools: list[str] | None,
         session_id: str | None,
+        extra_args: list[str],
     ) -> list[str]:
         if readonly:
             tools = tools or READONLY_TOOLS
@@ -115,7 +116,7 @@ class ClaudeBackend(Backend):
             argv += [f"--tools={joined}", f"--allowed-tools={joined}"]
         if session_id:
             argv += ["--resume", session_id]
-        argv += self._extra_args()
+        argv += extra_args
 
         # The prompt is positional, so it goes last.
         argv.append(prompt)

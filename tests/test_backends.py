@@ -19,7 +19,7 @@ from ralpher.backend.antigravity import AntigravityBackend
 from ralpher.backend.base import MAX_PLAN_CORRECTIONS, AgentResult, Backend
 from ralpher.backend.claude import READONLY_TOOLS, ClaudeBackend
 from ralpher.backend.common import MAX_TASKS, Plan, check_task_ids
-from ralpher.models import PlannedTask, Project, Task, Tasks
+from ralpher.models import AGENT_ROLES, AgentRole, PlannedTask, Project, Task, Tasks
 
 
 class Out(BaseModel):
@@ -46,6 +46,7 @@ def _build(backend: Backend, **overrides) -> list[str]:
         "readonly": False,
         "tools": None,
         "session_id": None,
+        "extra_args": [],
     }
     kwargs.update(overrides)
     return backend.build_command(**kwargs)
@@ -86,72 +87,83 @@ class TestDispatcher:
 
 
 class TestDefaultModels:
-    """Each backend owns its own per-kind defaults and effort vocabulary."""
+    """Each backend owns its own per-role defaults and effort vocabulary."""
 
     def test_claude_defaults(self, tmp_path, monkeypatch):
         backend = get_backend(_project(tmp_path, monkeypatch))
-        assert backend._resolve_model("plan", None) == ("opus", None)
-        assert backend._resolve_model("verify", None) == ("sonnet", None)
-        assert backend._resolve_model("loop", None) == ("opus", None)
+        assert backend._resolve_model("planner", None) == ("opus", None)
+        assert backend._resolve_model("verifier", None) == ("sonnet", None)
+        assert backend._resolve_model("worker", None) == ("opus", None)
 
     def test_antigravity_defaults(self, tmp_path, monkeypatch):
         project = _project(tmp_path, monkeypatch, backend="antigravity")
         backend = get_backend(project)
-        assert backend._resolve_model("plan", None) == ("gemini-3.7-flash", "high")
-        assert backend._resolve_model("verify", None) == ("gemini-3.7-flash", "high")
+        assert backend._resolve_model("planner", None) == ("gemini-3.7-flash", "high")
+        assert backend._resolve_model("verifier", None) == ("gemini-3.7-flash", "high")
 
-    def test_every_kind_has_a_default_on_both_backends(self):
-        kinds = {"plan", "refine", "loop", "verify"}
+    def test_every_role_has_a_default_on_both_backends(self):
         for cls in BACKENDS.values():
-            assert kinds <= set(cls.default_models)
+            assert set(AGENT_ROLES) == set(cls.default_models)
 
     def test_defaults_do_not_leak_across_backends(self):
         assert ClaudeBackend.default_models != AntigravityBackend.default_models
 
-    def test_unknown_kind_has_no_default(self, tmp_path, monkeypatch):
-        backend = get_backend(_project(tmp_path, monkeypatch))
-        assert backend._resolve_model("nope", None) == (None, None)
-
     def test_explicit_model_wins(self, tmp_path, monkeypatch):
+        # The agent passes its `[agents.<role>].model` in this argument.
         backend = get_backend(_project(tmp_path, monkeypatch))
-        assert backend._resolve_model("plan", "haiku:low") == ("haiku", "low")
+        assert backend._resolve_model("planner", "haiku:low") == ("haiku", "low")
 
     def test_settings_pin_beats_the_default(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         ralpher = tmp_path / ".ralpher"
         ralpher.mkdir()
-        (ralpher / "settings.toml").write_text('[models]\nplan = "some-model:medium"\n')
+        (ralpher / "settings.toml").write_text('model = "some-model:medium"\n')
         # The pin applies whichever backend is active.
         for kind in ("claude-code", "antigravity"):
             backend = get_backend(Project(id="proj", backend=kind))
-            assert backend._resolve_model("plan", None) == ("some-model", "medium")
+            assert backend._resolve_model("planner", None) == ("some-model", "medium")
 
     def test_bare_pin_leaves_effort_to_the_cli(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         ralpher = tmp_path / ".ralpher"
         ralpher.mkdir()
-        (ralpher / "settings.toml").write_text('[models]\nplan = "some-model"\n')
+        (ralpher / "settings.toml").write_text('model = "some-model"\n')
         backend = get_backend(Project(id="proj", backend="claude-code"))
-        assert backend._resolve_model("plan", None) == ("some-model", None)
+        assert backend._resolve_model("planner", None) == ("some-model", None)
 
-    def test_settings_single_string_pin_applies_to_all_kinds(
-        self, tmp_path, monkeypatch
-    ):
+    def test_settings_pin_applies_to_every_role(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         ralpher = tmp_path / ".ralpher"
         ralpher.mkdir()
-        (ralpher / "settings.toml").write_text('models = "universal-model:low"\n')
+        (ralpher / "settings.toml").write_text('model = "universal-model:low"\n')
         for kind in ("claude-code", "antigravity"):
             backend = get_backend(Project(id="proj", backend=kind))
-            assert backend._resolve_model("plan", None) == ("universal-model", "low")
-            assert backend._resolve_model("verify", None) == (
-                "universal-model",
-                "low",
-            )
-            assert backend._resolve_model("loop", None) == (
-                "universal-model",
-                "low",
-            )
+            for role in AGENT_ROLES:
+                assert backend._resolve_model(role, None) == ("universal-model", "low")
+
+
+class TestResolveExtraArgs:
+    """The global `extra_args` and the role's own are merged, in that order."""
+
+    def _backend(self, tmp_path, monkeypatch, settings: str = "") -> Backend:
+        monkeypatch.chdir(tmp_path)
+        if settings:
+            ralpher = tmp_path / ".ralpher"
+            ralpher.mkdir()
+            (ralpher / "settings.toml").write_text(settings)
+        return get_backend(Project(id="proj", backend="claude-code"))
+
+    def test_global_only(self, tmp_path, monkeypatch):
+        backend = self._backend(tmp_path, monkeypatch, 'extra_args = ["--foo"]\n')
+        assert backend._resolve_extra_args(None) == ["--foo"]
+
+    def test_role_args_follow_the_global_ones(self, tmp_path, monkeypatch):
+        backend = self._backend(tmp_path, monkeypatch, 'extra_args = ["--foo"]\n')
+        assert backend._resolve_extra_args(["--bar"]) == ["--foo", "--bar"]
+
+    def test_role_args_without_any_global_ones(self, tmp_path, monkeypatch):
+        backend = self._backend(tmp_path, monkeypatch)
+        assert backend._resolve_extra_args(["--bar"]) == ["--bar"]
 
 
 class TestSplitEffort:
@@ -252,12 +264,9 @@ class TestClaudeCommand:
         argv = _build(get_backend(_project(tmp_path, monkeypatch)), session_id="sess-1")
         assert _flag(argv, "--resume") == "sess-1"
 
-    def test_extra_args_from_settings_precede_the_prompt(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        ralpher = tmp_path / ".ralpher"
-        ralpher.mkdir()
-        (ralpher / "settings.toml").write_text('extra_args = ["--foo", "bar"]\n')
-        argv = _build(get_backend(Project(id="proj", backend="claude-code")))
+    def test_extra_args_precede_the_prompt(self, tmp_path, monkeypatch):
+        backend = get_backend(_project(tmp_path, monkeypatch))
+        argv = _build(backend, extra_args=["--foo", "bar"])
         assert "--foo" in argv
         assert argv[argv.index("--foo") + 1] == "bar"
         # The prompt is positional, so extra args must not land after it.
@@ -356,12 +365,9 @@ class TestAntigravityCommand:
         assert "--sandbox" not in _build(get_backend(off))
         assert "--sandbox" in _build(get_backend(on))
 
-    def test_extra_args_from_settings_are_appended(self, tmp_path, monkeypatch):
-        monkeypatch.chdir(tmp_path)
-        ralpher = tmp_path / ".ralpher"
-        ralpher.mkdir()
-        (ralpher / "settings.toml").write_text('extra_args = ["--foo", "bar"]\n')
-        argv = _build(get_backend(Project(id="proj", backend="antigravity")))
+    def test_extra_args_are_appended(self, tmp_path, monkeypatch):
+        project = _project(tmp_path, monkeypatch, backend="antigravity")
+        argv = _build(get_backend(project), extra_args=["--foo", "bar"])
         assert "--foo" in argv
         assert argv[argv.index("--foo") + 1] == "bar"
 
@@ -446,13 +452,13 @@ class _StubBackend(Backend):
     kind = "claude-code"
     executable = sys.executable
     install_hint = ""
-    default_models: ClassVar[dict[str, str]] = {}
+    default_models: ClassVar[dict[AgentRole, str]] = {}
     effort_levels: ClassVar[tuple[str, ...]] = ()
 
     script: str = ""
 
     def build_command(
-        self, *, prompt, model, effort, schema, readonly, tools, session_id
+        self, *, prompt, model, effort, schema, readonly, tools, session_id, extra_args
     ):
         return [self.executable, self.script, prompt]
 
@@ -514,17 +520,19 @@ class TestSpawn:
     @pytest.mark.asyncio
     async def test_returns_validated_structured_output(self, stub):
         backend = stub(lines=[json.dumps({"type": "assistant"}), _RESULT])
-        assert await backend.run(kind="verify", prompt="go", schema=Out) == Out(value=7)
+        assert await backend.run(role="verifier", prompt="go", schema=Out) == Out(
+            value=7
+        )
 
     @pytest.mark.asyncio
     async def test_returns_none_without_a_schema(self, stub):
-        assert await stub(lines=[_RESULT]).run(kind="loop", prompt="go") is None
+        assert await stub(lines=[_RESULT]).run(role="worker", prompt="go") is None
 
     @pytest.mark.asyncio
     async def test_tees_the_stream_to_the_log(self, stub):
         backend = stub(lines=[_RESULT])
-        await backend.run(kind="loop", prompt="go")
-        logs = list((backend.project.project_dir / "logs").glob("loop-*.log"))
+        await backend.run(role="worker", prompt="go")
+        logs = list((backend.project.project_dir / "logs").glob("worker-*.log"))
         assert len(logs) == 1
         body = logs[0].read_text()
         # The initial prompt heads the log, the raw CLI stream follows.
@@ -534,8 +542,8 @@ class TestSpawn:
     @pytest.mark.asyncio
     async def test_log_records_the_command_without_the_prompt(self, stub):
         backend = stub(lines=[_RESULT])
-        await backend.run(kind="loop", prompt="go")
-        log = next((backend.project.project_dir / "logs").glob("loop-*.log"))
+        await backend.run(role="worker", prompt="go")
+        log = next((backend.project.project_dir / "logs").glob("worker-*.log"))
         command = next(
             json.loads(line)["command"]
             for line in log.read_text().splitlines()
@@ -547,32 +555,34 @@ class TestSpawn:
     @pytest.mark.asyncio
     async def test_ignores_non_json_output(self, stub):
         backend = stub(lines=["not json at all", _RESULT])
-        assert await backend.run(kind="verify", prompt="go", schema=Out) == Out(value=7)
+        assert await backend.run(role="verifier", prompt="go", schema=Out) == Out(
+            value=7
+        )
 
     @pytest.mark.asyncio
     async def test_non_zero_exit_fails(self, stub):
         backend = stub(lines=[_RESULT], code=2, stderr="boom")
         with pytest.raises(SystemExit, match="boom"):
-            await backend.run(kind="loop", prompt="go")
+            await backend.run(role="worker", prompt="go")
 
     @pytest.mark.asyncio
     async def test_missing_result_fails(self, stub):
         with pytest.raises(SystemExit, match="No result"):
             await stub(lines=[json.dumps({"type": "assistant"})]).run(
-                kind="loop", prompt="go"
+                role="worker", prompt="go"
             )
 
     @pytest.mark.asyncio
     async def test_error_result_fails(self, stub):
         line = json.dumps({"type": "result", "is_error": True, "error": "nope"})
         with pytest.raises(SystemExit, match="nope"):
-            await stub(lines=[line]).run(kind="loop", prompt="go")
+            await stub(lines=[line]).run(role="worker", prompt="go")
 
     @pytest.mark.asyncio
     async def test_missing_structured_output_fails(self, stub):
         line = json.dumps({"type": "result", "session_id": "s1"})
         with pytest.raises(SystemExit, match="structured output"):
-            await stub(lines=[line]).run(kind="verify", prompt="go", schema=Out)
+            await stub(lines=[line]).run(role="verifier", prompt="go", schema=Out)
 
 
 _PLANNED_TASK = {
@@ -644,7 +654,7 @@ class TestRunPlanMode:
             lines=[json.dumps({"type": "result", "structured_output": plan})]
         )
         backend.project.project_dir.mkdir(parents=True, exist_ok=True)
-        await backend.run_plan_mode(kind="plan", prompt="go")
+        await backend.run_plan_mode(role="planner", prompt="go")
         assert backend.project.design_md.read_text() == "# Design"
         tasks = backend.project.load_tasks()
         assert tasks is not None
@@ -677,7 +687,7 @@ class TestRunPlanMode:
                 ]
             )
         )
-        await backend.run_plan_mode(kind="plan", prompt="go")
+        await backend.run_plan_mode(role="planner", prompt="go")
         tasks = backend.project.load_tasks()
         assert tasks is not None
         assert [(t.id, t.passed) for t in tasks.tasks] == [
@@ -705,7 +715,7 @@ class TestRunPlanMode:
 
         monkeypatch.setattr(backend, "_spawn", _spawn)
         await backend.run_plan_mode(
-            kind="refine",
+            role="refiner",
             prompt="go",
             validate=lambda plan: "restore the tasks" if not plan.tasks else None,
         )
@@ -742,7 +752,7 @@ class TestRunPlanMode:
 
         monkeypatch.setattr(backend, "_spawn", _spawn)
         # The id invariant holds for every plan, so no `validate` is needed.
-        await backend.run_plan_mode(kind="plan", prompt="go")
+        await backend.run_plan_mode(role="planner", prompt="go")
 
         assert len(turns) == 2
         assert "must be `T-001`" in turns[1]
@@ -773,7 +783,7 @@ class TestRunPlanMode:
 
         monkeypatch.setattr(backend, "_spawn", _spawn)
         await backend.run_plan_mode(
-            kind="refine",
+            role="refiner",
             prompt="go",
             validate=lambda plan: (
                 None
@@ -810,7 +820,7 @@ class TestRunPlanMode:
         monkeypatch.setattr(backend, "build_command", _build)
         monkeypatch.setattr(backend, "_spawn", _spawn)
         await backend.run_plan_mode(
-            kind="refine",
+            role="refiner",
             prompt="go",
             validate=lambda plan: "restore the tasks" if not plan.tasks else None,
         )
@@ -838,7 +848,7 @@ class TestRunPlanMode:
         monkeypatch.setattr(backend, "_spawn", _spawn)
         with pytest.raises(SystemExit, match="restore the tasks"):
             await backend.run_plan_mode(
-                kind="refine", prompt="go", validate=lambda plan: "restore the tasks"
+                role="refiner", prompt="go", validate=lambda plan: "restore the tasks"
             )
 
         # The first turn plus MAX_PLAN_CORRECTIONS retries, and nothing written.
@@ -881,7 +891,7 @@ class TestRunPlanMode:
             return AgentResult(session_id="s1", structured_output=plan)
 
         monkeypatch.setattr(backend, "_spawn", _spawn)
-        await backend.run_plan_mode(kind="plan", prompt="go")
+        await backend.run_plan_mode(role="planner", prompt="go")
 
         assert turns == ["go", "answers"]
         assert backend.project.design_md.read_text() == "# Design"

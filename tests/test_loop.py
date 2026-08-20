@@ -4,7 +4,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 import tomli_w
 
-from ralpher.loop.iterate import ProgressReport, Result, _append_progress, iterate
+from ralpher.agents import ProgressReport, Result
+from ralpher.loop.iterate import _append_progress, iterate
 from ralpher.loop.loop import run_ralph_loop
 from ralpher.loop.prepare import _init_progress
 from ralpher.models import Project, ProjectConfig, Tasks
@@ -82,7 +83,7 @@ class TestProgressLog:
 
 
 class TestIterate:
-    @patch("ralpher.loop.iterate.run_agent", new_callable=AsyncMock)
+    @patch("ralpher.agents.base.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_marks_task_passed_when_current_task_passes(
         self, mock_run, tmp_path, monkeypatch
@@ -111,7 +112,7 @@ class TestIterate:
         # The implementer never touches progress.md; ralpher records its report.
         assert "did the thing" in project.progress_md.read_text()
 
-    @patch("ralpher.loop.iterate.run_agent", new_callable=AsyncMock)
+    @patch("ralpher.agents.base.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_raises_on_claude_error(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -129,7 +130,7 @@ class TestIterate:
         with pytest.raises(SystemExit):
             await iterate(project, HooksManager([]))
 
-    @patch("ralpher.loop.iterate.run_agent", new_callable=AsyncMock)
+    @patch("ralpher.agents.base.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_writes_current_task(self, mock_run, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -158,7 +159,7 @@ class TestIterate:
 
         assert written_task["id"] == "T-001"  # type: ignore
 
-    @patch("ralpher.loop.iterate.run_agent", new_callable=AsyncMock)
+    @patch("ralpher.agents.base.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_command_uses_iterate_and_verify_skills(
         self, mock_run, tmp_path, monkeypatch
@@ -203,7 +204,7 @@ class TestIterate:
             ("antigravity", "GEMINI.md", "CLAUDE.md"),
         ],
     )
-    @patch("ralpher.loop.iterate.run_agent", new_callable=AsyncMock)
+    @patch("ralpher.agents.base.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_prompt_names_the_backends_context_file(
         self, mock_run, backend, expected, other, tmp_path, monkeypatch
@@ -250,7 +251,7 @@ class TestLoop:
             await run_ralph_loop(project=project, hooks=HooksManager([]))
 
     @patch("ralpher.loop.prepare.checkout_branch")
-    @patch("ralpher.loop.iterate.run_agent", new_callable=AsyncMock)
+    @patch("ralpher.agents.base.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_completes_when_all_tasks_pass(
         self, mock_run, mock_checkout, tmp_path, monkeypatch
@@ -273,7 +274,7 @@ class TestLoop:
         assert mock_run.call_count == 2
 
     @patch("ralpher.loop.prepare.checkout_branch")
-    @patch("ralpher.loop.iterate.run_agent", new_callable=AsyncMock)
+    @patch("ralpher.agents.base.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_exits_with_error_when_max_iterations_reached(
         self, mock_run, mock_checkout, tmp_path, monkeypatch

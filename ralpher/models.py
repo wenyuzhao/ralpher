@@ -71,12 +71,46 @@ def normalize_backend(value: str) -> BackendKind:
     return _BACKEND_ALIASES[key]
 
 
+# The four jobs ralpher hands to a coding agent. Each one is an `Agent`
+# subclass in `ralpher.agents`, and the role name is its key everywhere state is
+# kept per job: the `[agents.<role>]` tables in settings.toml, each backend's
+# `default_models`, and the `{role}-{timestamp}.log` filename.
+AgentRole = Literal["planner", "refiner", "worker", "verifier"]
+
+AGENT_ROLES: tuple[AgentRole, ...] = ("planner", "refiner", "worker", "verifier")
+
+
+class AgentSettings(BaseModel):
+    """Per-role overrides from an ``[agents.<role>]`` table in settings.toml.
+
+    Every field is opt-in: unset means "whatever the `Agent` subclass declares",
+    which in turn falls back to the backend's own defaults. See
+    `ralpher.agents.base.Agent` for where each one is applied.
+    """
+
+    # Model spec for this role, optionally with a ``:<level>`` effort suffix.
+    # Beats the global `model`, which beats the backend's `default_models`.
+    model: str | None = None
+    # Deny this role's turn every write. Defaults to the role's own setting:
+    # planner and refiner run read-only, worker and verifier do not.
+    readonly: bool | None = None
+    # Tool allowlist for this role, for backends that take one (claude-code).
+    tools: list[str] | None = None
+    # Extra CLI args for this role, appended after the global `extra_args`.
+    extra_args: list[str] = []
+    # How many times a rejected plan is handed back for correction. Planning
+    # roles only; unset means `MAX_PLAN_CORRECTIONS`.
+    max_corrections: int | None = None
+
+
 class Settings(BaseModel):
-    # Per-kind model pins ("plan", "refine", "loop", "verify") or a single
-    # string applied to all kinds, overriding whichever backend is
-    # active and its `default_models`. A pin may carry a ``:<level>``
-    # reasoning-effort suffix; see `Backend.split_effort`.
-    models: dict[str, str] | str = {}
+    # One model spec for every role, overriding whichever backend is active and
+    # its `default_models`. May carry a ``:<level>`` reasoning-effort suffix;
+    # see `Backend.split_effort`. A role that wants its own model sets
+    # `[agents.<role>].model`, which wins over this.
+    model: str | None = None
+    # Per-role overrides, keyed by role name.
+    agents: dict[AgentRole, AgentSettings] = {}
     # Default coding-agent backend for this checkout. Unset, it is detected from
     # which CLI is installed (see `detect_default_backend`). Overridden per run
     # by the ``--backend`` CLI flag. Accepts aliases (e.g. "cc", "agy") via the
@@ -96,10 +130,13 @@ class Settings(BaseModel):
     # `Backend._extra_args`.
     extra_args: list[str] = []
 
-    def get_model(self, kind: str) -> str | None:
-        if isinstance(self.models, str):
-            return self.models
-        return self.models.get(kind)
+    def get_model(self, role: AgentRole) -> str | None:
+        """The model pinned for `role`: its own, else the global one, else None."""
+        return self.for_agent(role).model or self.model
+
+    def for_agent(self, role: AgentRole) -> AgentSettings:
+        """The `[agents.<role>]` table for `role`, or an all-unset one."""
+        return self.agents.get(role, AgentSettings())
 
     @field_validator("backend", mode="before")
     @classmethod

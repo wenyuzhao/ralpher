@@ -94,7 +94,7 @@ class TestGeneratePlan:
         return side_effect
 
     @patch("ralpher.plan.plan.init_project")
-    @patch("ralpher.plan.plan.run_agent_plan_mode", new_callable=AsyncMock)
+    @patch("ralpher.agents.base.run_agent_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_returns_task_id_on_success(
         self, mock_run, mock_init, tmp_path, monkeypatch
@@ -108,7 +108,7 @@ class TestGeneratePlan:
         assert result == task_id
 
     @patch("ralpher.plan.plan.init_project")
-    @patch("ralpher.plan.plan.run_agent_plan_mode", new_callable=AsyncMock)
+    @patch("ralpher.agents.base.run_agent_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_raises_on_claude_error(
         self, mock_run, mock_init, tmp_path, monkeypatch
@@ -119,7 +119,7 @@ class TestGeneratePlan:
             await generate_plan(project=Project(id="task-fail"), prompt="test")
 
     @patch("ralpher.plan.plan.init_project")
-    @patch("ralpher.plan.plan.run_agent_plan_mode", new_callable=AsyncMock)
+    @patch("ralpher.agents.base.run_agent_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_creates_task_directory_and_prompt(
         self, mock_run, mock_init, tmp_path, monkeypatch
@@ -139,7 +139,7 @@ class TestGeneratePlan:
         assert project.prompt_md.read_text() == "My feature request"
 
     @patch("ralpher.plan.plan.init_project")
-    @patch("ralpher.plan.plan.run_agent_plan_mode", new_callable=AsyncMock)
+    @patch("ralpher.agents.base.run_agent_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_calls_run_agent_with_correct_args(
         self, mock_run, mock_init, tmp_path, monkeypatch
@@ -158,7 +158,7 @@ class TestGeneratePlan:
         assert call_kwargs["project"] is project
 
     @patch("ralpher.plan.plan.init_project")
-    @patch("ralpher.plan.plan.run_agent_plan_mode", new_callable=AsyncMock)
+    @patch("ralpher.agents.base.run_agent_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_raises_when_design_not_created(
         self, mock_run, mock_init, tmp_path, monkeypatch
@@ -169,7 +169,7 @@ class TestGeneratePlan:
             await generate_plan(project=Project(id="task-no-design"), prompt="test")
 
     @patch("ralpher.plan.plan.init_project")
-    @patch("ralpher.plan.plan.run_agent_plan_mode", new_callable=AsyncMock)
+    @patch("ralpher.agents.base.run_agent_plan_mode", new_callable=AsyncMock)
     @pytest.mark.asyncio
     async def test_raises_when_tasks_not_created(
         self, mock_run, mock_init, tmp_path, monkeypatch

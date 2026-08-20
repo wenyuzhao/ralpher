@@ -1,8 +1,10 @@
 """Coding-agent backends and the dispatcher that selects between them.
 
-This package is the single abstraction boundary for invoking a coding agent.
-Callers import `run_agent` / `run_agent_plan_mode` from here and never reach
-into a specific backend; the dispatcher builds one based on ``project.backend``:
+This package is the single abstraction boundary for invoking a coding-agent
+CLI. Its callers are the agents in :mod:`ralpher.agents` — a backend is *which
+CLI runs*, an agent is *what it is asked to do* — which reach it through
+`run_agent` / `run_agent_plan_mode` and never touch a specific backend; the
+dispatcher builds one based on ``project.backend``:
 
 - ``claude-code`` → :class:`ralpher.backend.claude.ClaudeBackend` (the `claude` CLI)
 - ``antigravity`` → :class:`ralpher.backend.antigravity.AntigravityBackend` (the `agy` CLI)
@@ -19,7 +21,7 @@ from typing import overload
 
 from pydantic import BaseModel
 
-from ralpher.models import BackendKind, Project
+from ralpher.models import AgentRole, BackendKind, Project
 
 from .antigravity import AntigravityBackend
 from .base import AgentResult, Backend
@@ -61,63 +63,78 @@ def check_prerequisites(kind: BackendKind) -> None:
 @overload
 async def run_agent(
     *,
-    kind: str,
+    role: AgentRole,
     prompt: str,
     project: Project,
     model: str | None = None,
     schema: None = None,
     readonly: bool = False,
     tools: list[str] | None = None,
+    extra_args: list[str] | None = None,
 ) -> None: ...
 
 
 @overload
 async def run_agent[T: BaseModel](
     *,
-    kind: str,
+    role: AgentRole,
     prompt: str,
     project: Project,
     model: str | None = None,
     schema: type[T],
     readonly: bool = False,
     tools: list[str] | None = None,
+    extra_args: list[str] | None = None,
 ) -> T: ...
 
 
 async def run_agent[T: BaseModel](
     *,
-    kind: str,
+    role: AgentRole,
     prompt: str,
     project: Project,
     model: str | None = None,
     schema: type[T] | None = None,
     readonly: bool = False,
     tools: list[str] | None = None,
+    extra_args: list[str] | None = None,
 ) -> T | None:
-    """Run the project's selected agent to execute a prompt."""
+    """Run the project's selected backend for one turn, as `role`."""
     return await get_backend(project).run(
-        kind=kind,
+        role=role,
         prompt=prompt,
         model=model,
         schema=schema,
         readonly=readonly,
         tools=tools,
+        extra_args=extra_args,
     )
 
 
 async def run_agent_plan_mode(
     *,
-    kind: str,
+    role: AgentRole,
     prompt: str,
     project: Project,
     model: str | None = None,
     validate: Callable[[Plan], str | None] | None = None,
+    readonly: bool = True,
+    tools: list[str] | None = None,
+    extra_args: list[str] | None = None,
+    max_corrections: int | None = None,
 ) -> None:
-    """Run the project's selected agent with a Q&A loop for plan generation.
+    """Run the project's selected backend with a Q&A loop for plan generation.
 
     `validate` (see `Backend.run_plan_mode`) vets the returned plan before it is
     written; returning a message sends the agent back to fix it.
     """
     await get_backend(project).run_plan_mode(
-        kind=kind, prompt=prompt, model=model, validate=validate
+        role=role,
+        prompt=prompt,
+        model=model,
+        validate=validate,
+        readonly=readonly,
+        tools=tools,
+        extra_args=extra_args,
+        max_corrections=max_corrections,
     )

@@ -1,4 +1,9 @@
+import pytest
+from pydantic import ValidationError
+
 from ralpher.models import (
+    AGENT_ROLES,
+    AgentSettings,
     PlannedTask,
     Project,
     ProjectConfig,
@@ -173,32 +178,82 @@ class TestTasksMarkdown:
 
 
 class TestSettingsModels:
-    def test_default_empty_dict(self):
+    """`model` pins one model for every role; `[agents.<role>].model` beats it."""
+
+    def test_unset_by_default(self):
         settings = Settings()
-        assert settings.models == {}
-        assert settings.get_model("plan") is None
+        assert settings.model is None
+        assert settings.get_model("planner") is None
 
-    def test_dict_models(self):
-        settings = Settings(models={"plan": "opus", "verify": "sonnet"})
-        assert settings.get_model("plan") == "opus"
-        assert settings.get_model("verify") == "sonnet"
-        assert settings.get_model("loop") is None
+    def test_global_pin_applies_to_every_role(self):
+        settings = Settings(model="haiku:low")
+        for role in AGENT_ROLES:
+            assert settings.get_model(role) == "haiku:low"
 
-    def test_string_models(self):
-        settings = Settings(models="haiku:low")
-        assert settings.get_model("plan") == "haiku:low"
-        assert settings.get_model("verify") == "haiku:low"
-        assert settings.get_model("extract-tasks") == "haiku:low"
+    def test_role_pin_beats_the_global_one(self):
+        settings = Settings(
+            model="haiku:low", agents={"verifier": AgentSettings(model="sonnet")}
+        )
+        assert settings.get_model("verifier") == "sonnet"
+        assert settings.get_model("worker") == "haiku:low"
 
-    def test_load_string_models_from_toml(self, tmp_path, monkeypatch):
+    def test_role_pin_without_a_global_one(self):
+        settings = Settings(agents={"planner": AgentSettings(model="opus")})
+        assert settings.get_model("planner") == "opus"
+        assert settings.get_model("worker") is None
+
+    def test_load_from_toml(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         ralpher = tmp_path / ".ralpher"
         ralpher.mkdir()
-        (ralpher / "settings.toml").write_text('models = "universal-model:medium"\n')
+        (ralpher / "settings.toml").write_text(
+            'model = "universal-model:medium"\n\n[agents.verifier]\nmodel = "cheap"\n'
+        )
         settings = Settings.load()
-        assert settings.models == "universal-model:medium"
-        assert settings.get_model("plan") == "universal-model:medium"
-        assert settings.get_model("loop") == "universal-model:medium"
+        assert settings.get_model("worker") == "universal-model:medium"
+        assert settings.get_model("verifier") == "cheap"
+
+
+class TestAgentSettings:
+    """Per-role overrides beyond the model pin, from `[agents.<role>]`."""
+
+    def test_unset_roles_get_an_empty_table(self):
+        config = Settings().for_agent("worker")
+        assert config.model is None
+        assert config.readonly is None
+        assert config.tools is None
+        assert config.extra_args == []
+        assert config.max_corrections is None
+
+    def test_load_from_toml(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        ralpher = tmp_path / ".ralpher"
+        ralpher.mkdir()
+        (ralpher / "settings.toml").write_text(
+            "[agents.worker]\n"
+            'model = "opus:max"\n'
+            "readonly = false\n"
+            'tools = ["Read", "Bash"]\n'
+            'extra_args = ["--add-dir", "/extra"]\n'
+            "\n[agents.planner]\n"
+            "max_corrections = 1\n"
+        )
+        settings = Settings.load()
+        worker = settings.for_agent("worker")
+        assert worker.model == "opus:max"
+        assert worker.readonly is False
+        assert worker.tools == ["Read", "Bash"]
+        assert worker.extra_args == ["--add-dir", "/extra"]
+        assert settings.for_agent("planner").max_corrections == 1
+
+    def test_unknown_role_is_rejected(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        ralpher = tmp_path / ".ralpher"
+        ralpher.mkdir()
+        # A typo in a table name is an error, not a silently ignored table.
+        (ralpher / "settings.toml").write_text('[agents.loop]\nmodel = "opus"\n')
+        with pytest.raises(ValidationError):
+            Settings.load()
 
 
 class TestProjectConfig:

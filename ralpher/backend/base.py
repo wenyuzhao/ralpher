@@ -27,7 +27,7 @@ from typing import Any, ClassVar, overload
 import rich
 from pydantic import BaseModel
 
-from ralpher.models import BackendKind, Project, Settings
+from ralpher.models import AgentRole, BackendKind, Project, Settings
 from ralpher.utils.error import fail
 from ralpher.utils.spinner import Spinner
 
@@ -81,11 +81,12 @@ class Backend(abc.ABC):
     #: conventions ("CLAUDE.md", "GEMINI.md", …). Prompts refer to it by this
     #: name so the agent updates the file its own CLI will pick up later.
     context_file: ClassVar[str]
-    #: Per-kind default model specs for this CLI, keyed by the `kind` passed to
-    #: `run` ("plan", "refine", "loop", "verify"). A `models`
-    #: pin in settings.toml overrides these. A trailing ``:<level>`` suffix on a
-    #: spec sets the reasoning effort; a bare name leaves the CLI's own default.
-    default_models: ClassVar[dict[str, str]]
+    #: Per-role default model specs for this CLI, keyed by the `role` passed to
+    #: `run` (see `AgentRole`). A model pinned in settings.toml — globally or
+    #: under ``[agents.<role>]`` — overrides these. A trailing ``:<level>``
+    #: suffix on a spec sets the reasoning effort; a bare name leaves the CLI's
+    #: own default.
+    default_models: ClassVar[dict[AgentRole, str]]
     #: Reasoning-effort levels this CLI accepts as ``--effort``. Only these are
     #: recognized as a ``:<level>`` model suffix.
     effort_levels: ClassVar[tuple[str, ...]]
@@ -126,8 +127,13 @@ class Backend(abc.ABC):
         readonly: bool,
         tools: list[str] | None,
         session_id: str | None,
+        extra_args: list[str],
     ) -> list[str]:
-        """Full argv for one turn, including the executable itself."""
+        """Full argv for one turn, including the executable itself.
+
+        `extra_args` is already merged (global settings first, then this role's)
+        and must be appended verbatim, before any positional prompt.
+        """
 
     @abc.abstractmethod
     def read_result(self, record: dict[str, Any]) -> AgentResult | None:
@@ -139,39 +145,42 @@ class Backend(abc.ABC):
     async def run(
         self,
         *,
-        kind: str,
+        role: AgentRole,
         prompt: str,
         model: str | None = None,
         schema: None = None,
         readonly: bool = False,
         tools: list[str] | None = None,
+        extra_args: list[str] | None = None,
     ) -> None: ...
 
     @overload
     async def run[T: BaseModel](
         self,
         *,
-        kind: str,
+        role: AgentRole,
         prompt: str,
         model: str | None = None,
         schema: type[T],
         readonly: bool = False,
         tools: list[str] | None = None,
+        extra_args: list[str] | None = None,
     ) -> T: ...
 
     async def run[T: BaseModel](
         self,
         *,
-        kind: str,
+        role: AgentRole,
         prompt: str,
         model: str | None = None,
         schema: type[T] | None = None,
         readonly: bool = False,
         tools: list[str] | None = None,
+        extra_args: list[str] | None = None,
     ) -> T | None:
         """Run one turn of this backend's CLI to execute `prompt`."""
-        log_file = self._start_log(kind, prompt)
-        model_name, effort = self._resolve_model(kind, model)
+        log_file = self._start_log(role, prompt)
+        model_name, effort = self._resolve_model(role, model)
 
         argv = self.build_command(
             prompt=prompt,
@@ -181,6 +190,7 @@ class Backend(abc.ABC):
             readonly=readonly,
             tools=tools,
             session_id=None,
+            extra_args=self._resolve_extra_args(extra_args),
         )
         result = await self._spawn(argv, prompt, log_file)
 
@@ -193,10 +203,14 @@ class Backend(abc.ABC):
     async def run_plan_mode(
         self,
         *,
-        kind: str,
+        role: AgentRole,
         prompt: str,
         model: str | None = None,
         validate: Callable[[Plan], str | None] | None = None,
+        readonly: bool = True,
+        tools: list[str] | None = None,
+        extra_args: list[str] | None = None,
+        max_corrections: int | None = None,
     ) -> None:
         """Run a Q&A loop until the agent returns a plan, then write it out.
 
@@ -216,16 +230,18 @@ class Backend(abc.ABC):
         passed). Either one returning a message rejects the plan, and that
         message becomes the next turn's prompt so the agent can correct itself
         with its context intact — both messages together when both fire. After
-        `MAX_PLAN_CORRECTIONS` rejections the run fails with it instead —
-        nothing is written for a plan that never validated. A correction turn is
-        given the narrower `PlanOnly` schema: it is answering a rejection of its
-        own output, so its only move is to return a fixed plan, never to put a
-        question to the user.
+        `max_corrections` rejections (`MAX_PLAN_CORRECTIONS` unless the role
+        pins its own) the run fails with it instead — nothing is written for a
+        plan that never validated. A correction turn is given the narrower
+        `PlanOnly` schema: it is answering a rejection of its own output, so its
+        only move is to return a fixed plan, never to put a question to the user.
         """
-        log_file = self._start_log(kind, prompt)
-        model_name, effort = self._resolve_model(kind, model)
+        log_file = self._start_log(role, prompt)
+        model_name, effort = self._resolve_model(role, model)
         schema = PlanOrQuestions.model_json_schema()
         correction_schema = PlanOnly.model_json_schema()
+        limit = MAX_PLAN_CORRECTIONS if max_corrections is None else max_corrections
+        merged_extra_args = self._resolve_extra_args(extra_args)
 
         session_id: str | None = None
         current_prompt = prompt
@@ -237,9 +253,10 @@ class Backend(abc.ABC):
                 model=model_name,
                 effort=effort,
                 schema=correction_schema if corrections else schema,
-                readonly=True,
-                tools=None,
+                readonly=readonly,
+                tools=tools,
                 session_id=session_id,
+                extra_args=merged_extra_args,
             )
             result = await self._spawn(argv, current_prompt, log_file)
 
@@ -269,11 +286,11 @@ class Backend(abc.ABC):
                 problem = "\n\n".join(problems)
                 _append_log(log_file, {"rejected_plan": problem})
                 corrections += 1
-                if corrections > MAX_PLAN_CORRECTIONS:
+                if corrections > limit:
                     fail(problem)
                 rich.print(
                     f"[yellow]The returned plan was rejected; asking the agent to fix it "
-                    f"({corrections}/{MAX_PLAN_CORRECTIONS}).[/]"
+                    f"({corrections}/{limit}).[/]"
                 )
                 current_prompt = problem
                 continue
@@ -284,30 +301,32 @@ class Backend(abc.ABC):
     # --- shared plumbing --------------------------------------------------- #
 
     def _resolve_model(
-        self, kind: str, model: str | None
+        self, role: AgentRole, model: str | None
     ) -> tuple[str | None, str | None]:
-        """Model name and reasoning effort for `kind`.
+        """Model name and reasoning effort for `role`.
 
-        An explicitly passed `model` wins, else a `models` pin in settings.toml,
-        else this backend's `default_models`. Whichever it is, a trailing
-        ``:<level>`` suffix is peeled off into the effort; a spec without one
-        leaves the effort unset, so the CLI applies its own default.
+        An explicitly passed `model` wins (the agent supplies its
+        ``[agents.<role>].model`` there), else the global ``model`` pin in
+        settings.toml, else this backend's `default_models`. Whichever it is, a
+        trailing ``:<level>`` suffix is peeled off into the effort; a spec
+        without one leaves the effort unset, so the CLI applies its own default.
         """
-        spec = model or Settings.load().get_model(kind) or self.default_models.get(kind)
+        spec = model or Settings.load().get_model(role) or self.default_models.get(role)
         return self.split_effort(spec) if spec else (None, None)
 
-    def _extra_args(self) -> list[str]:
-        """Extra CLI args from the ``extra_args`` list in settings.toml.
+    def _resolve_extra_args(self, extra: list[str] | None) -> list[str]:
+        """Extra CLI args for one turn: the global ones, then this role's.
 
-        Appended verbatim by each backend's `build_command`; there is no CLI
-        flag for these, so they always come from settings.toml.
+        The global list is the ``extra_args`` key in settings.toml; the per-role
+        one comes from ``[agents.<role>]``. There is no CLI flag for either, so
+        they always come from settings.toml.
         """
-        return Settings.load().extra_args
+        return [*Settings.load().extra_args, *(extra or [])]
 
-    def _start_log(self, kind: str, prompt: str) -> Path:
+    def _start_log(self, role: AgentRole, prompt: str) -> Path:
         """Create this run's log file, seeded with the initial prompt."""
         timestamp = datetime.now().astimezone().strftime("%Y-%m-%d-%H%M%S")
-        log_file = self.project.project_dir / "logs" / f"{kind}-{timestamp}.log"
+        log_file = self.project.project_dir / "logs" / f"{role}-{timestamp}.log"
         log_file.parent.mkdir(parents=True, exist_ok=True)
         log_file.write_text(json.dumps({"initial_prompt": prompt}) + "\n\n")
         return log_file

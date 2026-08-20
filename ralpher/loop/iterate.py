@@ -2,46 +2,10 @@ from datetime import datetime
 from pathlib import Path
 
 import rich
-from pydantic import BaseModel, Field
 
-from ..backend import context_file, run_agent
+from ..agents import Verifier, Worker
 from ..models import Project
-from ..prompts import render_prompt
 from ..utils.hooks import HooksManager
-
-
-class ProgressReport(BaseModel):
-    """What the implementation session reports back about its iteration.
-
-    The agent never writes the progress log itself — `.ralpher` is read-only to
-    it — so it returns the entry it wants recorded and ralpher appends it.
-    """
-
-    notes: str = Field(
-        description=(
-            "Markdown body of this iteration's progress log entry: what was "
-            "implemented, which files changed, which quality checks were run "
-            "and their outcome (with the exact error output of any that still "
-            "fail), and learnings for future iterations. Do not include a "
-            "date/task heading or a trailing '---' separator — those are added "
-            "for you."
-        )
-    )
-
-
-class Result(BaseModel):
-    task_passed: bool = Field(
-        description="Whether the task is fully implemented and passes all checks."
-    )
-    notes: str | None = Field(
-        default=None,
-        description=(
-            "When task_passed is false, a markdown-formatted note describing "
-            "what is still incomplete, which acceptance criteria are unmet, "
-            "which checks failed and their error messages, and any hints for "
-            "the next attempt. Null or empty when task_passed is true."
-        ),
-    )
 
 
 def _append_progress(progress_md: Path, task_id: str, notes: str) -> None:
@@ -67,50 +31,6 @@ def _append_verifier_notes(
         f.write(section)
 
 
-async def implement(project: Project) -> ProgressReport:
-    """Implement the current task, returning the progress entry to record.
-
-    The session reads the progress log but never writes it: it hands its entry
-    back as structured output, which the caller appends.
-    """
-    assert project.current_iteration is not None
-
-    return await run_agent(
-        kind="loop",
-        prompt=render_prompt(
-            "iterate",
-            current_task_path=str(project.current_task_toml),
-            design_path=str(project.design_md),
-            tasks_path=str(project.tasks_toml),
-            progress_path=str(project.progress_md),
-            jj=project.jj,
-            context_file=context_file(project.backend),
-        ),
-        project=project,
-        schema=ProgressReport,
-    )
-
-
-async def verify(project: Project) -> Result:
-    """Run a fresh, non-persistent Claude session to independently verify the
-    current task. The verifier has no context from the implementation session,
-    so it cannot rubber-stamp its own work."""
-    assert project.current_iteration is not None
-
-    return await run_agent(
-        kind="verify",
-        prompt=render_prompt(
-            "verify",
-            current_task_path=str(project.current_task_toml),
-            design_path=str(project.design_md),
-            tasks_path=str(project.tasks_toml),
-            jj=project.jj,
-        ),
-        project=project,
-        schema=Result,
-    )
-
-
 async def iterate(project: Project, hooks: HooksManager) -> None:
     i = project.current_iteration
     tasks = project.load_tasks()
@@ -129,12 +49,12 @@ async def iterate(project: Project, hooks: HooksManager) -> None:
     # save to current_task.toml for claude to read
     project.save_current_task(task)
 
-    # Implement the task in one session, then verify in a fresh session so the
-    # verifier isn't biased by the implementer's context.
-    report = await implement(project)
+    # The worker implements the task in one session; the verifier then runs in a
+    # fresh one, so it isn't biased by the worker's context.
+    report = await Worker(project).run()
     _append_progress(project.progress_md, task.id, report.notes)
 
-    result = await verify(project)
+    result = await Verifier(project).run()
 
     # Always persist the verifier verdict to the progress log so the next
     # implementation iteration can see the previous status + any diagnosis.
