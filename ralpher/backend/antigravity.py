@@ -107,7 +107,7 @@ class AntigravityBackend(Backend):
         if not isinstance(result, dict):
             return None
         status = result.get("status")
-        failed = (
+        failed = status == "ERROR" or (
             status != "SUCCESS"
             and result.get("structured_output") is None
             and not result.get("response")

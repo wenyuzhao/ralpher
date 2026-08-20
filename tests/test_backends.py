@@ -442,6 +442,22 @@ class TestAntigravityReadResult:
         assert result is not None
         assert result.is_error
 
+    def test_error_status_with_response_is_an_error(self, tmp_path, monkeypatch):
+        result = self._backend(tmp_path, monkeypatch).read_result(
+            {
+                "event": "result",
+                "result": {
+                    "conversation_id": "conv-1",
+                    "status": "ERROR",
+                    "response": "An error occurred",
+                    "error": "search path does not exist",
+                },
+            }
+        )
+        assert result is not None
+        assert result.is_error
+        assert result.error == "search path does not exist"
+
 
 # --- the shared subprocess driver ------------------------------------------ #
 
@@ -474,14 +490,21 @@ class _StubBackend(Backend):
 
 
 def _stub_cli(
-    tmp_path: Path, *, lines: list[str], code: int = 0, stderr: str = ""
+    tmp_path: Path,
+    *,
+    lines: list[str],
+    code: int = 0,
+    stderr: str = "",
+    sleep_after: float = 0.0,
 ) -> str:
     """Write a stub CLI that prints `lines` to stdout and exits with `code`."""
     script = tmp_path / "stub_cli.py"
     script.write_text(
-        "import sys\n"
+        "import sys, time\n"
         f"for line in {lines!r}:\n"
         "    print(line, flush=True)\n"
+        f"if {sleep_after} > 0:\n"
+        f"    time.sleep({sleep_after})\n"
         f"sys.stderr.write({stderr!r})\n"
         f"sys.exit({code})\n"
     )
@@ -583,6 +606,16 @@ class TestSpawn:
         line = json.dumps({"type": "result", "session_id": "s1"})
         with pytest.raises(SystemExit, match="structured output"):
             await stub(lines=[line]).run(role="verifier", prompt="go", schema=Out)
+
+    @pytest.mark.asyncio
+    async def test_does_not_block_when_process_hangs_after_result(
+        self, stub, monkeypatch
+    ):
+        monkeypatch.setattr("ralpher.backend.base.PROCESS_EXIT_TIMEOUT", 0.1)
+        backend = stub(lines=[_RESULT], sleep_after=10.0)
+        assert await backend.run(role="verifier", prompt="go", schema=Out) == Out(
+            value=7
+        )
 
 
 _PLANNED_TASK = {

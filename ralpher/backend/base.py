@@ -52,6 +52,10 @@ _PROMPT_PLACEHOLDER = "<prompt>"
 # keep this small.
 MAX_PLAN_CORRECTIONS = 4
 
+# How long to wait (seconds) for the CLI process and stderr pipe to finish after
+# receiving a terminal result record or reaching EOF on stdout.
+PROCESS_EXIT_TIMEOUT = 30.0
+
 
 @dataclass(frozen=True)
 class AgentResult:
@@ -365,6 +369,7 @@ class Backend(abc.ABC):
                         parsed = self.read_result(record)
                         if parsed is not None:
                             result = parsed
+                            break
                 except ValueError:
                     # A single JSONL record longer than STREAM_LINE_LIMIT.
                     proc.kill()
@@ -372,8 +377,21 @@ class Backend(abc.ABC):
                     drain_stderr.cancel()
                     fail(f"{self.executable} emitted an oversized output record.")
 
-            stderr = (await drain_stderr).decode("utf-8", errors="replace").strip()
-            code = await proc.wait()
+            try:
+                code = await asyncio.wait_for(proc.wait(), timeout=PROCESS_EXIT_TIMEOUT)
+            except TimeoutError:
+                proc.kill()
+                await proc.wait()
+                code = 0 if result is not None else -1
+
+            try:
+                stderr_bytes = await asyncio.wait_for(
+                    drain_stderr, timeout=PROCESS_EXIT_TIMEOUT
+                )
+            except TimeoutError:
+                drain_stderr.cancel()
+                stderr_bytes = b""
+            stderr = stderr_bytes.decode("utf-8", errors="replace").strip()
 
         if stderr:
             _append_log(log_file, {"stderr": stderr})
