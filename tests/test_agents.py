@@ -142,6 +142,16 @@ class TestPrompts:
         project = _project(tmp_path, monkeypatch, jj=True)
         assert "Jujutsu" in _agent(cls, project).prompt()
 
+    def test_worker_prompt_requires_timeout(self, tmp_path, monkeypatch):
+        project = _project(tmp_path, monkeypatch)
+        prompt = Worker(project).prompt()
+        assert "timeout" in prompt.lower()
+
+    def test_verifier_prompt_requires_timeout(self, tmp_path, monkeypatch):
+        project = _project(tmp_path, monkeypatch)
+        prompt = Verifier(project).prompt()
+        assert "timeout" in prompt.lower()
+
 
 # --- declared configuration ------------------------------------------------ #
 

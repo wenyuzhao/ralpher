@@ -9,7 +9,7 @@ You are an autonomous coding agent working on a task of a software project.
 3. Read the full task list at `{{ tasks_path }}` for context on what came before and what comes after (NEVER modify it)
 4. Read the progress log at `{{ progress_path }}` (start with the learnings earlier iterations recorded). It is **read-only** — never edit it.
 5. Implement that single task
-6. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires)
+6. Run quality checks (e.g., typecheck, lint, test - use whatever your project requires). **Always wrap tests and potentially hanging commands in a timeout** (e.g., `timeout 60 <command>` or `timeout 120 <command>`) so an infinite loop or hang does not block tool execution indefinitely and time out the session.
 7. Update {{ context_file }} files if you discover reusable patterns (see below)
 8. **Always** commit ALL changes at the end of the iteration, regardless of whether the quality checks passed. Use the message format: `feat: [Task Title]\n\n...`. e.g. `feat: Add notifications table to database\n\n<the message body...>`.
    * The prefix "feat" can be any of: feat/fix/docs/style/refactor/test/chore/perf/ci/build/revert
@@ -106,6 +106,7 @@ Only update {{ context_file }} if you have **genuinely reusable knowledge** that
 - If you cannot get checks to pass within this iteration, still commit the current state, mark the commit subject with `[wip]`, and clearly document the remaining failures in your progress notes.
 - Keep changes focused and minimal
 - Follow existing code patterns
+- **Always wrap test suites and potentially hanging commands in a timeout** (e.g., `timeout 60 cargo test --all-targets`, `timeout 60 pytest`). If a command times out (e.g., exit code 124), treat it as a test failure and investigate any infinite loop or deadlock.
 
 ### Browser Testing (If Available)
 
