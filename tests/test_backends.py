@@ -313,7 +313,7 @@ class TestAntigravityCommand:
         argv = _build(get_backend(project))
         assert argv[0] == "agy"
         assert _flag(argv, "--print") == "do the thing"
-        assert _flag(argv, "--print-timeout") == "1h"
+        assert _flag(argv, "--print-timeout") == "3h"
         assert _flag(argv, "--output-format") == "stream-json"
 
     def test_workspace_is_cwd(self, tmp_path, monkeypatch):

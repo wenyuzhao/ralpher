@@ -49,18 +49,24 @@ async def iterate(project: Project, hooks: HooksManager) -> None:
     # save to current_task.toml for claude to read
     project.save_current_task(task)
 
-    # The worker implements the task in one session; the verifier then runs in a
-    # fresh one, so it isn't biased by the worker's context.
-    report = await Worker(project).run()
-    _append_progress(project.progress_md, task.id, report.notes)
+    task_passed = False
+    try:
+        # The worker implements the task in one session; the verifier then runs in a
+        # fresh one, so it isn't biased by the worker's context.
+        report = await Worker(project).run()
+        _append_progress(project.progress_md, task.id, report.notes)
 
-    result = await Verifier(project).run()
+        result = await Verifier(project).run()
+        task_passed = result.task_passed
 
-    # Always persist the verifier verdict to the progress log so the next
-    # implementation iteration can see the previous status + any diagnosis.
-    _append_verifier_notes(
-        project.progress_md, task.id, result.task_passed, result.notes
-    )
+        # Always persist the verifier verdict to the progress log so the next
+        # implementation iteration can see the previous status + any diagnosis.
+        _append_verifier_notes(
+            project.progress_md, task.id, result.task_passed, result.notes
+        )
+    except (Exception, SystemExit) as e:
+        if isinstance(e, SystemExit) and (e.code == 0 or e.code is None):
+            raise
 
     # Propagate changes to tasks.toml if updated
     tasks = project.load_tasks()
@@ -69,7 +75,7 @@ async def iterate(project: Project, hooks: HooksManager) -> None:
     # `passed`, a failure bumps that task's running failure count.
     for t in tasks.tasks:
         if t.id == task.id:
-            if result.task_passed:
+            if task_passed:
                 t.passed = True
             else:
                 t.failures += 1
@@ -78,7 +84,7 @@ async def iterate(project: Project, hooks: HooksManager) -> None:
 
     # Finish iteration
     project.remove_current_task()
-    if result.task_passed:
+    if task_passed:
         rich.print("  [green]✔ PASSED[/green]\n")
     else:
         rich.print("  [red]✘ FAILED[/red]\n")

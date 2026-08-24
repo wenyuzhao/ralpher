@@ -74,7 +74,7 @@ class AntigravityBackend(Backend):
             "--print",
             prompt,
             "--print-timeout",
-            "1h",
+            "3h",
             "--output-format",
             "stream-json",
             # Unattended runs must never block on a permission prompt. In

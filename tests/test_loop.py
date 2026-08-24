@@ -165,9 +165,11 @@ class TestIterate:
 
     @patch("ralpher.agents.base.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
-    async def test_raises_on_claude_error(self, mock_run, tmp_path, monkeypatch):
+    async def test_reports_failure_on_worker_backend_error(
+        self, mock_run, tmp_path, monkeypatch
+    ):
         monkeypatch.chdir(tmp_path)
-        project = _make_project("iter-fail")
+        project = _make_project("iter-worker-fail")
         project.project_dir.mkdir(parents=True)
         project.current_iteration = 0
         project.current_task_id = "T-001"
@@ -178,8 +180,46 @@ class TestIterate:
 
         mock_run.side_effect = SystemExit("Claude process returned an error.")
 
-        with pytest.raises(SystemExit):
-            await iterate(project, HooksManager([]))
+        await iterate(project, HooksManager([]))
+
+        tasks = project.load_tasks()
+        assert tasks is not None
+        assert tasks.tasks[0].passed is False
+        assert tasks.tasks[0].failures == 1
+        # No progress or verifier notes added when worker fails before reporting
+        assert "VERIFIER NOTES" not in project.progress_md.read_text()
+        assert not project.current_task_toml.exists()
+
+    @patch("ralpher.agents.base.run_agent", new_callable=AsyncMock)
+    @pytest.mark.asyncio
+    async def test_reports_failure_on_verifier_backend_error(
+        self, mock_run, tmp_path, monkeypatch
+    ):
+        monkeypatch.chdir(tmp_path)
+        project = _make_project("iter-verifier-fail")
+        project.project_dir.mkdir(parents=True)
+        project.current_iteration = 0
+        project.current_task_id = "T-001"
+
+        tasks_data = _make_tasks_data()
+        project.tasks_toml.write_text(tomli_w.dumps(tasks_data))
+        project.progress_md.write_text("# Progress\n")
+
+        mock_run.side_effect = [
+            ProgressReport(notes="implemented feature"),
+            SystemExit("Verifier process returned an error."),
+        ]
+
+        await iterate(project, HooksManager([]))
+
+        tasks = project.load_tasks()
+        assert tasks is not None
+        assert tasks.tasks[0].passed is False
+        assert tasks.tasks[0].failures == 1
+        # Worker progress was appended, but verifier notes were not added since verifier failed
+        assert "implemented feature" in project.progress_md.read_text()
+        assert "VERIFIER NOTES" not in project.progress_md.read_text()
+        assert not project.current_task_toml.exists()
 
     @patch("ralpher.agents.base.run_agent", new_callable=AsyncMock)
     @pytest.mark.asyncio
@@ -323,6 +363,40 @@ class TestLoop:
         ]
         await run_ralph_loop(project=project, hooks=HooksManager([]))
         assert mock_run.call_count == 2
+
+    @patch("ralpher.loop.prepare.checkout_branch")
+    @patch("ralpher.agents.base.run_agent", new_callable=AsyncMock)
+    @pytest.mark.asyncio
+    async def test_loop_retries_after_backend_error_and_succeeds(
+        self, mock_run, mock_checkout, tmp_path, monkeypatch
+    ):
+        monkeypatch.chdir(tmp_path)
+        project = _make_project("loop-retry")
+        project.project_dir.mkdir(parents=True)
+        _write_config(project)
+
+        tasks_data = _make_tasks_data()
+        project.design_md.write_text("# Design")
+        project.tasks_toml.write_text(tomli_w.dumps(tasks_data))
+
+        # Iteration 1: worker backend crashes (1 call)
+        # Iteration 2: worker succeeds, verifier passes (2 calls)
+        mock_run.side_effect = [
+            SystemExit("Backend crashed"),
+            ProgressReport(notes="recovered"),
+            Result(task_passed=True),
+        ]
+        import sys
+
+        _loop_mod = sys.modules["ralpher.loop.loop"]
+        monkeypatch.setattr(_loop_mod.asyncio, "sleep", AsyncMock())
+
+        await run_ralph_loop(project=project, hooks=HooksManager([]))
+        assert mock_run.call_count == 3
+        tasks = project.load_tasks()
+        assert tasks is not None
+        assert tasks.tasks[0].passed is True
+        assert tasks.tasks[0].failures == 1
 
     @patch("ralpher.loop.prepare.checkout_branch")
     @patch("ralpher.agents.base.run_agent", new_callable=AsyncMock)
